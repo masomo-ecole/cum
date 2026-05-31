@@ -3,7 +3,7 @@
 <head>  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>  
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Système Eleves / Enseignants</title>  
+<title>Système Scolaire Moderne</title>  
   
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>  
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>  
@@ -11,6 +11,12 @@
   
  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script> 
  <script src="https://unpkg.com/html5-qrcode"></script>
+ <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-messaging-compat.js"></script>
+
+
   
 <style>
   
@@ -72,6 +78,45 @@ button.fab{
   background-size:cover;        
 }  
 
+.new-user{
+display:flex;
+align-items:center;
+gap:12px;
+padding:12px;
+border-radius:14px;
+margin-bottom:10px;
+background:#1e1e1e;
+cursor:pointer;
+transition:0.2s;
+}
+
+.new-user:hover{
+background:#2a2a2a;
+}
+
+.new-user img{
+width:55px;
+height:55px;
+border-radius:50%;
+object-fit:cover;
+background:#333;
+}
+
+.new-user-info{
+flex:1;
+}
+
+.new-user-name{
+font-size:15px;
+font-weight:600;
+color:white;
+}
+
+.new-user-email{
+font-size:12px;
+color:#aaa;
+margin-top:3px;
+}
 
 
 #actualitesList img{
@@ -165,7 +210,21 @@ button.fab{
   display:flex;        
   flex-direction:column;        
   justify-content:center;        
-}        
+}
+.register-photo-preview{
+display:flex;
+justify-content:center;
+margin-top:15px;
+}
+
+#photoPreview{
+width:90px;
+height:90px;
+border-radius:50%;
+object-fit:cover;
+border:3px solid #ffffff22;
+}
+        
         
 /* ===== TITRES ===== */        
 h2{        
@@ -226,61 +285,157 @@ h2{
 }        
         
 /* ===== MENU WHATSAPP STYLE ===== */        
-.fab-menu{        
-  position:fixed;        
-        
-  bottom:85px;        
-  right:20px;        
-        
-  display:flex;        
-  flex-direction:column;        
-  align-items:flex-end;        
-        
-  gap:12px;        
-        
-  z-index:9998;        
-        
-  opacity:0;        
-  visibility:hidden;        
-  transform:translateY(15px);        
-        
-  transition:0.25s ease;        
-}        
+
+.fab-menu{
+
+position:fixed;
+
+right:18px;
+bottom:90px;
+
+display:none;
+flex-direction:column;
+align-items:flex-end;
+
+gap:8px;
+
+padding:0;
+
+background:transparent;
+
+width:auto;
+height:auto;
+
+z-index:9999;
+}
         
 /* affichage */        
-.fab-menu.show{        
-  opacity:1;        
-  visibility:visible;        
-  transform:translateY(0);        
-}        
+.fab-menu.show{
+display:flex;
+}
         
 /* boutons menu */        
-.fab-menu button{        
-        
-  width:auto;        
-  min-width:200px;        
-        
-  padding:12px 16px;        
-        
-  border:none;        
-  border-radius:16px;        
-        
-  background:#202c33;        
-  color:white;        
-        
-  font-size:15px;        
-  font-weight:bold;        
-        
-  display:flex;        
-  align-items:center;        
-  justify-content:flex-start;        
-        
-  box-shadow:0 5px 15px rgba(0,0,0,0.35);        
-        
-  cursor:pointer;        
-        
-  transition:0.2s;        
-}        
+.fab-menu button{
+
+all:unset;
+
+background:#1f2c34;
+
+color:white;
+
+padding:10px 14px;
+
+border-radius:14px;
+
+font-size:14px;
+
+font-weight:600;
+
+cursor:pointer;
+
+display:flex;
+
+align-items:center;
+
+gap:8px;
+
+min-width:170px;
+
+box-sizing:border-box;
+
+box-shadow:0 4px 10px rgba(0,0,0,0.25);
+
+transition:0.2s;
+
+animation:fabItemShow 0.25s ease forwards;
+opacity:0;
+transform:translateX(20px);
+
+}
+
+.fab-menu button:hover{
+background:#2a3942;
+transform:translateX(-3px);
+}
+.fab-menu button:nth-child(1){
+animation-delay:0.02s;
+}
+
+.fab-menu button:nth-child(2){
+animation-delay:0.05s;
+}
+
+.fab-menu button:nth-child(3){
+animation-delay:0.08s;
+}
+
+.fab-menu button:nth-child(4){
+animation-delay:0.11s;
+}
+
+.fab-menu button:nth-child(5){
+animation-delay:0.14s;
+}
+
+.fab-menu button:nth-child(6){
+animation-delay:0.17s;
+}
+
+.fab-menu button:nth-child(7){
+animation-delay:0.20s;
+}
+
+.fab-menu button:nth-child(8){
+animation-delay:0.23s;
+}
+
+@keyframes fabItemShow{
+
+from{
+opacity:0;
+transform:translateX(20px);
+}
+
+to{
+opacity:1;
+transform:translateX(0);
+}
+
+}
+
+.actualites-card{
+position:relative;
+}
+
+.notif-badge{
+
+position:absolute;
+
+top:10px;
+right:10px;
+
+background:red;
+
+color:white;
+
+min-width:22px;
+height:22px;
+
+padding:0 6px;
+
+border-radius:50px;
+
+display:flex;
+align-items:center;
+justify-content:center;
+
+font-size:12px;
+font-weight:bold;
+
+box-shadow:0 2px 6px rgba(0,0,0,0.3);
+
+display:none;
+}
    
 /* ACTUALITE */
 
@@ -756,6 +911,194 @@ body{
   margin-top:5px;        
 }
 
+/* ===== USERS LIST ===== */
+
+.user-card{
+display:flex;
+align-items:center;
+gap:12px;
+background:#111b21;
+padding:12px;
+margin:10px;
+border-radius:14px;
+cursor:pointer;
+transition:0.2s;
+border:1px solid #222;
+}
+
+.user-card:hover{
+background:#202c33;
+}
+
+.user-photo{
+width:55px;
+height:55px;
+border-radius:50%;
+object-fit:cover;
+border:2px solid #25D366;
+background:#333;
+}
+
+.user-info{
+display:flex;
+flex-direction:column;
+overflow:hidden;
+}
+
+.user-name{
+color:white;
+font-size:16px;
+font-weight:bold;
+}
+
+.user-email{
+color:#aaa;
+font-size:13px;
+overflow:hidden;
+text-overflow:ellipsis;
+white-space:nowrap;
+max-width:200px;
+}
+
+.status-card{
+display:flex;
+align-items:center;
+gap:12px;
+
+background:#111b21;
+
+padding:12px;
+
+margin:10px;
+
+border-radius:14px;
+
+cursor:pointer;
+
+transition:0.2s;
+}
+
+.status-card:hover{
+background:#1f2c34;
+}
+
+.status-photo{
+width:58px;
+height:58px;
+
+border-radius:50%;
+
+object-fit:cover;
+
+border:3px solid #25D366;
+}
+
+.status-info{
+display:flex;
+flex-direction:column;
+}
+
+.status-name{
+color:white;
+font-size:16px;
+font-weight:bold;
+}
+
+.status-text{
+color:#aaa;
+font-size:13px;
+margin-top:3px;
+}
+#createSchool input,
+#createSchool textarea{
+
+width:100%;
+
+margin-bottom:12px;
+
+padding:14px;
+
+border:none;
+
+border-radius:14px;
+
+background:#1f2c34;
+
+color:white;
+
+font-size:15px;
+
+box-sizing:border-box;
+}
+
+#createSchool textarea{
+
+min-height:100px;
+
+resize:none;
+}
+.export-bar{
+display:flex;
+gap:8px;
+overflow:auto;
+padding:10px 0;
+margin-bottom:10px;
+}
+
+.export-bar button{
+all:unset;
+
+background:#1f2c34;
+
+color:white;
+
+padding:10px 14px;
+
+border-radius:12px;
+
+font-size:14px;
+
+cursor:pointer;
+
+white-space:nowrap;
+}
+.reception-card{
+
+background:#1f2c34;
+
+padding:12px;
+
+border-radius:14px;
+
+margin-top:10px;
+
+color:white;
+
+line-height:1.6;
+
+border-left:4px solid #25D366;
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -880,7 +1223,18 @@ font-size:14px;
 <input id="regName" placeholder="Nom">  
 <input id="regEmail" placeholder="Email">  
 <input id="regPass" type="password" placeholder="Mot de passe (min 6)"> 
-<input type="file" id="registerPhoto" accept="image/*"> 
+<input
+type="file"
+id="registerPhoto"
+accept="image/*"
+onchange="previewRegisterPhoto(event)">
+<div class="register-photo-preview">
+
+  <img id="photoPreview"
+  src=""
+  style="display:none;">
+
+</div> 
   
 <select id="regRole">  
 <option value="eleve">Élève</option>  
@@ -1159,6 +1513,7 @@ flex:none;
 
   </div>
 
+ 
   <!-- SCANNER QR -->
   <div style="background:#111b21;padding:15px;border-radius:12px;">
 
@@ -1197,7 +1552,13 @@ flex:none;
 <textarea id="evaluation" placeholder="Évaluation" style="width:80%;height:60px;"></textarea>  
 <textarea id="remarque" placeholder="Remarques" style="width:80%;height:60px;"></textarea>  
   
-<button onclick="saveFiche()">Enregistrer</button>  
+<button onclick="saveFiche()">
+Enregistrer
+</button>
+
+<button onclick="shareFiche()">
+📤 Partager à l'école
+</button>
   
 <hr style="width:80%;">  
   
@@ -1299,19 +1660,19 @@ Retour
       <p>Ouvrir</p>
     </div>
 
-    <!-- PARAMÈTRES -->
-    <div class="dash-card" onclick="openPage('schoolSettings')">
-      ⚙️<br>
-      <b>Paramètres</b>
-      <p>Admin</p>
-    </div>
-    
-    <!-- CALENDRIER -->
-    <div class="dash-card" onclick="openPage('schoolSettings')">
-      ⚙️<br>
-      <b>Paramètres</b>
-      <p>Admin</p>
-    </div>
+    <!-- RÉCEPTION -->
+<div class="dash-card" onclick="openSchoolSettings()">
+  🏢<br>
+  <b>Réception</b>
+  <p>Administration</p>
+</div>
+
+<!-- CALENDRIER -->
+<div class="dash-card" onclick="openPage('calendarPage')">
+  📅<br>
+  <b>Calendrier</b>
+  <p>Événements scolaires</p>
+</div>
 
   </div>
 
@@ -1336,23 +1697,76 @@ Retour
 </button>
 
 </div>
+ 
     
  <!-- ===== CRÉER ÉCOLE ===== -->
 <div id="createSchool" class="page">
 
   <h2>🏫 Créer une École</h2>
 
-  <!-- Nom de l'école -->
-  <input id="schoolName" placeholder="Nom de l'école">
+  <!-- Photo école -->
+  <input
+  type="file"
+  id="schoolPhoto"
+  accept="image/*">
+
+  <!-- Nom -->
+  <input
+  id="schoolName"
+  placeholder="Nom de l'école">
+
+  <!-- Devise -->
+  <input
+  id="schoolMotto"
+  placeholder="Devise de l'école">
+
+  <!-- Adresse -->
+  <input
+  id="schoolAddress"
+  placeholder="Adresse">
+
+  <!-- Téléphone -->
+  <input
+  id="schoolPhone"
+  placeholder="Téléphone">
+
+  <!-- Email -->
+  <input
+  id="schoolEmail"
+  placeholder="Email">
+
+  <!-- Site web -->
+  <input
+  id="schoolWebsite"
+  placeholder="Site web">
+
+  <!-- Directeur -->
+  <input
+  id="schoolDirector"
+  placeholder="Nom du directeur">
+
+  <!-- Année création -->
+  <input
+  id="schoolYear"
+  placeholder="Année de création">
 
   <!-- Description -->
-  <textarea id="schoolDesc" placeholder="Description de l'école"></textarea>
+  <textarea
+  id="schoolDesc"
+  placeholder="Description de l'école"></textarea>
 
-  <!-- Bouton création -->
-  <button onclick="createSchool()">Créer l'école</button>
+  <!-- Bouton -->
+  <button onclick="createSchool()">
 
-  <!-- retour -->
-  <button onclick="back()">Retour</button>
+    Créer l'école
+
+  </button>
+
+  <button onclick="back()">
+
+    Retour
+
+  </button>
 
 </div>
 <!-- ===== MES ECOLES ===== -->
@@ -1369,6 +1783,30 @@ Retour
 <div id="studentsPage" class="page">
 
 <h2>🎓 Gestion des élèves</h2>
+<div class="export-bar">
+
+  <button onclick="printData()">
+    🖨️ Imprimer
+  </button>
+
+  <button onclick="exportTXT()">
+    📄 Texte
+  </button>
+
+  <button onclick="exportPDF()">
+    📕 PDF
+  </button>
+
+  <button onclick="exportWord()">
+    📘 Word
+  </button>
+
+  <button onclick="exportExcel()">
+    📗 Excel
+  </button>
+
+</div>
+
 
 <div style="
 background:#111b21;
@@ -1409,6 +1847,29 @@ oninput="renderStudents()">
 <div id="teachersPage" class="page">
 
   <h2>👨‍🏫 Gestion Enseignants</h2>
+  <div class="export-bar">
+
+  <button onclick="printData()">
+    🖨️ Imprimer
+  </button>
+
+  <button onclick="exportTXT()">
+    📄 Texte
+  </button>
+
+  <button onclick="exportPDF()">
+    📕 PDF
+  </button>
+
+  <button onclick="exportWord()">
+    📘 Word
+  </button>
+
+  <button onclick="exportExcel()">
+    📗 Excel
+  </button>
+
+</div>
 
   <div style="
     background:#111b21;
@@ -1436,110 +1897,187 @@ oninput="renderStudents()">
 </div>
 
 
-<div class="page" id="addActualitePage">
-
-  <div class="topBar">
-    <button onclick="back()">⬅</button>
-    <h2>➕ Nouvelle actualité</h2>
-  </div>
-
-  <div style="padding:15px;">
-
-    <input type="text"
-    id="actTitle"
-    placeholder="Titre">
-
-    <select id="actType">
-
-      <option value="announcement">
-        Annonce
-      </option>
-
-      <option value="course">
-        Cours
-      </option>
-
-      <option value="homework">
-        Devoir
-      </option>
-
-      <option value="exam">
-        Examen
-      </option>
-
-    </select>
-
-    <input type="text"
-    id="actClasse"
-    placeholder="Classe">
-
-    <input type="text"
-    id="actMatiere"
-    placeholder="Matière">
-
-    <textarea
-    id="actContent"
-    placeholder="Contenu"
-    style="height:150px;"></textarea>
-
-    <input
-    type="file"
-    id="actImage">
-
-   
-   <button onclick="saveActualite()">
-      📤 Save
-    </button>
-
-  </div>
-
-</div>
 
 <!-- ===================================== -->
 <!-- 🔥 PAGE ACTUALITÉS -->
 <!-- ===================================== -->
+
 <div class="page" id="actualitesPage">
 
-  <div class="topbar">
-    <button onclick="back()">⬅</button>
+  <div class="topBar">
+
+    <button onclick="back()">
+      ⬅
+    </button>
+
     <h2>📢 Actualités</h2>
+
   </div>
 
-  <!-- publication -->
+  <!-- Liste des publications -->
+  <div id="actualitesList"></div>
+
+  <!-- Bouton ajouter -->
+  <button
+  class="addActBtn"
+  onclick="openAddActualite()">
+
+    ➕
+
+  </button>
+
+</div>
+
+<!-- ===================================== -->
+<!-- 📢 NOUVELLE ACTUALITÉ -->
+<!-- ===================================== -->
+<div class="page" id="addActualitePage">
+
+  <!-- HEADER -->
+  <div class="topBar">
+
+    <button onclick="back()">
+      ⬅
+    </button>
+
+    <h2>
+      📢 Nouvelle publication
+    </h2>
+
+  </div>
+
+  <!-- FORMULAIRE -->
   <div style="padding:15px;">
 
+    <!-- TYPE -->
+    <label>
+      Type de publication
+    </label>
+
+    <select id="actType">
+
+      <option value="">
+        Sélectionner un type
+      </option>
+
+      <option value="announcement">
+        📢 Annonce
+      </option>
+
+      <option value="exam">
+        📝 Examen
+      </option>
+
+      <option value="homework">
+        📚 Devoir
+      </option>
+
+      <option value="alert">
+        🚨 Alerte
+      </option>
+
+      <option value="event">
+        🎉 Événement
+      </option>
+
+      <option value="meeting">
+        👥 Réunion
+      </option>
+
+      <option value="course">
+        📖 Cours
+      </option>
+
+    </select>
+
+    <!-- TITRE -->
+    <label>
+      Titre
+    </label>
+
+    <input
+    type="text"
+    id="actTitle"
+    placeholder="Exemple : Contrôle de Mathématiques">
+
+    <!-- CLASSE -->
+    <label>
+      Classe concernée
+    </label>
+
+    <input
+    type="text"
+    id="actClasse"
+    placeholder="Exemple : 8ème A">
+
+    <!-- MATIERE -->
+    <label>
+      Matière
+    </label>
+
+    <input
+    type="text"
+    id="actMatiere"
+    placeholder="Exemple : Mathématiques">
+
+    <!-- CONTENU -->
+    <label>
+      Description
+    </label>
+
     <textarea
-    id="actualiteText"
-    placeholder="Publier une information..."
+    id="actContent"
+    placeholder="Rédiger la publication..."
     style="
-    width:100%;
-    height:100px;
-    border:none;
-    border-radius:15px;
-    padding:12px;
-    background:#111b21;
-    color:white;
+    height:180px;
     resize:none;
     "></textarea>
 
-    <br><br>
+    <!-- IMAGE -->
+    <label>
+      Ajouter une image
+    </label>
 
     <input
     type="file"
-    id="actualiteFile"
+    id="actImage"
     accept="image/*">
 
-    <br><br>
+    <!-- ACTIONS -->
+    <div style="
+    display:flex;
+    gap:10px;
+    margin-top:15px;
+    ">
 
-    
-    <button onclick="saveActualite()">
-      📢 Publier
-    </button>
+      <button
+      type="button"
+      onclick="clearActualiteForm()"
+      style="
+      background:#444;
+      color:white;
+      flex:1;
+      ">
+
+        🗑 Effacer
+
+      </button>
+
+      <button
+      id="publishBtn"
+      type="button"
+      onclick="saveActualite()"
+      style="
+      flex:1;
+      ">
+
+        📤 Publier
+
+      </button>
+
+    </div>
 
   </div>
-
-  <!-- liste -->
-  <div id="actualitesList"></div>
 
 </div>
 
@@ -1547,15 +2085,26 @@ oninput="renderStudents()">
 <!-- ===================================== -->
 <!-- 🔥 PAGE COMMENTAIRES -->
 <!-- ===================================== -->
-<div class="page" id="commentsPage">
 
-  <div class="topbar">
-    <button onclick="back()">⬅</button>
-    <h2>💬 Commentaires</h2>
+<div class="page"
+id="commentsPage">
+
+  <div class="topBar">
+
+    <button onclick="back()">
+      ⬅
+    </button>
+
+    <h2>
+      💬 Commentaires
+    </h2>
+
   </div>
 
+  <!-- Liste commentaires -->
   <div id="commentsList"></div>
 
+  <!-- Saisie commentaire -->
   <div style="
   position:fixed;
   bottom:0;
@@ -1584,7 +2133,14 @@ oninput="renderStudents()">
   </div>
 
 </div>
+
+
+<!-- ===================================== -->
+<!-- 🔥 VISUALISATION IMAGE -->
+<!-- ===================================== -->
+
 <div id="imageViewer"
+
 style="
 display:none;
 position:fixed;
@@ -1597,16 +2153,93 @@ z-index:9999;
 justify-content:center;
 align-items:center;
 "
+
 onclick="closeImage()">
 
-<img id="viewerImg"
-style="
-max-width:95%;
-max-height:95%;
-border-radius:10px;
-">
+  <img
+  id="viewerImg"
+
+  style="
+  max-width:95%;
+  max-height:95%;
+  border-radius:10px;
+  ">
 
 </div>
+
+<div id="calendarPage" class="page">
+
+  <h2>📅 Calendrier scolaire</h2>
+
+  <div id="calendarEvents">
+
+    Aucun événement
+
+  </div>
+
+  <button onclick="back()">
+
+    Retour
+
+  </button>
+
+</div>
+
+<div id="schoolSettings" class="page">
+
+  <h2>🏢 Réception école</h2>
+
+  <input
+  id="editSchoolName"
+  placeholder="Nom école">
+
+  <input
+  id="editSchoolMotto"
+  placeholder="Devise">
+
+  <input
+  id="editSchoolAddress"
+  placeholder="Adresse">
+
+  <textarea
+  id="editSchoolDesc"
+  placeholder="Description"></textarea>
+
+  <button onclick="saveSchoolSettings()">
+
+    💾 Enregistrer
+
+  </button>
+  <hr>
+
+<h3>📥 Réception enseignants</h3>
+
+<div id="receptionList">
+
+Aucune fiche
+
+</div>
+
+  <button onclick="back()">
+
+    Retour
+
+  </button>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1673,6 +2306,7 @@ const firebaseConfig = {
 };  
   
 firebase.initializeApp(firebaseConfig);  
+
   
 const auth = firebase.auth();  
 const db = firebase.database();  
@@ -1681,6 +2315,7 @@ let usersList = [];
 let currentChat = null; 
 let editFicheId = null;
 let currentSchool = null;
+let inSchoolPage = false;
 let navMode = "app"; // "app" ou "school"
 let qrScanner = null;
 let isSchoolAdmin = false;
@@ -1999,25 +2634,31 @@ function listenJoinRequests(){
 }
   
 // ================= NAVIGATION =================  
+
 function go(page){
 
-  // page active actuelle
+  // ===== PAGE ACTUELLE =====
+
   let currentPage =
   document.querySelector(".page.active");
 
-  // sauvegarder historique
+  // ===== HISTORIQUE =====
+
   if(currentPage){
 
-    let currentId = currentPage.id;
+    let currentId =
+    currentPage.id;
 
-    // éviter doublons
     if(currentId !== page){
+
       pageHistory.push(currentId);
+
     }
 
   }
 
-  // changer page
+  // ===== CHANGER PAGE =====
+
   document.querySelectorAll(".page")
   .forEach(p => p.classList.remove("active"));
 
@@ -2025,37 +2666,107 @@ function go(page){
   document.getElementById(page);
 
   if(next){
+
     next.classList.add("active");
+
   }
+
+  // ===== PAGES ECOLE =====
+
+  let schoolPages = [
+
+    "schoolDashboard",
+
+    "studentsPage",
+
+    "teachersPage",
+
+    "coursesPage",
+
+    "notesPage",
+
+    "createSchool",
+
+    "schoolSettings",
+
+    "eventsPage",
+
+    "announcementsPage",
+
+    "timetablePage"
+
+  ];
+
+  inSchoolPage =
+  schoolPages.includes(page);
 
 }
 
   
 function back(){
 
-  // arrêter scanner QR
+  // ===== PAGE ACTIVE =====
+
   let activePage =
   document.querySelector(".page.active")?.id;
 
+  // ===== STOP QR =====
+
   if(activePage === "settingsPage"){
+
     stopQRScanner();
+
   }
 
-  // aucune page précédente
-  if(pageHistory.length === 0){
+  // ===== SYSTEME ECOLE =====
 
-    if(currentSchool){
+  if(inSchoolPage){
+
+    // Si déjà dashboard école
+    if(activePage === "schoolDashboard"){
+
       currentSchool = null;
+
+      inSchoolPage = false;
+
+      go("dashboard");
+
+      return;
+
     }
 
-    go("dashboard");
+    // Retour dashboard école
+    go("schoolDashboard");
+
+    if(currentSchool){
+
+      loadSchoolDashboard(currentSchool);
+
+    }
+
     return;
+
   }
 
-  // récupérer dernière page
-  let prevPage = pageHistory.pop();
+  // ===== AUCUN HISTORIQUE =====
 
-  // changer page
+  if(pageHistory.length === 0){
+
+    currentSchool = null;
+
+    go("dashboard");
+
+    return;
+
+  }
+
+  // ===== DERNIERE PAGE =====
+
+  let prevPage =
+  pageHistory.pop();
+
+  // ===== CHANGER PAGE =====
+
   document.querySelectorAll(".page")
   .forEach(p => p.classList.remove("active"));
 
@@ -2065,15 +2776,15 @@ function back(){
 
 }
   
-// ================= INSCRIPTION =================  
+// ================= INSCRIPTION =================
 
-function register(){
+async function register(){
 
   let name =
-  document.getElementById("registerName").value;
+  document.getElementById("registerName").value.trim();
 
   let email =
-  document.getElementById("registerEmail").value;
+  document.getElementById("registerEmail").value.trim();
 
   let password =
   document.getElementById("registerPassword").value;
@@ -2081,59 +2792,87 @@ function register(){
   let file =
   document.getElementById("registerPhoto").files[0];
 
-  auth.createUserWithEmailAndPassword(email,password)
+  // Vérification
+  if(!name || !email || !password){
+    showMessage("Remplis tous les champs");
+    return;
+  }
 
-  .then(async userCredential => {
+  try{
+
+    // Création compte Firebase
+    let userCredential =
+    await auth.createUserWithEmailAndPassword(email,password);
 
     let uid = userCredential.user.uid;
 
     let photo = "";
 
+    // ================= IMAGE =================
     if(file){
 
-      let reader = new FileReader();
+      // Limite image 2MB
+      if(file.size > 2 * 1024 * 1024){
 
-      reader.onload = async function(){
+        showMessage("Image trop lourde (max 2MB)");
 
-        photo = reader.result;
-
-        await saveUser();
-
-      };
-
-      reader.readAsDataURL(file);
-
-    }else{
-
-      await saveUser();
+        return;
+      }
+     
+      photo = await compressImage(file);
 
     }
 
-    async function saveUser(){
+    // ================= SAVE USER =================
+    await db.ref("users/" + uid).set({
 
-      await db.ref("users/" + uid).set({
+      uid: uid,
 
-        uid: uid,
+      name: name,
 
-        name: name,
+      email: email,
 
-        email: email,
+      photo: photo,
 
-        photo: photo,
+      role: "user",
 
-        role: "user",
+      createdAt: Date.now()
 
-        createdAt: Date.now()
+    });
 
-      });
+    showMessage("Compte créé ✅");
 
-      showMessage("Compte créé ✅");
+    go("home");
 
-    }
+  }catch(error){
+
+    console.log(error);
+
+    showMessage(error.message);
+
+  }
+
+}
+
+
+// ================= CONVERT IMAGE =================
+
+function convertToBase64(file){
+
+  return new Promise((resolve,reject)=>{
+
+    let reader = new FileReader();
+
+    reader.onload = () => resolve(reader.result);
+
+    reader.onerror = error => reject(error);
+
+    reader.readAsDataURL(file);
 
   });
 
 }
+
 function openImage(src){
 
   let win = window.open("");
@@ -2631,12 +3370,17 @@ document.getElementById("fabBtn").classList.remove("active");
 
   function newDiscussion(){
 
-  document.getElementById("fabMenu").classList.remove("show");
-  document.getElementById("fabBtn").classList.remove("active");
+  document.getElementById("fabMenu")
+  .classList.remove("show");
+
+  document.getElementById("fabBtn")
+  .classList.remove("active");
 
   go("newChat");
 
-  let box = document.getElementById("usersBox");
+  let box =
+  document.getElementById("usersBox");
+
   box.innerHTML = "Chargement...";
 
   db.ref("users").once("value").then(snap => {
@@ -2644,38 +3388,60 @@ document.getElementById("fabBtn").classList.remove("active");
     box.innerHTML = "";
 
     if(!snap.exists()){
+
       box.innerHTML = "Aucun utilisateur";
+
       return;
     }
 
     snap.forEach(child => {
 
       let uid = child.key;
+
       let user = child.val();
 
       if(uid === currentUser) return;
 
-      let div = document.createElement("div");
+      let photo =
+      user.photo ||
+      "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
-      div.style.background = "#111b21";
-      div.style.margin = "10px";
-      div.style.padding = "10px";
-      div.style.borderRadius = "10px";
-      div.style.cursor = "pointer";
+      let div =
+      document.createElement("div");
+
+      div.className = "user-card";
 
       div.innerHTML = `
-        <b>${user.name}</b><br>
-        <small>${user.email}</small>
+
+        <img
+        src="${photo}"
+        class="user-photo">
+
+        <div class="user-info">
+
+          <div class="user-name">
+            ${user.name}
+          </div>
+
+          <div class="user-email">
+            ${user.email}
+          </div>
+
+        </div>
+
       `;
 
-      div.onclick = () => startChat(uid, user.name);
+      div.onclick = () =>
+      startChat(uid, user.name);
 
       box.appendChild(div);
+
     });
 
   });
 
-}    
+}
+
     function startChat(uid, name){
 
   currentChat = uid;
@@ -2761,6 +3527,77 @@ function saveFiche(){
     loadFiches();
   });
 }
+async function shareFiche(){
+
+  // ===== INFOS =====
+
+  let fiche = {
+
+    matiere:
+    document.getElementById("matiere").value,
+
+    classe:
+    document.getElementById("classe").value,
+
+    date:
+    document.getElementById("date").value,
+
+    heure:
+    document.getElementById("heure").value,
+
+    duree:
+    document.getElementById("duree").value,
+
+    objectif:
+    document.getElementById("objectif").value,
+
+    prerequis:
+    document.getElementById("prerequis").value,
+
+    materiel:
+    document.getElementById("materiel").value,
+
+    intro:
+    document.getElementById("intro").value,
+
+    developpement:
+    document.getElementById("developpement").value,
+
+    conclusion:
+    document.getElementById("conclusion").value,
+
+    evaluation:
+    document.getElementById("evaluation").value,
+
+    remarque:
+    document.getElementById("remarque").value,
+
+    teacher: currentUser,
+
+    createdAt: Date.now()
+
+  };
+
+  // ===== SAVE RECEPTION =====
+
+  let id =
+  "fiche_" + Date.now();
+
+  await db.ref(
+
+    "schools/" +
+    currentSchool +
+    "/reception/" +
+    id
+
+  ).set(fiche);
+
+  showMessage(
+    "Fiche envoyée à la réception ✅"
+  );
+
+}
+
   
 // 🔥 CHARGER LISTE  
 function renderFiche(id, d){
@@ -3143,34 +3980,102 @@ style="cursor:pointer;"
 
 }
 
-function openStatus(){
+
+async function openStatus(){
 
   go("statusPage");
 
-  let box = document.getElementById("statusList");
+  let box =
+  document.getElementById("statusList");
+
+  box.innerHTML = "Chargement...";
+
+  let myChats = [];
+
+  // ===== RECUPERER DISCUSSIONS =====
+
+  let chatsSnap =
+  await db.ref("chats").once("value");
+
+  chatsSnap.forEach(chat => {
+
+    let key = chat.key;
+
+    if(key.includes(currentUser)){
+
+      let ids = key.split("_");
+
+      let otherUser =
+      ids.find(id => id !== currentUser);
+
+      if(otherUser){
+
+        myChats.push(otherUser);
+
+      }
+
+    }
+
+  });
+
+  // ===== RECUPERER STATUS =====
+
+  let statusSnap =
+  await db.ref("statuses").once("value");
 
   box.innerHTML = "";
 
-  db.ref("status").once("value")
-  .then(snap => {
+  if(!statusSnap.exists()){
 
-    snap.forEach(s => {
+    box.innerHTML =
+    "Aucun statut";
 
-      let d = s.val();
+    return;
+  }
 
-      box.innerHTML += `
-      <div style="
-      background:#111b21;
-      padding:10px;
-      margin:10px;
-      border-radius:10px;
-      ">
-      <b>${d.name}</b><br>
-      ${d.text}
+  statusSnap.forEach(child => {
+
+    let uid = child.key;
+
+    let status = child.val();
+
+    // ===== FILTRE CONTACTS =====
+
+    if(!myChats.includes(uid)) return;
+
+    let photo =
+    status.photo ||
+    "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+
+    let div =
+    document.createElement("div");
+
+    div.className = "status-card";
+
+    div.innerHTML = `
+
+      <img
+      src="${photo}"
+      class="status-photo">
+
+      <div class="status-info">
+
+        <div class="status-name">
+          ${status.name}
+        </div>
+
+        <div class="status-text">
+          Voir le statut
+        </div>
+
       </div>
-      `;
 
-    });
+    `;
+
+    div.onclick = () =>
+    viewStatus(uid);
+
+    box.appendChild(div);
 
   });
 
@@ -3379,41 +4284,135 @@ window.addEventListener("DOMContentLoaded", () => {
 
 });
 // ================= CREER ECOLE =================
-function createSchool(){
+async function createSchool(){
 
-  let name = document.getElementById("schoolName").value;
-  let desc = document.getElementById("schoolDesc").value;
+  let name =
+  document.getElementById("schoolName").value.trim();
 
-  if(!name) return showMessage("Nom requis");
+  let motto =
+  document.getElementById("schoolMotto").value.trim();
 
-  let schoolId = "school_" + Date.now();
+  let address =
+  document.getElementById("schoolAddress").value.trim();
 
-  db.ref("schools/" + schoolId).set({
+  let phone =
+  document.getElementById("schoolPhone").value.trim();
+
+  let email =
+  document.getElementById("schoolEmail").value.trim();
+
+  let website =
+  document.getElementById("schoolWebsite").value.trim();
+
+  let director =
+  document.getElementById("schoolDirector").value.trim();
+
+  let year =
+  document.getElementById("schoolYear").value.trim();
+
+  let desc =
+  document.getElementById("schoolDesc").value.trim();
+
+  let file =
+  document.getElementById("schoolPhoto").files[0];
+
+  if(!name){
+
+    return showMessage("Nom requis");
+
+  }
+
+  let schoolId =
+  "school_" + Date.now();
+
+  let photo = "";
+
+  // ===== IMAGE =====
+
+  if(file){
+
+    photo =
+    await compressImage(file);
+
+  }
+
+  // ===== SAVE =====
+
+  await db.ref("schools/" + schoolId).set({
 
     info: {
-      name,
+
+      id: schoolId,
+
+      name: name,
+
+      motto: motto,
+
+      address: address,
+
+      phone: phone,
+
+      email: email,
+
+      website: website,
+
+      director: director,
+
+      year: year,
+
       description: desc,
+
+      photo: photo,
+
       createdBy: currentUser,
+
       createdAt: Date.now()
+
     },
 
     admins: {
+
       [currentUser]: true
+
     },
 
     students: {},
+
     teachers: {},
+
     courses: {},
-    notes: {}
+
+    notes: {},
+
+    events: {},
+
+    announcements: {},
+
+    timetable: {}
+
   });
 
-  db.ref("users/" + currentUser + "/schools/" + schoolId).set(true);
+  // ===== USER SCHOOL =====
+
+  await db.ref(
+
+    "users/" +
+    currentUser +
+    "/schools/" +
+    schoolId
+
+  ).set(true);
 
   currentSchool = schoolId;
-  
+
+  showMessage("École créée ✅");
+
   go("schoolDashboard");
+
   loadSchoolDashboard(schoolId);
+
 }
+
 function checkAdminRole(){
 
   let user = firebase.auth().currentUser;
@@ -4271,109 +5270,114 @@ function openActualites(){
 // ==========================================
 
 
+
 async function saveActualite(){
 
   try{
 
-    // 🔒 Vérification accès
-    if(!auth.currentUser){
+    // ===== SECURITE =====
 
+    if(!auth.currentUser){
       showMessage("❌ Connexion requise");
       return;
-
     }
 
     if(!currentSchool){
-
       showMessage("❌ Aucune école");
       return;
-
     }
 
-    // 📝 Champs
-    let title =
+    // ===== VERIFICATION ROLE =====
+
+    if(
+      !isSchoolAdmin &&
+      !["teacher","admin"]
+      .includes(usersList[currentUser]?.role)
+    ){
+      showMessage("❌ Accès refusé");
+      return;
+    }
+
+    // ===== CHAMPS =====
+
+    const title =
     document.getElementById("actTitle")
-    ?.value
-    ?.trim();
+    ?.value.trim();
 
-    let type =
+    const type =
     document.getElementById("actType")
-    ?.value
-    ?.trim();
+    ?.value.trim();
 
-    let classe =
+    const classe =
     document.getElementById("actClasse")
-    ?.value
-    ?.trim();
+    ?.value.trim() || "";
 
-    let matiere =
+    const matiere =
     document.getElementById("actMatiere")
-    ?.value
-    ?.trim();
+    ?.value.trim() || "";
 
-    let content =
+    const content =
     document.getElementById("actContent")
-    ?.value
-    ?.trim();
+    ?.value.trim();
 
-    let file =
+    const file =
     document.getElementById("actImage")
     ?.files[0];
 
-    // ✅ Vérification contenu
-    if(!title){
+    // ===== VALIDATION =====
 
+    if(!title){
       showMessage("❌ Titre requis");
       return;
+    }
 
+    if(!type){
+      showMessage("❌ Choisir un type");
+      return;
     }
 
     if(!content){
-
-      showMessage("❌ Écris un message");
+      showMessage("❌ Contenu requis");
       return;
-
     }
 
-    // 🔄 bouton loading
-    let btn =
+    // ===== BOUTON =====
+
+    const btn =
     document.getElementById("publishBtn");
 
     if(btn){
-
       btn.disabled = true;
-      btn.innerHTML = "Publication...";
-
+      btn.innerHTML = "⏳ Publication...";
     }
 
-    // 👤 infos utilisateur
-    let user =
+    // ===== INFOS AUTEUR =====
+
+    const user =
     auth.currentUser;
 
-    let userSnap =
+    const userSnap =
     await db.ref(
       "users/" + user.uid
     ).once("value");
 
-    let userData =
+    const userData =
     userSnap.val() || {};
 
-    // 🖼 upload image
+    // ===== IMAGE =====
+
     let imageUrl = "";
 
     if(file){
 
-      let ext =
-      file.name.split(".").pop();
-
-      let fileName =
+      const fileName =
       "act_" +
       Date.now() +
-      "." + ext;
+      "_" +
+      file.name;
 
-      let storageRef =
-      storage
-      .ref(
+      const storageRef =
+      storage.ref(
         "actualites/" +
         currentSchool +
         "/" +
@@ -4387,43 +5391,56 @@ async function saveActualite(){
 
     }
 
-    // 🆔 ID actualité
-    let id =
+    // ===== ID =====
+
+    const id =
     "act_" + Date.now();
 
-    // 💾 Sauvegarde Firebase
+    // ===== ROLE AFFICHAGE =====
+
+    let authorRole =
+    userData.role || "teacher";
+
+    // ===== ENREGISTREMENT =====
+
     await db.ref(
       "schools/" +
       currentSchool +
       "/actualites/" +
       id
-    )
-    .set({
+    ).set({
 
       id:id,
 
       title:title,
-      type:type || "actualite",
 
-      classe:classe || "",
-      matiere:matiere || "",
+      type:type,
+
+      classe:classe,
+
+      matiere:matiere,
 
       content:content,
 
-      image:imageUrl || "",
+      image:imageUrl,
 
       authorId:user.uid,
 
-      
       authorName:
       userData.name ||
-      "Utilisateur",
+      user.displayName ||
+      "Inconnu",
 
       authorPhoto:
       userData.photo ||
       "",
 
-      createdAt:Date.now(),
+      authorRole:
+      authorRole,
+
+      createdAt:
+      firebase.database
+      .ServerValue.TIMESTAMP,
 
       edited:false,
 
@@ -4437,7 +5454,8 @@ async function saveActualite(){
 
     });
 
-    // 🧹 vider formulaire
+    // ===== NETTOYAGE =====
+
     document.getElementById("actTitle").value = "";
 
     document.getElementById("actContent").value = "";
@@ -4448,50 +5466,55 @@ async function saveActualite(){
 
     document.getElementById("actImage").value = "";
 
-    // 🔄 remettre bouton
-    if(btn){
+    document.getElementById("actType").selectedIndex = 0;
 
-      btn.disabled = false;
-      btn.innerHTML = "📤 Publier";
+    // ===== MESSAGE =====
 
-    }
-
-    // ✅ message
     showMessage(
-      "✅ Actualité publiée"
+      "✅ Publication envoyée"
     );
 
-    // 🔄 reload
-    renderActualites();
+    // ===== RETOUR =====
 
-    // 🔙 retour liste
-    if(typeof closeCreateActualite === "function"){
+    go("actualitesPage");
 
-      closeCreateActualite();
+    if(typeof loadActualites === "function"){
+      loadActualites();
+    }
 
+    if(typeof checkActualitesNotif === "function"){
+      checkActualitesNotif();
     }
 
   }
 
-  catch(err){
+  catch(error){
 
-    console.log(err);
+    console.error(error);
 
     showMessage(
-      "❌ Erreur publication"
+      "❌ Erreur de publication"
     );
 
-    let btn =
-    document.getElementById("publishBtn");
+  }
 
-    if(btn){
+  finally{
 
-      btn.disabled = false;
-      btn.innerHTML = "📤 Publier";
+  const btn =
+  document.getElementById(
+    "publishBtn"
+  );
 
-    }
+  if(btn){
+
+    btn.disabled = false;
+
+    btn.textContent =
+    "📤 Publier";
 
   }
+
+}
 
 }
 
@@ -5785,6 +6808,461 @@ function sendSchoolMessage(){
   input.value = "";
 
 }
+function previewRegisterPhoto(event){
+
+  let file = event.target.files[0];
+
+  if(!file) return;
+
+  let reader = new FileReader();
+
+  reader.onload = function(e){
+
+    let img =
+    document.getElementById("photoPreview");
+
+    img.src = e.target.result;
+
+    img.style.display = "block";
+
+  };
+
+  reader.readAsDataURL(file);
+
+}
+async function compressImage(file){
+
+  return new Promise((resolve)=>{
+
+    let reader = new FileReader();
+
+    reader.readAsDataURL(file);
+
+    reader.onload = function(event){
+
+      let img = new Image();
+
+      img.src = event.target.result;
+
+      img.onload = function(){
+
+        let canvas =
+        document.createElement("canvas");
+
+        let maxWidth = 500;
+
+        let scale =
+        maxWidth / img.width;
+
+        canvas.width = maxWidth;
+
+        canvas.height =
+        img.height * scale;
+
+        let ctx =
+        canvas.getContext("2d");
+
+        ctx.drawImage(
+          img,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        let compressed =
+        canvas.toDataURL(
+          "image/jpeg",
+          0.7
+        );
+
+        resolve(compressed);
+
+      };
+
+    };
+
+  });
+
+}
+// ===== PRINT =====
+
+function printData(){
+
+  window.print();
+
+}
+
+// ===== TXT =====
+
+function exportTXT(){
+
+  let text =
+  document.body.innerText;
+
+  let blob =
+  new Blob([text],{
+    type:"text/plain"
+  });
+
+  let a =
+  document.createElement("a");
+
+  a.href =
+  URL.createObjectURL(blob);
+
+  a.download =
+  "document.txt";
+
+  a.click();
+
+}
+
+// ===== PDF =====
+
+async function exportPDF(){
+
+  const { jsPDF } = window.jspdf;
+
+  let doc = new jsPDF();
+
+  doc.text(
+    document.body.innerText,
+    10,
+    10
+  );
+
+  doc.save("document.pdf");
+
+}
+
+// ===== WORD =====
+
+function exportWord(){
+
+  let content =
+  document.body.innerHTML;
+
+  let blob =
+  new Blob([content],{
+    type:"application/msword"
+  });
+
+  let a =
+  document.createElement("a");
+
+  a.href =
+  URL.createObjectURL(blob);
+
+  a.download =
+  "document.doc";
+
+  a.click();
+
+}
+
+// ===== EXCEL =====
+
+function exportExcel(){
+
+  let table =
+  document.querySelector("table");
+
+  let wb =
+  XLSX.utils.table_to_book(table);
+
+  XLSX.writeFile(
+    wb,
+    "document.xlsx"
+  );
+
+}
+
+async function openSchoolSettings(){
+
+  let adminSnap =
+  await db.ref(
+
+    "schools/" +
+    currentSchool +
+    "/admins/" +
+    currentUser
+
+  ).once("value");
+
+  // PAS ADMIN
+  if(!adminSnap.exists()){
+
+    return showMessage(
+      "Accès administrateur requis"
+    );
+
+  }
+
+  go("schoolSettings");
+
+  loadSchoolSettings();
+  loadReception();
+
+}
+async function saveSchoolSettings(){
+
+  let updates = {
+
+    "info/name":
+    document
+    .getElementById("editSchoolName")
+    .value,
+
+    "info/motto":
+    document
+    .getElementById("editSchoolMotto")
+    .value,
+
+    "info/address":
+    document
+    .getElementById("editSchoolAddress")
+    .value,
+
+    "info/description":
+    document
+    .getElementById("editSchoolDesc")
+    .value
+
+  };
+
+  await db.ref(
+    "schools/" + currentSchool
+  ).update(updates);
+
+  showMessage(
+    "Informations modifiées ✅"
+  );
+
+}
+async function loadSchoolSettings(){
+
+  let snap =
+  await db.ref(
+    "schools/" + currentSchool + "/info"
+  ).once("value");
+
+  if(!snap.exists()) return;
+
+  let info = snap.val();
+
+  // ===== INPUTS =====
+
+  document.getElementById(
+    "editSchoolName"
+  ).value =
+  info.name || "";
+
+  document.getElementById(
+    "editSchoolMotto"
+  ).value =
+  info.motto || "";
+
+  document.getElementById(
+    "editSchoolAddress"
+  ).value =
+  info.address || "";
+
+  document.getElementById(
+    "editSchoolDesc"
+  ).value =
+  info.description || "";
+
+}
+async function loadReception(){
+
+  let box =
+  document.getElementById(
+    "receptionList"
+  );
+
+  box.innerHTML =
+  "Chargement...";
+
+  let snap =
+  await db.ref(
+
+    "schools/" +
+    currentSchool +
+    "/reception"
+
+  ).once("value");
+
+  if(!snap.exists()){
+
+    box.innerHTML =
+    "Aucune fiche reçue";
+
+    return;
+
+  }
+
+  box.innerHTML = "";
+
+  snap.forEach(child => {
+
+    let fiche =
+    child.val();
+
+    let div =
+    document.createElement("div");
+
+    div.className =
+    "reception-card";
+
+    div.innerHTML = `
+
+      <b>${fiche.matiere}</b><br>
+
+      Classe :
+      ${fiche.classe}<br>
+
+      Date :
+      ${fiche.date}<br>
+
+      Heure :
+      ${fiche.heure}
+
+    `;
+
+    box.appendChild(div);
+
+  });
+
+}
+
+async function checkActualitesNotif(){
+
+  if(!currentSchool) return;
+
+  const badge =
+  document.getElementById(
+    "actualitesBadge"
+  );
+
+  // Si le badge n'existe pas
+  if(!badge) return;
+
+  try{
+
+    const snap =
+    await db.ref(
+      "schools/" +
+      currentSchool +
+      "/actualites"
+    ).once("value");
+
+    const total =
+    snap.exists()
+    ? snap.numChildren()
+    : 0;
+
+    const readSnap =
+    await db.ref(
+      "users/" +
+      currentUser +
+      "/actualitesRead/" +
+      currentSchool
+    ).once("value");
+
+    const read =
+    readSnap.val() || 0;
+
+    const unread =
+    Math.max(0, total - read);
+
+    if(unread > 0){
+
+      badge.style.display =
+      "flex";
+
+      badge.textContent =
+      unread;
+
+    }else{
+
+      badge.style.display =
+      "none";
+
+      badge.textContent =
+      "";
+
+    }
+
+  }catch(error){
+
+    console.error(
+      "Erreur notifications actualités :",
+      error
+    );
+
+  }
+
+}
+
+async function openActualites(){
+
+  if(!currentSchool){
+
+    showMessage(
+      "❌ Aucune école"
+    );
+
+    return;
+  }
+
+  go("actualitesPage");
+
+  loadActualites();
+
+  // ===== TOTAL POSTS =====
+
+  let snap =
+  await db.ref(
+
+    "schools/" +
+    currentSchool +
+    "/actualites"
+
+  ).once("value");
+
+  let total = 0;
+
+  if(snap.exists()){
+
+    total =
+    snap.numChildren();
+
+  }
+
+  // ===== MARQUER COMME LU =====
+
+  await db.ref(
+
+    "users/" +
+    currentUser +
+    "/actualitesRead/" +
+    currentSchool
+
+  ).set(total);
+
+  // ===== RETIRER BADGE =====
+
+  checkActualitesNotif();
+
+}
+
+
+
+
+
+
+
 
 
 
