@@ -2653,6 +2653,11 @@ function go(page){
 
       pageHistory.push(currentId);
 
+      localStorage.setItem(
+        "pageHistory",
+        JSON.stringify(pageHistory)
+      );
+
     }
 
   }
@@ -2668,6 +2673,12 @@ function go(page){
   if(next){
 
     next.classList.add("active");
+
+    // Sauvegarder la page actuelle
+    localStorage.setItem(
+      "lastPage",
+      page
+    );
 
   }
 
@@ -2701,7 +2712,6 @@ function go(page){
   schoolPages.includes(page);
 
 }
-
   
 function back(){
 
@@ -2781,49 +2791,58 @@ function back(){
 async function register(){
 
   let name =
-  document.getElementById("registerName").value.trim();
+  document.getElementById("regName").value.trim();
 
   let email =
-  document.getElementById("registerEmail").value.trim();
+  document.getElementById("regEmail").value.trim();
 
   let password =
-  document.getElementById("registerPassword").value;
+  document.getElementById("regPass").value;
+
+  let role =
+  document.getElementById("regRole").value;
 
   let file =
   document.getElementById("registerPhoto").files[0];
 
-  // Vérification
   if(!name || !email || !password){
+
     showMessage("Remplis tous les champs");
+
     return;
+
   }
 
   try{
 
-    // Création compte Firebase
     let userCredential =
-    await auth.createUserWithEmailAndPassword(email,password);
+    await auth.createUserWithEmailAndPassword(
+      email,
+      password
+    );
 
-    let uid = userCredential.user.uid;
+    let uid =
+    userCredential.user.uid;
 
     let photo = "";
 
-    // ================= IMAGE =================
     if(file){
 
-      // Limite image 2MB
       if(file.size > 2 * 1024 * 1024){
 
-        showMessage("Image trop lourde (max 2MB)");
+        showMessage(
+          "Image trop lourde (max 2MB)"
+        );
 
         return;
+
       }
-     
-      photo = await compressImage(file);
+
+      photo =
+      await compressImage(file);
 
     }
 
-    // ================= SAVE USER =================
     await db.ref("users/" + uid).set({
 
       uid: uid,
@@ -2832,9 +2851,9 @@ async function register(){
 
       email: email,
 
-      photo: photo,
+      role: role,
 
-      role: "user",
+      photo: photo,
 
       createdAt: Date.now()
 
@@ -2842,7 +2861,7 @@ async function register(){
 
     showMessage("Compte créé ✅");
 
-    go("home");
+    go("login");
 
   }catch(error){
 
@@ -2853,7 +2872,6 @@ async function register(){
   }
 
 }
-
 
 // ================= CONVERT IMAGE =================
 
@@ -2924,38 +2942,61 @@ function login(){
   showMessage(formatError(err)); // propre utilisateur
 });
 }  
-  
+ 
 // ================= CHARGER USER =================  
 
-function loadUser(uid){  
-  currentUser = uid;  
-  
-  db.ref("users/" + uid).once("value").then(snap => {  
-    let data = snap.val();  
-  
-    document.getElementById("welcome").innerText = "Bienvenue " + data.name;  
-    document.getElementById("roleText").innerText = "Rôle : " + data.role;  
-  
-    document.getElementById("eleveBox").style.display = "none";  
-    document.getElementById("teacherBox").style.display = "none";  
-  
-    if(data.role === "eleve"){  
-      document.getElementById("eleveBox").style.display = "block";  
-    } else {  
-      document.getElementById("teacherBox").style.display = "block";  
-    }  
+function loadUser(uid){
+
+  currentUser = uid;
+
+  db.ref("users/" + uid).once("value").then(snap => {
+
+    let data = snap.val();
+
+    document.getElementById("welcome").innerText =
+    "Bienvenue " + data.name;
+
+    document.getElementById("roleText").innerText =
+    "Rôle : " + data.role;
+
+    document.getElementById("eleveBox").style.display =
+    "none";
+
+    document.getElementById("teacherBox").style.display =
+    "none";
+
+    if(data.role === "eleve"){
+
+      document.getElementById("eleveBox").style.display =
+      "block";
+
+    }else{
+
+      document.getElementById("teacherBox").style.display =
+      "block";
+
+    }
+
     if(data.role === "admin"){
-  isSchoolAdmin = true;
-}
-else{
-  isSchoolAdmin = false;
-}
-  
-    loadUsers(); // 👈 AJOUT CHAT  
+
+      isSchoolAdmin = true;
+
+    }else{
+
+      isSchoolAdmin = false;
+
+    }
+
+    loadUsers();
+
     listenApproval();
-    go("dashboard");  
-  });  
-}  
+
+    go("dashboard");
+
+  });
+
+}
+ 
 function loadUsers(){  
   
   // 🔥 mettre l'utilisateur actuel en ligne  
@@ -4686,24 +4727,22 @@ function openPage(page){
 
   document.getElementById(page).classList.add("active");
 
-  // 🔥 caméra QR paramètres
+  localStorage.setItem("lastPage", page);
+
   if(page === "settingsPage"){
     setTimeout(() => {
       startQRScanner();
     }, 500);
   }
 
-  // 💬 chat
   if(page === "chat"){
     loadContacts();
   }
 
-  // 🎓 élèves
   if(page === "studentsPage"){
     renderStudents();
   }
 
-  // 👨‍🏫 enseignants
   if(page === "teachersPage"){
     renderTeachers();
   }
@@ -7257,6 +7296,63 @@ async function openActualites(){
 
 }
 
+// ===== RESTAURATION PAGE =====
+
+window.addEventListener("load", () => {
+
+  pageHistory = JSON.parse(
+    localStorage.getItem("pageHistory")
+  ) || [];
+
+  let lastPage =
+  localStorage.getItem("lastPage");
+
+  if(
+    lastPage &&
+    document.getElementById(lastPage)
+  ){
+
+    go(lastPage);
+
+  }
+
+});
+
+
+// ===== SAUVEGARDE SCROLL =====
+
+window.addEventListener("scroll", () => {
+
+  localStorage.setItem(
+    "scrollPosition",
+    window.scrollY
+  );
+
+});
+
+// ===== RESTAURATION SCROLL =====
+
+window.addEventListener("load", () => {
+
+  let pos =
+  localStorage.getItem(
+    "scrollPosition"
+  );
+
+  if(pos){
+
+    setTimeout(() => {
+
+      window.scrollTo(
+        0,
+        parseInt(pos)
+      );
+
+    }, 300);
+
+  }
+
+});
 
 
 
