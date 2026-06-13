@@ -9,6 +9,13 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>  
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-database-compat.js"></script>  
   
+ <link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+
+  
+  
  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script> 
  <script src="https://unpkg.com/html5-qrcode"></script>
  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
@@ -606,7 +613,7 @@ body.light .fab-menu button{
 }        
 /* ===== INPUTS ===== */        
 input, select, textarea{        
-  width:100%;        
+  width:90%;        
   padding:12px;        
   margin:8px 0;        
   border-radius:10px;        
@@ -1085,6 +1092,95 @@ border-left:4px solid #25D366;
 
 
 
+/* Chat sasa */ 
+
+/* PAGE CHAT */
+#chat{
+  background:linear-gradient(180deg,#07141f,#0b1d2b);
+}
+
+/* Sous-titre */
+#chatTitle{
+  color:#aab8c2;
+  font-size:17px;
+  margin-bottom:20px;
+}
+
+/* Liste conversations */
+#chatList{
+  width:100%;
+  max-width:600px;
+  background:rgba(255,255,255,0.02);
+  border-radius:18px;
+  overflow:hidden;
+}
+
+/* Une conversation */
+.chat-user{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:14px;
+  border-bottom:1px solid rgba(255,255,255,.05);
+  transition:.25s;
+}
+
+.chat-user:hover{
+  background:rgba(37,211,102,.08);
+}
+
+/* Photo profil */
+.chat-user img{
+  width:62px;
+  height:62px;
+  border-radius:50%;
+  object-fit:cover;
+  border:3px solid #25D366;
+  box-shadow:0 0 10px rgba(37,211,102,.25);
+}
+
+/* Nom */
+.chat-user-name{
+  color:#fff;
+  font-size:18px;
+  font-weight:600;
+}
+
+/* Dernier message */
+.chat-user-last{
+  color:#9ba7b1;
+  font-size:14px;
+  margin-top:4px;
+}
+
+/* Heure */
+.chat-user-time{
+  margin-left:auto;
+  color:#25D366;
+  font-size:13px;
+  font-weight:bold;
+}
+
+img{
+  background:#1c2a34;
+}
+
+.chat-user img,
+.new-user img{
+  border:3px solid #25D366;
+}
+
+/* chat sasa */
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1172,7 +1268,7 @@ font-size:14px;
     <div class="logo">🎓</div>
 
     <!-- TITRE -->
-    <h1 class="title">Multi-École</h1>
+    <h1 class="title">Masomo-École</h1>
 
     <p class="subtitle">
       Plateforme intelligente pour élèves & enseignants
@@ -1205,8 +1301,8 @@ font-size:14px;
   <div class="container">
     <h2>Connexion</h2>
 
-    <input id="logEmail" placeholder="Email">
-    <input id="logPass" type="password" placeholder="Mot de passe">
+    <input id="logEmail" placeholder="📧.             E-mail">
+    <input id="logPass" type="password" placeholder=" 🔒.            Mot de passe">
 
     <button onclick="login()">Se connecter</button>
     <button onclick="go('home')">Retour</button>
@@ -1220,21 +1316,24 @@ font-size:14px;
   
 <h2>Inscription</h2>  
   
-<input id="regName" placeholder="Nom">  
-<input id="regEmail" placeholder="Email">  
-<input id="regPass" type="password" placeholder="Mot de passe (min 6)"> 
+<input id="regName" placeholder="😎.          Nom">  
+<input id="regEmail" placeholder="📧.          Email">  
+<input id="regPass" type="password" placeholder="🔒.          Mot de passe (min 6)"> 
 <input
 type="file"
 id="registerPhoto"
 accept="image/*"
-onchange="previewRegisterPhoto(event)">
+onchange="openEditor(event)">
+
 <div class="register-photo-preview">
+  <img id="photoPreview" style="max-width:100%;display:none;">
+</div>
 
-  <img id="photoPreview"
-  src=""
-  style="display:none;">
-
-</div> 
+<button id="cropBtn"
+onclick="saveEditedPhoto()"
+style="display:none;">
+Valider la photo
+</button>
   
 <select id="regRole">  
 <option value="eleve">Élève</option>  
@@ -2321,6 +2420,8 @@ let qrScanner = null;
 let isSchoolAdmin = false;
 let pageHistory = [];
 let currentActualite = null;
+let cropper = null;
+let editedFile = null;
 
 
 
@@ -2336,6 +2437,11 @@ function openSchool(schoolId){
   go("schoolDashboard");
   
   loadSchoolDashboard(schoolId);
+  
+  localStorage.setItem(
+  "currentSchool",
+  schoolId
+);
 }
 function startQRScanner(){
 
@@ -2763,6 +2869,9 @@ function back(){
   if(pageHistory.length === 0){
 
     currentSchool = null;
+    localStorage.removeItem(
+  "currentSchool"
+);
 
     go("dashboard");
 
@@ -2803,7 +2912,8 @@ async function register(){
   document.getElementById("regRole").value;
 
   let file =
-  document.getElementById("registerPhoto").files[0];
+editedFile ||
+document.getElementById("registerPhoto").files[0];
 
   if(!name || !email || !password){
 
@@ -5160,6 +5270,10 @@ function openStudent(studentId){
 function exitSchool(){
   navMode = "app";
   currentSchool = null;
+  localStorage.removeItem(
+  "currentSchool"
+);
+
   go("dashboard");
 }
 
@@ -7295,65 +7409,65 @@ async function openActualites(){
   checkActualitesNotif();
 
 }
+function openEditor(event){
 
-// ===== RESTAURATION PAGE =====
+  const file = event.target.files[0];
 
-window.addEventListener("load", () => {
+  if(!file) return;
 
-  pageHistory = JSON.parse(
-    localStorage.getItem("pageHistory")
-  ) || [];
+  const reader = new FileReader();
 
-  let lastPage =
-  localStorage.getItem("lastPage");
+  reader.onload = function(e){
 
-  if(
-    lastPage &&
-    document.getElementById(lastPage)
-  ){
+    const img =
+    document.getElementById("photoPreview");
 
-    go(lastPage);
+    img.src = e.target.result;
+    img.style.display = "block";
 
-  }
+    if(cropper){
+      cropper.destroy();
+    }
 
-});
+    cropper = new Cropper(img,{
+      aspectRatio: 1,
+      viewMode: 1,
+      movable: true,
+      zoomable: true,
+      scalable: true,
+      rotatable: true,
+      cropBoxResizable: true
+    });
 
+    document.getElementById("cropBtn")
+    .style.display = "block";
+  };
 
-// ===== SAUVEGARDE SCROLL =====
+  reader.readAsDataURL(file);
+}
 
-window.addEventListener("scroll", () => {
+function saveEditedPhoto(){
 
-  localStorage.setItem(
-    "scrollPosition",
-    window.scrollY
-  );
+  if(!cropper) return;
 
-});
+  cropper.getCroppedCanvas({
+    width: 400,
+    height: 400
+  }).toBlob(function(blob){
 
-// ===== RESTAURATION SCROLL =====
+    editedFile = new File(
+      [blob],
+      "profile.jpg",
+      {type:"image/jpeg"}
+    );
 
-window.addEventListener("load", () => {
+    showMessage(
+      "Photo modifiée ✅"
+    );
 
-  let pos =
-  localStorage.getItem(
-    "scrollPosition"
-  );
+  },"image/jpeg",0.9);
 
-  if(pos){
-
-    setTimeout(() => {
-
-      window.scrollTo(
-        0,
-        parseInt(pos)
-      );
-
-    }, 300);
-
-  }
-
-});
-
+}
 
 
 
