@@ -26,6 +26,33 @@ href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
 
   
 <style>
+    
+    /* FICHE DE PRÉPARATION*/
+    
+    @media print {
+
+  body *{
+    display:none !important;
+  }
+
+  #printArea,
+  #printArea *{
+    display:block !important;
+  }
+
+  #printArea{
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    background:white;
+    color:black;
+    padding:20px;
+  }
+
+}
+
+    /* FIN FICHE */
   
 .container{        
   display:flex;        
@@ -1906,6 +1933,8 @@ Retour
 
 </div>
 
+<div id="qrcode"></div>
+
 
 <div style="
 background:#111b21;
@@ -2327,7 +2356,9 @@ Aucune fiche
 
 </div>
 
+<!-- IMPRESSION FICHE -->
 
+<div id="printArea" style="display:none;"></div>
 
 
 
@@ -3855,156 +3886,162 @@ function filterMatiere(m){
   });  
 }  
     
-function printFiche(id){
+async function printFiche(id){
 
-  db.ref("fiches/" + currentUser + "/" + id).once("value").then(snap => {
+  let snap = await db.ref("fiches/" + currentUser + "/" + id).once("value");
 
-    let d = snap.val();
+  if(!snap.exists()){
+    alert("Fiche introuvable");
+    return;
+  }
 
-    let w = window.open("", "", "width=900,height=1000");
+  let d = snap.val();
 
-    w.document.write(`
-<html>
-<head>
-<title>Fiche Ministère</title>
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF("p","mm","a4");
 
-<style>
+  const pageWidth = 210;
+  const pageHeight = 297;
 
-@page {
-  size: A4;
-  margin: 10mm;
+  let y = 10;
+
+  // ===== CADRE GLOBAL =====
+  pdf.rect(5,5,200,287);
+
+  // ===== ENTETE =====
+  pdf.setFont("helvetica","bold");
+  pdf.setFontSize(14);
+
+  pdf.text(
+    "MINISTÈRE DE L'ENSEIGNEMENT",
+    pageWidth/2,
+    y+5,
+    {align:"center"}
+  );
+
+  pdf.setFontSize(11);
+
+  pdf.text(
+    "FICHE DE PRÉPARATION DE COURS",
+    pageWidth/2,
+    y+12,
+    {align:"center"}
+  );
+
+  // numéro fiche
+  pdf.setFontSize(10);
+
+  pdf.text(
+    "N° : " + (d.number || ""),
+    165,
+    18
+  );
+
+  y = 28;
+
+  // ===== INFORMATIONS =====
+
+  pdf.rect(10,y,190,28);
+
+  pdf.setFont("helvetica","normal");
+
+  pdf.text("Enseignant : " + (d.teacher || ""),12,y+6);
+  pdf.text("Date : " + (d.date || ""),110,y+6);
+
+  pdf.text("Matière : " + (d.matiere || ""),12,y+13);
+  pdf.text("Classe : " + (d.classe || ""),110,y+13);
+
+  pdf.text("Heure : " + (d.heure || ""),12,y+20);
+  pdf.text("Durée : " + (d.duree || ""),110,y+20);
+
+  y += 35;
+
+  // ===== FONCTION BLOC =====
+
+  function addSection(titre, contenu){
+
+    let texte = contenu || "";
+
+    pdf.setFont("helvetica","bold");
+
+    pdf.rect(10,y,190,8);
+
+    pdf.text(titre,12,y+5.5);
+
+    y += 8;
+
+    pdf.setFont("helvetica","normal");
+
+    let lignes = pdf.splitTextToSize(
+      texte,
+      180
+    );
+
+    let hauteur = Math.max(
+      15,
+      lignes.length * 5 + 5
+    );
+
+    if(y + hauteur > 280){
+
+      pdf.addPage();
+
+      pdf.rect(5,5,200,287);
+
+      y = 15;
+    }
+
+    pdf.rect(10,y,190,hauteur);
+
+    pdf.text(
+      lignes,
+      12,
+      y+6
+    );
+
+    y += hauteur + 5;
+  }
+
+  // ===== BLOCS =====
+
+  addSection(
+    "OBJECTIFS",
+    d.objectif
+  );
+
+  addSection(
+    "PRÉREQUIS",
+    d.prerequis
+  );
+
+  addSection(
+    "DÉROULEMENT",
+    d.developpement
+  );
+
+  addSection(
+    "ÉVALUATION",
+    d.evaluation
+  );
+
+  // ===== PIED =====
+
+  pdf.setFontSize(8);
+
+  pdf.text(
+    "Document généré automatiquement",
+    pageWidth/2,
+    287,
+    {align:"center"}
+  );
+
+  pdf.save(
+    "Fiche_Preparation_" +
+    (d.number || "SansNumero") +
+    ".pdf"
+  );
 }
 
-body{
-  font-family: Arial;
-  margin:0;
-  padding:0;
-  color:#000;
-}
-
-/* CADRE GLOBAL A4 */
-.sheet{
-  width: 100%;
-  height: 100%;
-  border: 2px solid #000;
-  padding: 10px;
-  box-sizing: border-box;
-  overflow: hidden;
-}
-
-/* HEADER MINISTÈRE */
-.header{
-  text-align:center;
-  border-bottom:2px solid #000;
-  padding-bottom:5px;
-  margin-bottom:8px;
-}
-
-.header h1{
-  font-size:16px;
-  margin:0;
-  text-transform:uppercase;
-}
-
-.sub{
-  font-size:11px;
-}
-
-/* NUMÉRO */
-.num{
-  position:absolute;
-  top:15px;
-  right:20px;
-  font-weight:bold;
-  font-size:12px;
-}
-
-/* GRID INFOS */
-.grid{
-  display:grid;
-  grid-template-columns: 1fr 1fr;
-  gap:5px;
-  font-size:11px;
-  margin-bottom:5px;
-}
-
-/* BLOCS */
-.block{
-  border:1px solid #000;
-  padding:5px;
-  margin-top:5px;
-  font-size:11px;
-  line-height:1.3;
-}
-
-.title{
-  font-weight:bold;
-  font-size:12px;
-  border-bottom:1px solid #000;
-  margin-bottom:3px;
-}
-
-/* SUPPRESSION SCROLL */
-*{
-  overflow:hidden;
-}
-
-</style>
-
-</head>
-
-<body>
-
-<div class="sheet">
-
-  <div class="num">${d.number || ""}</div>
-
-  <div class="header">
-    <h1>MINISTÈRE DE L’ENSEIGNEMENT</h1>
-    <div class="sub">FICHE DE PRÉPARATION DE COURS</div>
-  </div>
-
-  <div class="grid">
-    <div><b>Enseignant :</b> ${d.teacher || ""}</div>
-    <div><b>Date :</b> ${d.date || ""}</div>
-    <div><b>Matière :</b> ${d.matiere || ""}</div>
-    <div><b>Classe :</b> ${d.classe || ""}</div>
-    <div><b>Heure :</b> ${d.heure || ""}</div>
-    <div><b>Durée :</b> ${d.duree || ""}</div>
-  </div>
-
-  <div class="block">
-    <div class="title">Objectifs</div>
-    ${d.objectif || ""}
-  </div>
-
-  <div class="block">
-    <div class="title">Prérequis</div>
-    ${d.prerequis || ""}
-  </div>
-
-  <div class="block">
-    <div class="title">Déroulement</div>
-    ${d.developpement || ""}
-  </div>
-
-  <div class="block">
-    <div class="title">Évaluation</div>
-    ${d.evaluation || ""}
-  </div>
-
-</div>
-
-</body>
-</html>
-`);
-
-    w.document.close();
-    w.print();
-
-  });
-
-}
 function loadFiches(){
 
   let box = document.getElementById("ficheList");
@@ -5203,6 +5240,7 @@ function deleteStudent(id){
 
   renderStudents();
 }
+
 function generateQR(studentId){
     if(!isSchoolAdmin){
   showMessage("❌ Accès refusé");
