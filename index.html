@@ -1292,7 +1292,7 @@ font-size:14px;
     </div>
 
     <!-- LOGO -->
-    <div class="logo">🎓</div>
+    <div class="logo">⚽🎓</div>
 
     <!-- TITRE -->
     <h1 class="title">Masomo-École</h1>
@@ -3886,160 +3886,50 @@ function filterMatiere(m){
   });  
 }  
     
-async function printFiche(id){
+function printFiche(id){
 
-  let snap = await db.ref("fiches/" + currentUser + "/" + id).once("value");
+  db.ref("fiches/" + currentUser + "/" + id)
+  .once("value")
+  .then(snap => {
 
-  if(!snap.exists()){
-    alert("Fiche introuvable");
-    return;
-  }
+    let d = snap.val();
 
-  let d = snap.val();
+    let zone = document.getElementById("printArea");
 
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF("p","mm","a4");
+    zone.innerHTML = `
+      <div class="sheet">
 
-  const pageWidth = 210;
-  const pageHeight = 297;
+        <h2 style="text-align:center">
+          FICHE DE PRÉPARATION DE COURS
+        </h2>
 
-  let y = 10;
+        <p><b>N° :</b> ${d.number || ""}</p>
+        <p><b>Enseignant :</b> ${d.teacher || ""}</p>
+        <p><b>Date :</b> ${d.date || ""}</p>
+        <p><b>Matière :</b> ${d.matiere || ""}</p>
+        <p><b>Classe :</b> ${d.classe || ""}</p>
 
-  // ===== CADRE GLOBAL =====
-  pdf.rect(5,5,200,287);
+        <hr>
 
-  // ===== ENTETE =====
-  pdf.setFont("helvetica","bold");
-  pdf.setFontSize(14);
+        <h3>Objectifs</h3>
+        ${d.objectif || ""}
 
-  pdf.text(
-    "MINISTÈRE DE L'ENSEIGNEMENT",
-    pageWidth/2,
-    y+5,
-    {align:"center"}
-  );
+        <h3>Prérequis</h3>
+        ${d.prerequis || ""}
 
-  pdf.setFontSize(11);
+        <h3>Déroulement</h3>
+        ${d.developpement || ""}
 
-  pdf.text(
-    "FICHE DE PRÉPARATION DE COURS",
-    pageWidth/2,
-    y+12,
-    {align:"center"}
-  );
+        <h3>Évaluation</h3>
+        ${d.evaluation || ""}
 
-  // numéro fiche
-  pdf.setFontSize(10);
+      </div>
+    `;
 
-  pdf.text(
-    "N° : " + (d.number || ""),
-    165,
-    18
-  );
+    window.print();
 
-  y = 28;
+  });
 
-  // ===== INFORMATIONS =====
-
-  pdf.rect(10,y,190,28);
-
-  pdf.setFont("helvetica","normal");
-
-  pdf.text("Enseignant : " + (d.teacher || ""),12,y+6);
-  pdf.text("Date : " + (d.date || ""),110,y+6);
-
-  pdf.text("Matière : " + (d.matiere || ""),12,y+13);
-  pdf.text("Classe : " + (d.classe || ""),110,y+13);
-
-  pdf.text("Heure : " + (d.heure || ""),12,y+20);
-  pdf.text("Durée : " + (d.duree || ""),110,y+20);
-
-  y += 35;
-
-  // ===== FONCTION BLOC =====
-
-  function addSection(titre, contenu){
-
-    let texte = contenu || "";
-
-    pdf.setFont("helvetica","bold");
-
-    pdf.rect(10,y,190,8);
-
-    pdf.text(titre,12,y+5.5);
-
-    y += 8;
-
-    pdf.setFont("helvetica","normal");
-
-    let lignes = pdf.splitTextToSize(
-      texte,
-      180
-    );
-
-    let hauteur = Math.max(
-      15,
-      lignes.length * 5 + 5
-    );
-
-    if(y + hauteur > 280){
-
-      pdf.addPage();
-
-      pdf.rect(5,5,200,287);
-
-      y = 15;
-    }
-
-    pdf.rect(10,y,190,hauteur);
-
-    pdf.text(
-      lignes,
-      12,
-      y+6
-    );
-
-    y += hauteur + 5;
-  }
-
-  // ===== BLOCS =====
-
-  addSection(
-    "OBJECTIFS",
-    d.objectif
-  );
-
-  addSection(
-    "PRÉREQUIS",
-    d.prerequis
-  );
-
-  addSection(
-    "DÉROULEMENT",
-    d.developpement
-  );
-
-  addSection(
-    "ÉVALUATION",
-    d.evaluation
-  );
-
-  // ===== PIED =====
-
-  pdf.setFontSize(8);
-
-  pdf.text(
-    "Document généré automatiquement",
-    pageWidth/2,
-    287,
-    {align:"center"}
-  );
-
-  pdf.save(
-    "Fiche_Preparation_" +
-    (d.number || "SansNumero") +
-    ".pdf"
-  );
 }
 
 function loadFiches(){
