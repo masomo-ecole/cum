@@ -1,6 +1,11 @@
 <!DOCTYPE html>  
 <html lang="fr">  
 <head>  
+    
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js/dist/driver.css">
+<script src="https://cdn.jsdelivr.net/npm/driver.js/dist/driver.js.iife.js"></script>
+
+    
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>  
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Système Scolaire Moderne</title>  
@@ -1199,6 +1204,113 @@ img{
 
 /* chat sasa */
 
+/* GUIDE */
+
+#guideOverlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.6);
+  backdrop-filter: blur(3px);
+  z-index:9998;
+}
+
+.guide-focus{
+  position:relative;
+  z-index:9999;
+  background:#fff;
+  border-radius:12px;
+  box-shadow:0 0 0 4px rgba(0,123,255,.8);
+}
+
+.guide-tooltip{
+  position:fixed;
+  background:rgba(0,0,0,.9);
+  color:#fff;
+  padding:12px 14px;
+  border-radius:10px;
+  font-size:14px;
+  max-width:220px;
+  z-index:10000;
+  animation:fadeIn .3s ease;
+}
+
+@keyframes fadeIn{
+  from{opacity:0; transform:translateY(10px);}
+  to{opacity:1; transform:translateY(0);}
+}
+
+/*  AVIS ET COMMENTAIRES*/
+.feedback-link{
+  margin-top:12px;
+  text-align:center;
+}
+
+.feedback-link span{
+  color:var(--primary);
+  cursor:pointer;
+  font-weight:600;
+  transition:.3s;
+}
+
+.feedback-link span:hover{
+  opacity:.8;
+  text-decoration:underline;
+}
+
+/* BOUTON FLOTTANT COMMENTAIRES*/
+#fabFeedback {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 60px;
+  height: 60px;
+  background: #4CAF50;
+  color: white;
+  font-size: 26px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  cursor: pointer;
+  z-index: 9999;
+  transition: transform 0.2s ease;
+}
+
+#fabFeedback:hover {
+  transform: scale(1.1);
+}
+/* modal*/
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.6);
+  z-index: 9999;
+}
+
+.modalContent {
+  background: white;
+  width: 90%;
+  max-width: 500px;
+  margin: 80px auto;
+  padding: 20px;
+  border-radius: 15px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+#commentsList {
+  margin-top: 15px;
+}
+
+.commentBox {
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+}
 
 
 
@@ -1292,7 +1404,7 @@ font-size:14px;
     </div>
 
     <!-- LOGO -->
-    <div class="logo">⚽🎓</div>
+    <div class="logo">🎓</div>
 
     <!-- TITRE -->
     <h1 class="title">Masomo-École</h1>
@@ -1310,18 +1422,25 @@ font-size:14px;
     </div>
 
     <!-- BOUTON -->
-    <button class="btn" onclick="go('login')">
-      🚀 Commencer
-    </button>
+    <button id="btnStart" class="btn" onclick="go('login')">
+  🚀 Commencer
+</button>
 
     <p class="bottom-text">
-      Pas de compte ?
-      <span onclick="go('register')">Créer un compte</span>
-    </p>
+  Pas de compte ?
+  <span onclick="go('register')">Créer un compte</span>
+</p>
+
+
 
   </div>
 
 </div>
+
+<!-- TABLEAU GUIDE-->
+<div id="guideOverlay" style="display:none;"></div>
+<div id="guideTooltip" class="guide-tooltip" style="display:none;"></div>
+
   
 <!-- LOGIN -->  
 <div id="login" class="page">
@@ -1383,14 +1502,27 @@ Valider la photo
 <button onclick="openPage('notes')">Notes</button>  
 <button onclick="openPage('cours')">Cours</button>  
 <button onclick="openPage('chat')">Chat</button>
+<br> <br>
+<p class="bottom-text feedback-link">
+  <span onclick="openPage('feedbackPage')">
+    💡 Commentaires & Avis
+  </span>
+</p>
 </div> 
+  
   
 <div id="teacherBox" style="display:none;">  
 <h3>Enseignant</h3>  
 <button onclick="openPage('addNotes')">Ajouter notes</button>  
 <button onclick="openPage('addCours')">Ajouter cours</button>  
 <button onclick="openPage('fiche')">📄 Fiche de préparation</button>  
-<button onclick="openPage('chat')">Chat</button>  
+<button onclick="openPage('chat')">Chat</button> 
+<br> <br> 
+<p class="bottom-text feedback-link">
+  <span onclick="openPage('feedbackPage')">
+    💡 Commentaires & Avis
+  </span>
+</p> 
 </div>  
   
 <button onclick="logout()">Déconnexion</button>  
@@ -1403,13 +1535,13 @@ Valider la photo
 <!-- AJOUT NOTES -->
 <div id="addNotes" class="page">
   <h2>Ajouter notes</h2>
-  <button onclick="back()">Retour</button>
+  <button onclick="go('dashboard')">Retour</button>
 </div>
 
 <!-- AJOUT COURS -->
 <div id="addCours" class="page">
   <h2>Ajouter cours</h2>
-  <button onclick="back()">Retour</button>
+  <button onclick="go('dashboard')">Retour</button>
 </div>
   
   <!-- ====== CHAT ======= -->   
@@ -1452,11 +1584,69 @@ Valider la photo
 </div>
  
   
-<button onclick="back()">Retour</button>  
+<button onclick="go('dashboard')">Retour</button>  
 </div>  
+  
+
     
-    
-  <!-- ======= DISCUTION ===== -->  
+  <!-- ======= commentaire avis ==== -->  
+  <div id="feedbackPage" class="page">
+  
+<h2>💡 Commentaires & Avis</h2>
+  <p>
+    Aidez-nous à améliorer Masomo-École.
+  </p>
+
+<select id="feedbackRate">
+
+  <option value="5">⭐⭐⭐⭐⭐ Excellent</option>
+  <option value="4">⭐⭐⭐⭐ Très bien</option>
+  <option value="3">⭐⭐⭐ Bien</option>
+  <option value="2">⭐⭐ Moyen</option>
+  <option value="1">⭐ Mauvais</option>
+
+</select>
+
+<br><br>
+
+  <textarea
+    id="feedbackText"
+    placeholder="Écrivez votre commentaire, avis ou suggestion..."
+    rows="6"
+    style="width:100%;padding:12px;border-radius:10px;">
+  </textarea>
+  
+  <button onclick="sendFeedback()">
+📤 Envoyer
+</button>
+
+<p class="bottom-text"> cliquez ici pour
+  <span onclick="go('dashboard')">Fermé les commentaires </span>
+</p>
+
+<!-- Bouton flottant commentaires -->
+<div id="fabFeedback" onclick="openCommentsModal()">
+  💬
+</div>
+
+
+</div>
+
+<!-- MODAL COMMENTAIRES -->
+<div id="commentsModal" class="modal">
+  <div class="modalContent">
+
+    <h2>💬 Commentaires des utilisateurs</h2>
+
+    <div id="commentsList">
+      Chargement...
+    </div>
+
+    <button onclick="closeCommentsModal()">Fermer</button>
+
+  </div>
+</div>
+
 <!-- ======= DISCUTION ===== -->
 <div id="discussion" class="page">
 
@@ -1563,7 +1753,7 @@ color:white;
 margin:0;
 ">
 
-<button onclick="document.getElementById('fileInput').click()"
+<button onclick="document.getElementById('chatFileInput').click()"
 style="
 width:42px;
 height:42px;
@@ -1699,7 +1889,7 @@ Enregistrer
 <h3>Mes fiches</h3>  
 <div id="ficheList"></div>  
   
-<button onclick="back()">Retour</button>  
+<button onclick="go('dashboard')">Retour</button>  
   
 </div>  
 <div id="userProfilePage" class="page">
@@ -1806,9 +1996,17 @@ Retour
 
 </div>
 
-<input 
-type="file" 
-id="fileInput"
+<!-- Photo de profil -->
+<input
+type="file"
+id="profileFileInput"
+accept="image/*"
+style="display:none;">
+
+<!-- Images du chat -->
+<input
+type="file"
+id="chatFileInput"
 accept="image/*"
 style="display:none;">
 
@@ -2359,6 +2557,7 @@ Aucune fiche
 <!-- IMPRESSION FICHE -->
 
 <div id="printArea" style="display:none;"></div>
+
 
 
 
@@ -3893,35 +4092,118 @@ function printFiche(id){
   .then(snap => {
 
     let d = snap.val();
-
     let zone = document.getElementById("printArea");
 
     zone.innerHTML = `
+      <style>
+        .sheet{
+          background:#fff;
+          color:#000;
+          padding:30px;
+          font-family: Arial, sans-serif;
+          max-width:800px;
+          margin:auto;
+        }
+
+        .title{
+          text-align:center;
+          font-size:20px;
+          font-weight:bold;
+          margin-bottom:20px;
+          text-transform:uppercase;
+        }
+
+        .info{
+          display:grid;
+          grid-template-columns:1fr 1fr;
+          gap:10px;
+          margin-bottom:20px;
+        }
+
+        .info p{
+          margin:3px 0;
+          font-size:14px;
+        }
+
+        h3{
+          margin-top:20px;
+          margin-bottom:5px;
+          border-left:4px solid #000;
+          padding-left:8px;
+          font-size:16px;
+        }
+
+        .section{
+          font-size:14px;
+          line-height:1.5;
+          margin-bottom:10px;
+          white-space:pre-line;
+        }
+
+        .footer{
+          margin-top:40px;
+          text-align:right;
+          font-size:14px;
+        }
+
+        .signature-line{
+          margin-top:60px;
+          border-top:2px solid #000;
+          padding-top:10px;
+          text-align:center;
+          font-weight:bold;
+        }
+
+        .colors{
+          display:flex;
+          height:6px;
+          margin-top:15px;
+        }
+
+        .colors div{
+          flex:1;
+        }
+
+        .red{background:red;}
+        .blue{background:blue;}
+        .yellow{background:gold;}
+      </style>
+
       <div class="sheet">
 
-        <h2 style="text-align:center">
+        <div class="title">
           FICHE DE PRÉPARATION DE COURS
-        </h2>
+        </div>
 
-        <p><b>N° :</b> ${d.number || ""}</p>
-        <p><b>Enseignant :</b> ${d.teacher || ""}</p>
-        <p><b>Date :</b> ${d.date || ""}</p>
-        <p><b>Matière :</b> ${d.matiere || ""}</p>
-        <p><b>Classe :</b> ${d.classe || ""}</p>
-
-        <hr>
+        <div class="info">
+          <p><b>N° :</b> ${d.number || ""}</p>
+          <p><b>Date :</b> ${d.date || ""}</p>
+          <p><b>Enseignant :</b> ${d.teacher || ""}</p>
+          <p><b>Matière :</b> ${d.matiere || ""}</p>
+          <p><b>Classe :</b> ${d.classe || ""}</p>
+        </div>
 
         <h3>Objectifs</h3>
-        ${d.objectif || ""}
+        <div class="section">${d.objectif || ""}</div>
 
         <h3>Prérequis</h3>
-        ${d.prerequis || ""}
+        <div class="section">${d.prerequis || ""}</div>
 
         <h3>Déroulement</h3>
-        ${d.developpement || ""}
+        <div class="section">${d.developpement || ""}</div>
 
         <h3>Évaluation</h3>
-        ${d.evaluation || ""}
+        <div class="section">${d.evaluation || ""}</div>
+
+        <div class="signature-line">
+          Signé par : ${d.teacher || ""}
+        </div>
+
+        <div class="colors">
+          <div class="red"></div>
+          <div class="blue"></div>
+          <div class="yellow"></div>
+        </div>
 
       </div>
     `;
@@ -3931,7 +4213,6 @@ function printFiche(id){
   });
 
 }
-
 function loadFiches(){
 
   let box = document.getElementById("ficheList");
@@ -4000,7 +4281,7 @@ function openProfile(){
     
     document.getElementById("profilePhoto").onclick = () => {
 
-    document.getElementById("fileInput").click();
+    document.getElementById("profileFileInput").click();
 
 };
 
@@ -4280,7 +4561,7 @@ function saveProfile(){
   }, 1500);
 
 }   
-document.getElementById("fileInput")
+document.getElementById("chatFileInput")
 .addEventListener("change", function(e){
 
   let file = e.target.files[0];
@@ -4291,15 +4572,16 @@ document.getElementById("fileInput")
 
   reader.onload = function(){
 
-    let chatId = getChatId(currentUser,currentChat);
+    let chatId =
+    getChatId(currentUser,currentChat);
 
     db.ref("chats/" + chatId + "/messages")
     .push({
 
-      sender:currentUser,
-      image:reader.result,
-      time:Date.now(),
-      status:"sent"
+      sender: currentUser,
+      image: reader.result,
+      time: Date.now(),
+      status: "sent"
 
     });
 
@@ -4330,34 +4612,44 @@ function toggleTheme(){
 }
 window.addEventListener("DOMContentLoaded", () => {
 
-  const fileInput = document.getElementById("fileInput");
+  const profileInput =
+  document.getElementById("profileFileInput");
 
-  if (!fileInput) return;
+  if (!profileInput) return;
 
-  fileInput.addEventListener("change", function (e) {
+  profileInput.addEventListener("change", function (e) {
 
-    let file = e.target.files[0];
+    const file = e.target.files[0];
+
     if (!file) return;
 
-    let reader = new FileReader();
+    const reader = new FileReader();
 
     reader.onload = function () {
 
-      let image = reader.result;
+      const image = reader.result;
 
-      let photo = document.getElementById("profilePhoto");
-      if (photo) photo.src = image;
+      const photo =
+      document.getElementById("profilePhoto");
+
+      if (photo) {
+        photo.src = image;
+      }
 
       if (currentUser) {
+
         db.ref("users/" + currentUser).update({
           photo: image
         });
+
       }
 
-      showMessage("Photo mise à jour ✅");
+      showMessage("Photo de profil mise à jour ✅");
+
     };
 
     reader.readAsDataURL(file);
+
   });
 
 });
@@ -7399,6 +7691,114 @@ function saveEditedPhoto(){
 
 
 
+const chatInput =
+document.getElementById("chatFileInput");
+
+if(chatInput){
+
+  chatInput.addEventListener("change", function(e){
+
+    const file = e.target.files[0];
+
+    if(!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = function(){
+
+      const image = reader.result;
+
+      sendImageMessage(image);
+
+    };
+
+    reader.readAsDataURL(file);
+
+  });
+
+}
+
+function sendFeedback(){
+
+  const text =
+  document.getElementById("feedbackText")
+  .value.trim();
+
+  if(!text){
+
+    showMessage("Écrivez un commentaire");
+
+    return;
+  }
+
+  const rating =
+  document.getElementById("feedbackRate")
+  .value;
+
+  db.ref("feedbacks").push({
+
+    user: currentUser || "Visiteur",
+
+    message: text,
+
+    rating: rating,
+
+    date: Date.now()
+
+  });
+
+  document.getElementById("feedbackText").value="";
+
+  showMessage("Merci pour votre avis ❤️");
+
+}
+
+function loadFeedbacks(){
+
+  db.ref("feedbacks").on("value", snap => {
+
+    let html = "";
+
+    snap.forEach(item => {
+
+      let f = item.val();
+
+      html += `
+      <div class="card">
+
+        <b>${f.user}</b><br>
+
+        ⭐ ${f.rating}/5
+
+        <br><br>
+
+        ${f.message}
+
+      </div><br>
+      `;
+
+    });
+
+    document.getElementById("commentsList")
+    .innerHTML = html;
+
+  });
+
+}
+
+function openFeedbackPage() {
+  document.querySelectorAll(".page").forEach(p => p.style.display = "none");
+  document.getElementById("feedbackPage").style.display = "block";
+}
+
+function openCommentsModal() {
+  document.getElementById("commentsModal").style.display = "block";
+  loadFeedbacks();
+}
+
+function closeCommentsModal() {
+  document.getElementById("commentsModal").style.display = "none";
+}
 
 
 
@@ -7422,6 +7822,85 @@ function saveEditedPhoto(){
 
 
 
+const steps = [
+{
+    element: ".bottom-text",
+    text : "Crée d'abord un compte si c'est la premier fois d'utiliser MASOMO-ECOLE"
+},
+  {
+    element: ".logo",
+    text: "Voici le logo de Masomo-École 📚"
+  },
+  {
+    element: ".card",
+    text: "Ici tu trouves les fonctionnalités principales"
+  },
+  {
+    element: "#btnStart",
+    text: "Clique ici pour commencer 🚀"
+  }
+];
+
+let stepIndex = 0;
+
+function startGuide(){
+  document.getElementById("guideOverlay").style.display = "block";
+  document.getElementById("guideTooltip").style.display = "block";
+  showStep(stepIndex);
+
+  document.getElementById("guideOverlay").onclick = nextStep;
+}
+
+function showStep(i){
+  const step = steps[i];
+  const el = document.querySelector(step.element);
+
+  // reset
+  document.querySelectorAll(".guide-focus").forEach(e=>{
+    e.classList.remove("guide-focus");
+  });
+
+  // focus element
+  el.classList.add("guide-focus");
+
+  // position tooltip
+  const rect = el.getBoundingClientRect();
+  const tooltip = document.getElementById("guideTooltip");
+
+  tooltip.innerText = step.text;
+
+  tooltip.style.top = (rect.bottom + 10) + "px";
+  tooltip.style.left = rect.left + "px";
+}
+
+function nextStep(){
+  stepIndex++;
+
+  if(stepIndex >= steps.length){
+    endGuide();
+    return;
+  }
+
+  showStep(stepIndex);
+}
+
+function endGuide(){
+  document.getElementById("guideOverlay").remove();
+  document.getElementById("guideTooltip").remove();
+
+  document.querySelectorAll(".guide-focus").forEach(e=>{
+    e.classList.remove("guide-focus");
+  });
+}
+
+ window.onload = function(){
+  const firstTime = !localStorage.getItem("guideDone");
+
+  if(firstTime){
+    startGuide();
+    localStorage.setItem("guideDone", "true");
+  }
+};
 
 
 
@@ -7433,8 +7912,18 @@ function saveEditedPhoto(){
 
 
 
-
-
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
     
     
