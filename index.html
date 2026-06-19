@@ -56,6 +56,32 @@ href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
   }
 
 }
+/* Print élève */ 
+.print-bar{
+  display:flex;
+  gap:10px;
+  margin:10px 0;
+  flex-wrap:wrap;
+}
+
+.print-bar select{
+  flex:1;
+  min-width:150px;
+  padding:10px;
+  border:none;
+  border-radius:10px;
+  background:#202c33;
+  color:white;
+}
+
+.print-bar button{
+  padding:10px 15px;
+  border:none;
+  border-radius:10px;
+  background:#25d366;
+  color:white;
+  cursor:pointer;
+}
 
     /* FIN FICHE */
   
@@ -1314,6 +1340,111 @@ img{
 
 
 
+/* Élève formulaire*/
+.student-form{
+    background:#111b21;
+    padding:20px;
+    border-radius:15px;
+    margin-bottom:15px;
+}
+
+.student-form h3{
+    margin-top:20px;
+    color:#25d366;
+}
+
+.student-form input,
+.student-form select{
+    width:100%;
+    padding:12px;
+    margin:6px 0;
+    border:none;
+    border-radius:10px;
+    background:#202c33;
+    color:white;
+    box-sizing:border-box;
+}
+
+.student-form button{
+    width:100%;
+    margin-top:15px;
+    padding:14px;
+    border:none;
+    border-radius:12px;
+    background:#25d366;
+    color:white;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+/* Table containeur */ 
+.table-container{
+  overflow-x:auto;
+  margin-top:15px;
+}
+
+.student-table{
+  width:100%;
+  border-collapse:collapse;
+  background:#111b21;
+  border-radius:12px;
+  overflow:hidden;
+}
+
+.student-table th{
+  background:#25d366;
+  color:white;
+  padding:12px;
+  text-align:left;
+}
+
+.student-table td{
+  padding:12px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+
+.student-table tr:hover{
+  background:#1b2a33;
+}
+
+.student-table button{
+  background:#25d366;
+  border:none;
+  color:white;
+  padding:8px 12px;
+  border-radius:8px;
+  cursor:pointer;
+}
+
+/* BARRE DE DÉFILEMENT */
+/* Scroll général */
+html,
+body{
+    height:100%;
+    overflow-y:auto;
+    scroll-behavior:smooth;
+}
+
+/* Style moderne de la barre */
+::-webkit-scrollbar{
+    width:10px;
+}
+
+::-webkit-scrollbar-track{
+    background:#111b21;
+}
+
+::-webkit-scrollbar-thumb{
+    background:#25d366;
+    border-radius:10px;
+}
+
+::-webkit-scrollbar-thumb:hover{
+    background:#1faa52;
+}
+
+
+
 
 
 
@@ -1508,6 +1639,7 @@ Valider la photo
     💡 Commentaires & Avis
   </span>
 </p>
+
 </div> 
   
   
@@ -1523,7 +1655,33 @@ Valider la photo
     💡 Commentaires & Avis
   </span>
 </p> 
+
 </div>  
+
+<!-- FAB BUTTON -->
+<div class="fab" id="fabBtn" onclick="toggleFabMenu()">
+  +
+</div>
+
+<!-- MENU -->
+<div id="fabMenu" class="fab-menu">
+
+  <button onclick="newDiscussion()">💬 Nouvelle discussion</button>
+  <button onclick="openGroups()">👨‍👩‍👧 Groupe</button>
+  <button onclick="openSettings()">⚙️ Paramètres</button>
+  <button onclick="openStatus()">🟢 Statuts</button>
+  <button onclick="addStatus()">➕ Ajouter statut</button>
+  <button onclick="go('createSchool')">🏫 Créer École</button>
+  <button onclick="go('mySchools'); loadMySchools()">
+🏫 Mes Écoles
+</button>
+<button onclick="openPage('settingsPage')">
+📷 Scanner QR école
+</button>
+
+
+
+</div>
   
 <button onclick="logout()">Déconnexion</button>  
 </div>  
@@ -1558,31 +1716,7 @@ Valider la photo
 <!-- LISTE CONTACTS -->
 <div id="contactsBox"></div>  
   
-<!-- FAB BUTTON -->
-<div class="fab" id="fabBtn" onclick="toggleFabMenu()">
-  +
-</div>
 
-<!-- MENU -->
-<div id="fabMenu" class="fab-menu">
-
-  <button onclick="newDiscussion()">💬 Nouvelle discussion</button>
-  <button onclick="openGroups()">👨‍👩‍👧 Groupe</button>
-  <button onclick="openSettings()">⚙️ Paramètres</button>
-  <button onclick="openStatus()">🟢 Statuts</button>
-  <button onclick="addStatus()">➕ Ajouter statut</button>
-  <button onclick="go('createSchool')">🏫 Créer École</button>
-  <button onclick="go('mySchools'); loadMySchools()">
-🏫 Mes Écoles
-</button>
-<button onclick="openPage('settingsPage')">
-📷 Scanner QR école
-</button>
-
-
-
-</div>
- 
   
 <button onclick="go('dashboard')">Retour</button>  
 </div>  
@@ -2107,66 +2241,153 @@ Retour
 <div id="studentsPage" class="page">
 
 <h2>🎓 Gestion des élèves</h2>
-<div class="export-bar">
 
-  <button onclick="printData()">
-    🖨️ Imprimer
-  </button>
+<div class="student-form">
 
-  <button onclick="exportTXT()">
-    📄 Texte
-  </button>
+<h3>📝 Informations de l'élève</h3>
 
-  <button onclick="exportPDF()">
-    📕 PDF
-  </button>
+<input id="stuNom" placeholder="Nom">
+<input id="stuPostnom" placeholder="Postnom">
+<input id="stuPrenom" placeholder="Prénom">
 
-  <button onclick="exportWord()">
-    📘 Word
-  </button>
-
-  <button onclick="exportExcel()">
-    📗 Excel
-  </button>
-
-</div>
-
-<div id="qrcode"></div>
-
-
-<div style="
-background:#111b21;
-padding:15px;
-border-radius:12px;
-margin-bottom:10px;
-">
-
-<input id="stuName" placeholder="Nom complet">
 <input id="stuClasse" placeholder="Classe">
-<input id="stuGender" placeholder="Sexe">
+
+<select id="stuSexe">
+  <option value="">Sélectionner le sexe</option>
+  <option>Masculin</option>
+  <option>Féminin</option>
+</select>
+
 <input id="stuBirth" type="date">
-<input id="stuPhone" placeholder="Téléphone élève">
-<input id="stuAddress" placeholder="Adresse">
 
-<h3>👨‍👩‍👧 Parent / Tuteur</h3>
+<input id="stuBirthPlace" placeholder="Lieu de naissance">
 
-<input id="parentName" placeholder="Nom parent">
-<input id="parentPhone" placeholder="Téléphone parent">
-<input id="parentJob" placeholder="Profession parent">
+<input id="stuAddress" placeholder="Adresse domicile">
+
+<h3>👨 Père & 👩 Mère</h3>
+
+<input id="fatherName" placeholder="Nom du père">
+
+<input id="motherName" placeholder="Nom de la mère">
+
+<h3>🌍 Origine</h3>
+
+<select id="stuProvince" onchange="toggleProvinceOther()">
+
+<option value="">Choisir une province</option>
+
+<option>Bas-Uele</option>
+<option>Équateur</option>
+<option>Haut-Katanga</option>
+<option>Haut-Lomami</option>
+<option>Haut-Uele</option>
+<option>Ituri</option>
+<option>Kasaï</option>
+<option>Kasaï Central</option>
+<option>Kasaï Oriental</option>
+<option>Kinshasa</option>
+<option>Kongo Central</option>
+<option>Kwango</option>
+<option>Kwilu</option>
+<option>Lomami</option>
+<option>Lualaba</option>
+<option>Mai-Ndombe</option>
+<option>Maniema</option>
+<option>Mongala</option>
+<option>Nord-Kivu</option>
+<option>Nord-Ubangi</option>
+<option>Sankuru</option>
+<option>Sud-Kivu</option>
+<option>Sud-Ubangi</option>
+<option>Tanganyika</option>
+<option>Tshopo</option>
+<option>Tshuapa</option>
+
+<option value="AUTRE">AUTRE</option>
+
+</select>
+
+<input
+id="provinceOther"
+placeholder="Saisir la province"
+style="display:none;"
+>
+
+<input id="stuTerritory" placeholder="Territoire d'origine">
+
+<input id="stuSecteur" placeholder="Secteur d'origine">
+
+<h3>📞 Contact Parents</h3>
+
+<input id="parentPhone" placeholder="Numéro parent">
 
 <button onclick="addStudent()">
-➕ Ajouter élève
+➕ Ajouter Élève
 </button>
 
 </div>
 
-<input id="searchStudent"
-placeholder="Rechercher..."
+<input
+id="searchStudent"
+placeholder="🔍 Rechercher..."
 oninput="renderStudents()">
 
-<div id="studentsTable"></div>
+<!-- TRI ET IMPRESSION -->
 
-<button onclick="back()">⬅ Retour</button>
+<div class="print-bar">
+
+<select id="printSort">
+
+<option value="nom">
+Par nom
+</option>
+
+<option value="classe">
+Par classe
+</option>
+
+<option value="jour">
+Par jour
+</option>
+
+<option value="annee">
+Par année
+</option>
+
+</select>
+
+<button onclick="printStudentsList()">
+🖨️ Imprimer liste
+</button>
+
+</div>
+
+<!-- TABLEAU -->
+
+<div class="table-container">
+
+<table class="student-table">
+
+<thead>
+<tr>
+  <th>Nom complet</th>
+  <th>Sexe</th>
+  <th>Classe</th>
+  <th>Date</th>
+  <th>Heure</th>
+  <th>Fiche</th>
+</tr>
+</thead>
+
+<tbody id="studentsTable"></tbody>
+
+</table>
+
+</div>
+
+<button onclick="back()">
+⬅ Retour
+</button>
 
 </div>
 <!-- ===== ENSEIGNANTS ===== -->
@@ -2558,7 +2779,19 @@ Aucune fiche
 
 <div id="printArea" style="display:none;"></div>
 
+<div id="studentFilePage" class="page">
 
+<div id="studentFileContent"></div>
+
+<button onclick="printStudentFile()">
+🖨️ Imprimer PDF
+</button>
+
+<button onclick="back()">
+⬅ Retour
+</button>
+
+</div>
 
 
 
@@ -4951,64 +5184,133 @@ function loadStudents(){
 
 }
 function addStudent(){
-   if(!isSchoolAdmin){
-  showMessage("❌ Accès refusé");
-  return;
-} 
 
-  if(!currentSchool){
-    showMessage("❌ Aucune école");
+  if(!isSchoolAdmin){
+    showMessage("❌ Accès refusé");
     return;
   }
 
-  let name = document.getElementById("stuName").value;
-  let classe = document.getElementById("stuClasse").value;
-  let gender = document.getElementById("stuGender").value;
-  let birth = document.getElementById("stuBirth").value;
-  let phone = document.getElementById("stuPhone").value;
-  let address = document.getElementById("stuAddress").value;
-
-  let parentName = document.getElementById("parentName").value;
-  let parentPhone = document.getElementById("parentPhone").value;
-  let parentJob = document.getElementById("parentJob").value;
-
-  if(!name || !classe){
-    showMessage("Remplis les champs");
+  if(!currentSchool){
+    showMessage("❌ Aucune école sélectionnée");
     return;
+  }
+
+  let nom =
+  document.getElementById("stuNom").value.trim();
+
+  let postnom =
+  document.getElementById("stuPostnom").value.trim();
+
+  let prenom =
+  document.getElementById("stuPrenom").value.trim();
+
+  let classe =
+  document.getElementById("stuClasse").value.trim();
+
+  let sexe =
+  document.getElementById("stuSexe").value;
+
+  let birth =
+  document.getElementById("stuBirth").value;
+
+  let birthPlace =
+  document.getElementById("stuBirthPlace").value.trim();
+
+  let address =
+  document.getElementById("stuAddress").value.trim();
+
+  let fatherName =
+  document.getElementById("fatherName").value.trim();
+
+  let motherName =
+  document.getElementById("motherName").value.trim();
+
+  let province =
+  document.getElementById("stuProvince").value;
+
+  if(province === "AUTRE"){
+      province =
+      document.getElementById("provinceOther")
+      .value.trim();
+  }
+
+  let territory =
+  document.getElementById("stuTerritory").value.trim();
+
+  let secteur =
+  document.getElementById("stuSecteur").value.trim();
+
+  let parentPhone =
+  document.getElementById("parentPhone").value.trim();
+
+  if(
+      !nom ||
+      !postnom ||
+      !prenom ||
+      !classe
+  ){
+      showMessage("❌ Remplissez les champs obligatoires");
+      return;
   }
 
   let id = "stu_" + Date.now();
 
   let matricule =
-  "EL-" + Math.floor(100000 + Math.random()*900000);
+  "EL-" +
+  new Date().getFullYear() +
+  "-" +
+  Math.floor(100000 + Math.random()*900000);
 
-  db.ref("schools/" + currentSchool + "/students/" + id)
-  .set({
+  db.ref(
+    "schools/" +
+    currentSchool +
+    "/students/" +
+    id
+  ).set({
 
-    name,
-    classe,
-    gender,
-    birth,
-    phone,
-    address,
+      nom,
+      postnom,
+      prenom,
 
-    parent:{
-      name: parentName,
-      phone: parentPhone,
-      job: parentJob
-    },
+      nomComplet:
+      nom + " " +
+      postnom + " " +
+      prenom,
 
-    matricule,
-    createdAt: Date.now()
+      classe,
+      sexe,
+
+      dateNaissance: birth,
+      lieuNaissance: birthPlace,
+
+      adresse: address,
+
+      pere: fatherName,
+      mere: motherName,
+
+      provinceOrigine: province,
+      territoireOrigine: territory,
+      secteurOrigine: secteur,
+
+      numeroParent: parentPhone,
+
+      matricule,
+
+      createdAt: Date.now(),
+
+dateEnregistrement:
+new Date().toLocaleDateString("fr-FR"),
+
+heureEnregistrement:
+new Date().toLocaleTimeString("fr-FR")
 
   });
 
-  showMessage("✅ Élève ajouté");
+  showMessage("✅ Élève ajouté avec succès");
 
   renderStudents();
 
 }
-
 function searchStudents(){
 
   let text = document.getElementById("searchStudent").value.toLowerCase();
@@ -5132,7 +5434,9 @@ function checkSchoolAccess(){
 
 function renderStudents(){
 
-  let box = document.getElementById("studentsTable");
+  let box =
+  document.getElementById("studentsTable");
+
   box.innerHTML = "";
 
   let search =
@@ -5144,45 +5448,101 @@ function renderStudents(){
   .then(snap => {
 
     if(!snap.exists()){
-      box.innerHTML = "Aucun élève";
+
+      box.innerHTML = `
+      <tr>
+        <td colspan="6">
+          Aucun élève enregistré
+        </td>
+      </tr>
+      `;
+
       return;
     }
 
+    let students = [];
+
     snap.forEach(s => {
 
-      let d = s.val();
+      students.push({
+        id:s.key,
+        ...s.val()
+      });
+
+    });
+
+    // TRI PAR CLASSE PUIS NOM
+    students.sort((a,b)=>{
+
+      let classeA =
+      (a.classe || "").toLowerCase();
+
+      let classeB =
+      (b.classe || "").toLowerCase();
+
+      let compareClasse =
+      classeA.localeCompare(
+        classeB,
+        'fr',
+        {numeric:true}
+      );
+
+      if(compareClasse !== 0){
+        return compareClasse;
+      }
+
+      let nomA =
+      `${a.nom || ""} ${a.postnom || ""} ${a.prenom || ""}`;
+
+      let nomB =
+      `${b.nom || ""} ${b.postnom || ""} ${b.prenom || ""}`;
+
+      return nomA.localeCompare(
+        nomB,
+        'fr'
+      );
+
+    });
+
+    students.forEach(d => {
+
+      let nomComplet =
+      `${d.nom || ""} ${d.postnom || ""} ${d.prenom || ""}`
+      .trim();
 
       if(
-        d.name.toLowerCase().includes(search) ||
-        d.classe.toLowerCase().includes(search)
+        nomComplet.toLowerCase().includes(search) ||
+        (d.classe || "")
+        .toLowerCase()
+        .includes(search)
       ){
 
-        let div = document.createElement("div");
+        box.innerHTML += `
 
-        div.style.background = "#111b21";
-        div.style.padding = "12px";
-        div.style.margin = "10px 0";
-        div.style.borderRadius = "12px";
+        <tr>
 
-        let adminButtons = "";
+          <td>${nomComplet}</td>
 
-        if(isSchoolAdmin){
-          adminButtons = `
-            <button onclick="editStudent('${s.key}')">✏️</button>
-            <button onclick="deleteStudent('${s.key}')">🗑</button>
-            <button onclick="generateQR('${s.key}')">📱 QR</button>
-          `;
-        }
+          <td>${d.sexe || "-"}</td>
 
-        div.innerHTML = `
-          <b>🎓 ${d.name}</b><br>
-          📚 Classe: ${d.classe}<br>
-          🆔 Matricule: ${d.matricule}<br>
+          <td>${d.classe || "-"}</td>
 
-          ${adminButtons}
+          <td>${d.dateEnregistrement || "-"}</td>
+
+          <td>${d.heureEnregistrement || "-"}</td>
+
+          <td>
+
+            <button
+            onclick="openStudentFile('${d.id}')">
+            📄 Fiche
+            </button>
+
+          </td>
+
+        </tr>
+
         `;
-
-        box.appendChild(div);
 
       }
 
@@ -7800,7 +8160,255 @@ function closeCommentsModal() {
   document.getElementById("commentsModal").style.display = "none";
 }
 
+function toggleProvinceOther(){
 
+  let province =
+  document.getElementById("stuProvince").value;
+
+  document.getElementById("provinceOther")
+  .style.display =
+  province === "AUTRE"
+  ? "block"
+  : "none";
+
+}
+function openStudentFile(studentId){
+
+  db.ref(
+    "schools/" +
+    currentSchool +
+    "/students/" +
+    studentId
+  )
+  .once("value")
+  .then(snap => {
+
+    let d = snap.val();
+
+    let nomComplet =
+    `${d.nom || ""} ${d.postnom || ""} ${d.prenom || ""}`;
+
+    document.getElementById(
+      "studentFileContent"
+    ).innerHTML = `
+
+      <div id="studentPrintArea"
+      style="
+      background:white;
+      color:black;
+      padding:20px;
+      border-radius:10px;
+      ">
+
+      <h2 style="text-align:center;">
+      FICHE INDIVIDUELLE ÉLÈVE
+      </h2>
+
+      <hr>
+
+      <p><b>Nom complet :</b> ${nomComplet}</p>
+
+      <p><b>Classe :</b> ${d.classe || ""}</p>
+
+      <p><b>Sexe :</b> ${d.sexe || ""}</p>
+
+      <p><b>Date naissance :</b> ${d.dateNaissance || ""}</p>
+
+      <p><b>Lieu naissance :</b> ${d.lieuNaissance || ""}</p>
+
+      <p><b>Adresse :</b> ${d.adresse || ""}</p>
+
+      <p><b>Père :</b> ${d.pere || ""}</p>
+
+      <p><b>Mère :</b> ${d.mere || ""}</p>
+
+      <p><b>Province :</b>
+      ${d.provinceOrigine || ""}</p>
+
+      <p><b>Territoire :</b>
+      ${d.territoireOrigine || ""}</p>
+
+      <p><b>Secteur :</b>
+      ${d.secteurOrigine || ""}</p>
+
+      <p><b>Numéro parent :</b>
+      ${d.numeroParent || ""}</p>
+
+      <p><b>Matricule :</b>
+      ${d.matricule || ""}</p>
+
+      </div>
+
+    `;
+
+    openPage("studentFilePage");
+
+  });
+
+}
+function printStudentsList(){
+
+  let sortBy =
+  document.getElementById("printSort").value;
+
+  db.ref(
+    "schools/" +
+    currentSchool +
+    "/students"
+  )
+  .once("value")
+  .then(snap=>{
+
+    let students=[];
+
+    snap.forEach(s=>{
+
+      students.push(s.val());
+
+    });
+
+    if(sortBy==="nom"){
+
+      students.sort((a,b)=>
+
+      `${a.nom} ${a.postnom}`
+      .localeCompare(
+      `${b.nom} ${b.postnom}`)
+
+      );
+
+    }
+
+    if(sortBy==="classe"){
+
+      students.sort((a,b)=>
+
+      (a.classe||"")
+      .localeCompare(
+      b.classe||"",
+      'fr',
+      {numeric:true})
+
+      );
+
+    }
+
+    let html = `
+    <h2>
+    LISTE DES ÉLÈVES
+    </h2>
+
+    <table border="1"
+    width="100%"
+    cellspacing="0"
+    cellpadding="5">
+
+    <tr>
+      <th>N°</th>
+      <th>Nom complet</th>
+      <th>Sexe</th>
+      <th>Classe</th>
+      <th>Date</th>
+    </tr>
+    `;
+
+    students.forEach((d,i)=>{
+
+      html += `
+      <tr>
+
+      <td>${i+1}</td>
+
+      <td>
+      ${d.nom || ""}
+      ${d.postnom || ""}
+      ${d.prenom || ""}
+      </td>
+
+      <td>${d.sexe || ""}</td>
+
+      <td>${d.classe || ""}</td>
+
+      <td>
+      ${d.dateEnregistrement || ""}
+      </td>
+
+      </tr>
+      `;
+
+    });
+
+    html += "</table>";
+
+    let win =
+    window.open();
+
+    win.document.write(html);
+
+    win.print();
+
+  });
+
+}
+function printStudentFile(){
+
+  let content =
+  document.getElementById("studentPrintArea");
+
+  if(!content){
+
+    showMessage("❌ Aucune fiche ouverte");
+
+    return;
+
+  }
+
+  let win = window.open("", "_blank");
+
+  win.document.write(`
+
+    <html>
+
+    <head>
+
+      <title>Fiche Élève</title>
+
+      <style>
+
+        body{
+          font-family:Arial,sans-serif;
+          padding:20px;
+        }
+
+        h2{
+          text-align:center;
+        }
+
+      </style>
+
+    </head>
+
+    <body>
+
+      ${content.innerHTML}
+
+    </body>
+
+    </html>
+
+  `);
+
+  win.document.close();
+
+  win.focus();
+
+  setTimeout(()=>{
+
+    win.print();
+
+  },500);
+
+}
 
 
 
