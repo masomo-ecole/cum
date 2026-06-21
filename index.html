@@ -11,7 +11,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>  
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Système Scolaire Moderne</title>  
-    <link rel="manifest" href="manifest.json">
   
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>  
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>  
@@ -1446,6 +1445,28 @@ body{
     background:#1faa52;
 }
 
+/* TUTO*/
+.tutorial-btn{
+  width: auto !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+
+  padding: 4px 10px !important;
+
+  border-radius: 18px;
+  font-size: 11px;
+
+  position: absolute;
+  top: 10px;
+  left: 10px;
+}
+
+.tutorial-btn:hover{
+  transform:translateY(-2px);
+}
+
+
 
 
 
@@ -1529,6 +1550,10 @@ font-size:14px;
   
 <!-- HOME -->  
 <div id="home" class="page active">
+    <!-- BOUTON TUTORIEL -->
+<button class="tutorial-btn" onclick="openVideo('v1')">
+  🎬 Aide
+</button>
 
   <div class="home-container">
 
@@ -1544,15 +1569,17 @@ font-size:14px;
     <h1 class="title">Masomo-École</h1>
 
     <p class="subtitle">
-      Plateforme intelligente pour élèves & enseignants
+      Plateforme intelligente pour Directeurs, Enseignants, Elèves & Parents
     </p>
 
     <!-- CARTE -->
     <div class="card">
+      🧑‍🎓 Enregistrement
       📚 Cours organisés<br>
       📝 Notes en temps réel<br>
       💬 Chat instantané<br>
       📄 Fiches de préparation PDF
+      📤 Impression de fiche
     </div>
 
     <!-- BOUTON -->
@@ -1578,9 +1605,14 @@ font-size:14px;
   
 <!-- LOGIN -->  
 <div id="login" class="page">
+    <button class="tutorial-btn" onclick="openVideo('v2')">
+  🎬 Aide
+</button>
   <div class="container">
+      <h2> 🔐 </h2> 
     <h2>Connexion</h2>
-
+    
+    
     <input id="logEmail" placeholder="📧.             E-mail">
     <input id="logPass" type="password" placeholder=" 🔒.            Mot de passe">
 
@@ -1593,6 +1625,9 @@ font-size:14px;
   
 <!-- REGISTER -->  
 <div id="register" class="page"> 
+    <button class="tutorial-btn" onclick="openVideo('v3')">
+  🎬 Aide
+</button>
   
 <h2>Inscription</h2>  
   
@@ -1630,7 +1665,10 @@ Valider la photo
 <h2 id="welcome"></h2>  
 <p id="roleText"></p>  
   
-<div id="eleveBox" style="display:none;"> 
+<div id="eleveBox" style="display:none;">
+    <button class="tutorial-btn" onclick="openVideo('v4')">
+  🎬 Aide
+</button> 
  
 <h3>Élève</h3>  
 <button onclick="openPage('notes')">Notes</button>  
@@ -1647,6 +1685,9 @@ Valider la photo
   
   
 <div id="teacherBox" style="display:none;">  
+    <button class="tutorial-btn" onclick="openVideo('v5')">
+  🎬 Aide
+</button>
 <h3>Enseignant</h3>  
 <button onclick="openPage('addNotes')">Ajouter notes</button>  
 <button onclick="openPage('addCours')">Ajouter cours</button>  
@@ -1728,6 +1769,9 @@ Valider la photo
     
   <!-- ======= commentaire avis ==== -->  
   <div id="feedbackPage" class="page">
+      <button class="tutorial-btn" onclick="openVideo('v6')">
+  🎬 Aide
+</button>
   
 <h2>💡 Commentaires & Avis</h2>
   <p>
@@ -1951,6 +1995,9 @@ flex:none;
 </div>  
   
 <div id="settingsPage" class="page">
+    <button class="tutorial-btn" onclick="openVideo('v7')">
+  🎬 Aide
+</button>
 
   <h2>⚙️ Paramètres</h2>
 
@@ -1985,6 +2032,9 @@ flex:none;
   
   <!-- ==== FICHE DE PREPARATION ==== -->   
   <div id="fiche" class="page">  
+      <button class="tutorial-btn" onclick="openVideo('v8')">
+  🎬 Aide
+</button>
   
 <h2>Fiche de préparation</h2>  
   
@@ -2053,6 +2103,9 @@ Retour
 
 <!-- ===== DASHBOARD ECOLE ===== -->
 <div id="schoolDashboard" class="page">
+    <button class="tutorial-btn" onclick="openVideo('v9')">
+  🎬 Aide
+</button>
 
   <h2>🏫 Dashboard École</h2>
 
@@ -2242,6 +2295,9 @@ Retour
 </div>
 <!-- ===== ÉLÈVES ===== -->
 <div id="studentsPage" class="page">
+    <button class="tutorial-btn" onclick="openVideo('v10')">
+  🎬 Aide
+</button>
 
 <h2>🎓 Gestion des élèves</h2>
 
@@ -2795,6 +2851,7 @@ Aucune fiche
 </button>
 
 </div>
+
 
 
 
@@ -8410,6 +8467,21 @@ function printStudentFile(){
     win.print();
 
   },500);
+
+}
+
+//  ======= TUTO VIDEO ======== //
+function openVideo(version) {
+
+  const videos = {
+    v1: "https://youtube.com/shorts/ZRqsiU28n1k?si=Kr_--cbQtB9LQ4Kq",
+    v2: "https://youtube.com/shorts/xxxx",
+    v3: "https://youtube.com/shorts/yyyy"
+  };
+
+  if (videos[version]) {
+    window.open(videos[version], "_blank");
+  }
 
 }
 
