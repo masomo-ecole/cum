@@ -38,8 +38,8 @@ linear-gradient(
 
 .login-box{
 
-width:80%;
-max-width:380px;
+width:90%;
+max-width:420px;
 
 background:white;
 
@@ -55,9 +55,59 @@ flex-direction:column;
 
 gap:15px;
 
-animation:show .8s;
+/* important */
+
+max-height:90vh;
+overflow-y:auto;
 
 }
+.login-box::-webkit-scrollbar{
+
+width:6px;
+
+}
+
+.login-box::-webkit-scrollbar-thumb{
+
+background:#1f4cff;
+border-radius:20px;
+
+}
+
+.gridBox{
+
+display:grid;
+
+grid-template-columns:
+1fr 1fr;
+
+gap:10px;
+
+}
+
+.smallCard{
+
+padding:12px;
+
+background:#f2f5ff;
+
+border-radius:15px;
+
+font-size:13px;
+
+display:flex;
+
+gap:8px;
+
+align-items:center;
+
+cursor:pointer;
+
+box-shadow:
+0 3px 10px rgba(0,0,0,.05);
+
+}
+
 
 /* ================= TITRE ================= */
 
@@ -600,6 +650,43 @@ firebase.database();
 // mémoire temporaire utilisateurs école
 
 let schoolUsersCache=[];
+// ================= CONFIG ECOLE =================
+
+const primaryClasses=[
+
+"1ère Mat","2ème Mat","3ème Mat",
+
+"1ère Pr A","1ère Pr B",
+"2ème Pr A","2ème Pr B",
+"3ème Pr A","3ème Pr B",
+"4ème Pr A","4ème Pr B",
+"5ème Pr A","5ème Pr B",
+"6ème Pr A","6ème Pr B",
+"7ème Pr A","7ème Pr B",
+"8ème Pr A","8ème Pr B"
+
+];
+
+const secondaryYears=[
+
+"1ère H",
+"2ème H",
+"3ème H",
+"4ème H"
+
+];
+
+const secondaryOptions=[
+
+"Agistage",
+"Commercial et gestion",
+"Coupe et couture",
+"Electricité",
+"Mécanique automobile",
+"Mécanique générale",
+"Pédagogie générale"
+
+];
 
 
 
@@ -854,412 +941,172 @@ error.message
 
 }
 
-// ================= ESPACE ELEVE =================
-
-function openStudent(){
-
-document
-.querySelector(
-".login-box"
-)
-.innerHTML=`
-
-<h2 style="
-text-align:center;
-color:#1f4cff;
-">
-
-Espace Élève
-
-</h2>
-
-<button>
-
-Mes devoirs
-
-</button>
-
-<button>
-
-Mes notes
-
-</button>
-
-<button>
-
-Mon profil
-
-</button>
-
-`;
-
-}
-
-
-// ================= ESPACE ENSEIGNANT =================
-
-function openTeacher(){
-
-document
-.querySelector(
-".login-box"
-)
-.innerHTML=`
-
-<h2 style="
-text-align:center;
-color:#1f4cff;
-">
-
-Espace Enseignant
-
-</h2>
-
-<button>
-
-Mes classes
-
-</button>
-
-<button>
-
-Présence
-
-</button>
-
-<button>
-
-Notes
-
-</button>
-
-`;
-
-}
-
-
-// ================= ESPACE PARENT =================
-
-function openParent(){
-
-document
-.querySelector(
-".login-box"
-)
-.innerHTML=`
-
-<h2 style="
-text-align:center;
-color:#1f4cff;
-">
-
-Espace Parent
-
-</h2>
-
-<button>
-
-Mon enfant
-
-</button>
-
-<button>
-
-Résultats
-
-</button>
-
-<button>
-
-Messages
-
-</button>
-
-`;
-
-}
-
-
-// ================= BOUTONS =================
-
-function createSchool(){
-
-document
-.getElementById(
-"page2"
-)
-.innerHTML=`
-
-<h2 style="
-text-align:center;
-color:#1f4cff;
-">
-
-Inscription école
-
-</h2>
-
-
-<input
-type="text"
-id="schoolName"
-placeholder="Nom de l'école"
->
-
-<input
-type="text"
-id="directorName"
-placeholder="Nom du directeur"
->
-
-<input
-type="email"
-id="email"
-placeholder="Email"
->
-
-<input
-type="text"
-id="schoolAddress"
-placeholder="Adresse école"
->
-
-<button onclick="registerSchool()">
-
-Créer l'école
-
-</button>
-
-`;
-
-}
-// ================= ENREGISTRER ECOLE =================
-
-function registerSchool(){
-
-let schoolName=
-
-document
-.getElementById(
-"schoolName"
-)
-.value;
-
-
-let directorName=
-
-document
-.getElementById(
-"directorName"
-)
-.value;
-
-
-let email=
-
-document
-.getElementById(
-"email"
-)
-.value;
-
-
-let schoolAddress=
-
-document
-.getElementById(
-"schoolAddress"
-)
-.value;
-
-
-// vérifier champs
-
-if(
-
-schoolName==="" ||
-
-directorName==="" ||
-
-email==="" ||
-
-schoolAddress===""
-
+// ================= CARTE ECOLE =================
+
+function schoolHeader(
+school,
+user
 ){
 
-alert(
-"Compléter tous les champs"
-);
+let badge="";
 
-return;
+if(
+school.verificationStatus==="verified"
+){
 
-}
-
-
-// créer école
-
-// récupérer numéro utilisé au début
-
-let phone=
-
-document
-.getElementById(
-"countryCode"
-).value+
-
-document
-.getElementById(
-"phone"
-).value;
-
-
-// créer école
-
-let schoolRef=
-
-db.ref(
-"schools"
-).push();
-
-
-// enregistrer école
-
-schoolRef.set({
-
-schoolName:
-schoolName,
-
-directorName:
-directorName,
-
-email:
-email,
-
-address:
-schoolAddress,
-
-createdAt:
-new Date()
-.toISOString()
-
-})
-
-.then(()=>{
-
-
-// enregistrer directeur comme admin
-
-return db.ref(
-"users/"+phone
-)
-
-.set({
-
-phone:phone,
-
-schoolId:
-schoolRef.key,
-
-role:"admin",
-
-name:
-directorName,
-
-createdAt:
-new Date()
-.toISOString()
-
-});
-
-})
-
-.then(()=>{
-
-
-// créer code invitation
-
-let invitationCode=
-
-Math.random()
-.toString(36)
-.substring(2,8)
-.toUpperCase();
-
-
-// enregistrer invitation
-
-return db.ref(
-
-"invitations/"+invitationCode
-
-)
-
-.set({
-
-schoolId:
-schoolRef.key,
-
-role:"student"
-
-})
-
-.then(()=>{
-
-document
-.getElementById(
-"page2"
-)
-.innerHTML=`
-
-<h2 style="
-color:#1f4cff;
-text-align:center;
-">
-
-École créée
-
-</h2>
-
-<p>
-
-Code invitation :
-
-</p>
+badge=`
 
 <div style="
-
-font-size:35px;
-font-weight:bold;
-text-align:center;
-color:#1f4cff;
-
+background:green;
+padding:8px;
+border-radius:12px;
+margin-top:10px;
 ">
 
-${invitationCode}
+✅ École vérifiée
 
 </div>
 
-<p>
+`;
 
-Vous êtes administrateur
+}
 
-</p>
+else{
 
-<button onclick="openAdmin()">
+badge=`
 
-Entrer
+<div style="
+background:orange;
+padding:8px;
+border-radius:12px;
+margin-top:10px;
+">
 
-</button>
+⏳ Vérification en cours
+
+</div>
 
 `;
 
-});
+}
+return `
+
+<div style="
+background:linear-gradient(
+135deg,
+#1f4cff,
+#5ea8ff
+);
+padding:18px;
+border-radius:20px;
+color:white;
+margin-bottom:15px;
+">
+
+<h3>
+
+🏫
+${school.schoolName}
+
+</h3>
+
+<div>
+
+🆔
+${school.schoolCode}
+
+</div>
+
+<div>
+
+${badge}
+
+</div>
+
+<div>
+    <br> 
+
+👋
+Bienvenue : <br>
+${user.name}
+
+</div>
+
+</div>
+
+`;
+
+}
+
+function verifierEcole(schoolId){
+
+showLoader();
+
+db.ref(
+"schools/"+schoolId
+)
+
+.update({
+
+verificationStatus:
+"verified"
 
 })
 
+.then(()=>{
 
+hideLoader();
+
+alert(
+"École vérifiée avec succès"
+);
+
+openAdmin();
+
+})
 
 .catch(error=>{
+
+hideLoader();
+
+alert(
+error.message
+);
+
+});
+
+}
+
+function retirerVerification(schoolId){
+
+showLoader();
+
+db.ref(
+"schools/"+schoolId
+)
+
+.update({
+
+verificationStatus:
+"pending"
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert(
+"Vérification retirée"
+);
+
+openAdmin();
+
+})
+
+.catch(error=>{
+
+hideLoader();
 
 alert(
 error.message
@@ -1270,202 +1117,382 @@ error.message
 }
 
 
-function joinSchool(){
 
-document.getElementById("page2").innerHTML = `
+function openStudent(){
 
-<h2 style="text-align:center;color:#1f4cff;">
-Rejoindre une école
+let phone=window.currentPhone;
+
+db.ref("users/"+phone)
+
+.once("value")
+
+.then(userSnap=>{
+
+let user=userSnap.val();
+
+return Promise.all([
+Promise.resolve(user),
+db.ref(
+"schools/"+user.schoolId
+).once("value")
+]);
+
+})
+
+.then(([user,schoolSnap])=>{
+
+let school=schoolSnap.val();
+
+document.querySelector(
+".login-box"
+).innerHTML=`
+
+${schoolHeader(school,user)}
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+🎓 Espace Élève
+
 </h2>
 
-<input type="text" id="inviteCode" placeholder="Code d'invitation">
+<button onclick="chargerDevoirsEleve()">
+Mes devoirs
+</button>
 
-<button onclick="confirmJoin()">
-Rejoindre
+<button>Mes notes</button>
+
+<button>Mon profil</button>
+
+<button onclick="chargerEmploiTempsEleve()">
+📅 Mon emploi du temps
+</button>
+
+`;
+
+});
+
+}
+
+function openTeacher(){
+    window.currentRole="teacher";
+
+let phone=window.currentPhone;
+
+db.ref("users/"+phone)
+
+.once("value")
+
+.then(userSnap=>{
+
+let user=userSnap.val();
+
+return Promise.all([
+Promise.resolve(user),
+db.ref(
+"schools/"+user.schoolId
+).once("value")
+]);
+
+})
+
+.then(([user,schoolSnap])=>{
+
+let school=schoolSnap.val();
+
+document.querySelector(
+".login-box"
+).innerHTML=`
+
+${schoolHeader(school,user)}
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+📚 Espace Enseignant
+
+</h2>
+
+<button onclick="ouvrirDevoirs()">
+Mes devoirs
+</button>
+
+<button onclick="ouvrirEmploiTemps()">
+📅 Emploi du temps
+</button>
+
+<button>Présence</button>
+
+<button>Notes</button>
+
+<button onclick="ouvrirListeEleves()">
+📋 Liste élèves
+</button>
+
+`;
+
+});
+
+}
+
+
+function openParent(){
+
+let phone=window.currentPhone;
+
+db.ref("users/"+phone)
+
+.once("value")
+
+.then(userSnap=>{
+
+let user=userSnap.val();
+
+return Promise.all([
+Promise.resolve(user),
+db.ref(
+"schools/"+user.schoolId
+).once("value")
+]);
+
+})
+
+.then(([user,schoolSnap])=>{
+
+let school=schoolSnap.val();
+
+document.querySelector(
+".login-box"
+).innerHTML=`
+
+${schoolHeader(school,user)}
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+👨‍👩‍👦 Espace Parent
+
+</h2>
+
+<button onclick="chargerDevoirsParent()">
+Mon enfant
+</button>
+
+
+<button>Résultats</button>
+
+<button>Messages</button>
+
+<button onclick="chargerEmploiTempsParent()">
+📅 Emploi du temps
+</button>
+
+`;
+
+});
+
+}
+
+function createSchool(){
+
+let primaryHtml="";
+let secondaryHtml="";
+let optionsHtml="";
+
+primaryClasses.forEach(c=>{
+
+primaryHtml+=`
+
+<label class="smallCard">
+<input
+type="checkbox"
+class="schoolClass"
+value="${c}">
+${c}
+</label>
+
+`;
+
+});
+
+
+secondaryYears.forEach(c=>{
+
+secondaryHtml+=`
+
+<label class="smallCard">
+<input
+type="checkbox"
+class="schoolClass"
+value="${c}">
+${c}
+</label>
+
+`;
+
+});
+
+
+secondaryOptions.forEach(c=>{
+
+optionsHtml+=`
+
+<label class="smallCard">
+<input
+type="checkbox"
+class="schoolOption"
+value="${c}">
+${c}
+</label>
+
+`;
+
+});
+
+
+document.getElementById(
+"page2"
+).innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+Nouvelle école
+
+</h2>
+
+<input
+id="schoolName"
+placeholder="Nom école">
+
+<input
+id="schoolMotto"
+placeholder="Devise école">
+
+<input
+id="schoolPhone"
+placeholder="Téléphone école">
+
+<input
+id="email"
+placeholder="Email">
+
+<input
+id="schoolAddress"
+placeholder="Adresse">
+
+<input
+id="province"
+placeholder="Province">
+
+<input
+id="territoire"
+placeholder="Territoire">
+
+<input
+id="commune"
+placeholder="Commune/Secteur">
+
+<input
+id="directorName"
+placeholder="Nom directeur">
+
+<input
+id="schoolYear"
+placeholder="Année scolaire">
+
+<h3>Niveau</h3>
+
+<div class="gridBox">
+
+<label class="smallCard">
+<input
+type="checkbox"
+id="primaryLevel">
+Primaire
+</label>
+
+<label class="smallCard">
+<input
+type="checkbox"
+id="secondaryLevel">
+Secondaire
+</label>
+
+</div>
+
+<h3>Classes primaire</h3>
+
+<div class="gridBox">
+
+${primaryHtml}
+
+</div>
+
+<h3>Humanités</h3>
+
+<div class="gridBox">
+
+${secondaryHtml}
+
+</div>
+
+<h3>Options</h3>
+
+<div class="gridBox">
+
+${optionsHtml}
+
+</div>
+
+<button
+onclick="registerSchool()">
+
+Créer école
+
 </button>
 
 `;
 
 }
 
-// ================= VALIDATION TELEPHONE =================
 
-function validatePhone(){
-
-let input=
-document.getElementById(
-"phone"
-);
-
-let number=
-input.value.replace(
-/\D/g,
-''
-);
+// ================= ENREGISTRER ECOLE =================
 
 
-// maximum 10 caractères
 
-number=
-number.substring(
-0,
-10
-);
-
-
-// si RDC +243 et numéro commence par 0
-
-if(
-
-document
-.getElementById(
-"countryCode"
-)
-.value==="+243"
-
-&&
-
-number.length===10
-
-&&
-
-number.startsWith(
-"0"
-)
-
-){
-
-number=
-number.substring(
-1
-);
-
-}
-
-
-// remettre dans champ
-
-input.value=
-number;
-
-
-// récupérer bouton
-
-let btn=
-document.getElementById(
-"continueBtn"
-);
-
-let status=
-document.getElementById(
-"phoneStatus"
-);
-
-
-// validation
-
-if(number.length===9){
-
-btn.disabled=
-false;
-
-btn.classList.add(
-"active"
-);
-
-input.classList.add(
-"validInput"
-);
-
-status.innerHTML=
-"✓ Numéro valide";
-
-status.style.color=
-"green";
-
-}
-
-else{
-
-btn.disabled=
-true;
-
-btn.classList.remove(
-"active"
-);
-
-input.classList.remove(
-"validInput"
-);
-
-status.innerHTML=
-"Numéro incomplet";
-
-status.style.color=
-"#777";
-
-}
-
-}
-
-// ================= FINALISER =================
+// ================= FINALISER INSCRIPTION =================
 
 // ================= FINALISER INSCRIPTION =================
 
 function finishJoin(){
 
-let name=
+let matricule=
 
-document
-.getElementById(
-"fullName"
-)
-.value
-.trim();
-
-
-let email=
-
-document
-.getElementById(
-"userEmail"
-)
-.value
-.trim();
-
-
-// vérification
-
-if(
-name==="" ||
-email===""
-){
-
-alert(
-"Complétez tous les champs"
-);
-
-return;
-
-}
-
-
-// téléphone connecté
+document.getElementById(
+"matricule"
+)?.value.trim() || "";
 
 let phone=
 window.currentPhone;
 
-
-// invitation mémorisée
-
 let invite=
 window.currentInvite;
-
 
 showLoader();
 
 
-// enregistrer utilisateur
+// si matricule vide
+
+if(matricule===""){
 
 db.ref(
 "users/"+phone
@@ -1473,17 +1500,13 @@ db.ref(
 
 .set({
 
-name:name,
-
-email:email,
-
 phone:phone,
 
-schoolId:
-invite.schoolId,
+role:invite.role,
 
-role:
-invite.role,
+schoolId:invite.schoolId,
+
+name:"Nouvel utilisateur",
 
 createdAt:
 new Date()
@@ -1493,20 +1516,169 @@ new Date()
 
 .then(()=>{
 
+hideLoader();
 
-// marquer invitation utilisée
-
-return db.ref(
-"invitations"
-)
-
-.orderByChild(
-"schoolId"
-)
-
-.once(
-"value"
+alert(
+"Compte créé"
 );
+
+if(invite.role==="student"){
+openStudent();
+}
+else if(invite.role==="teacher"){
+openTeacher();
+}
+else{
+openParent();
+}
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(
+error.message
+);
+
+});
+
+return;
+
+}
+
+
+// si matricule rempli
+
+db.ref(
+"eleves/"+matricule
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+if(!snapshot.exists()){
+
+throw new Error(
+"Matricule introuvable"
+);
+
+}
+
+let eleve=
+snapshot.val();
+
+if(eleve.linked){
+
+throw new Error(
+"Élève déjà lié"
+);
+
+}
+
+
+let userData={
+
+matricule:
+eleve.matricule,
+
+nom:
+eleve.nom,
+
+postnom:
+eleve.postnom,
+
+prenom:
+eleve.prenom,
+
+name:
+eleve.name,
+
+phone:
+phone,
+
+role:
+"student",
+
+className:
+eleve.className,
+
+schoolId:
+eleve.schoolId,
+
+fatherName:
+eleve.fatherName || "",
+
+fatherPhone:
+eleve.fatherPhone || "",
+
+motherName:
+eleve.motherName || "",
+
+motherPhone:
+eleve.motherPhone || "",
+
+province:
+eleve.province || "",
+
+territoire:
+eleve.territoire || "",
+
+secteur:
+eleve.secteur || "",
+
+linked:true,
+
+createdAt:
+eleve.createdAt
+
+};
+
+return Promise.all([
+
+db.ref(
+"users/"+phone
+).set(userData),
+
+db.ref(
+"eleves/"+matricule
+)
+
+.update({
+
+phone:phone,
+linked:true
+
+}),
+
+db.ref(
+"schools/"
++
+eleve.schoolId+
+"/members/"
++
+phone
+)
+
+.set({
+
+name:
+eleve.name,
+
+role:
+"student",
+
+phone:
+phone,
+
+createdAt:
+Date.now()
+
+})
+
+]);
 
 })
 
@@ -1514,30 +1686,11 @@ return db.ref(
 
 hideLoader();
 
-
-// ouvrir espace selon rôle
-
-if(
-invite.role==="teacher"
-){
-
-openTeacher();
-
-}
-
-else if(
-invite.role==="parent"
-){
-
-openParent();
-
-}
-
-else{
+alert(
+"Compte lié avec succès"
+);
 
 openStudent();
-
-}
 
 })
 
@@ -1553,10 +1706,10 @@ error.message
 
 }
 
-
 // ================= DASHBOARD ADMIN =================
 
 function openAdmin(){
+    window.currentRole="admin";
 
 let phone=
 window.currentPhone;
@@ -1572,6 +1725,9 @@ db.ref(
 
 let user=
 userSnap.val();
+
+window.currentSchoolId=
+user.schoolId;
 
 return db.ref(
 "schools/"+user.schoolId
@@ -1644,6 +1800,17 @@ Générer invitation
 
 </button>
 
+ <button
+style="
+background:red;
+margin-top:10px;
+"
+>
+
+🗑 Réinitialiser base
+
+</button>
+
 <button onclick="openMembers()">
 
 Membres de l'école
@@ -1663,7 +1830,443 @@ text-align:center;
 
 </div>
 
+<button onclick="showActivities()">
+
+Activités récentes
+
+</button>
+
+<button onclick="studentRecords()">
+
+Fiches élèves
+
+</button>
+
+<button onclick="ouvrirListeEleves()">
+📋 Liste élèves
+</button>
+
+<button onclick="ouvrirEmploiTemps()">
+📅 Emploi du temps
+</button>
+
 `;
+
+});
+
+}
+
+
+// ================= FICHES ELEVES =================
+
+function studentRecords(){
+
+showLoader();
+
+db.ref("eleves")
+
+.once("value")
+
+.then(snapshot=>{
+
+let html=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+Fiches élèves
+
+</h2>
+
+<button
+onclick="openAddStudent()"
+>
+
+➕ Ajouter élève
+
+</button>
+
+<div style="
+display:flex;
+flex-direction:column;
+gap:10px;
+margin-top:15px;
+">
+
+`;
+
+if(!snapshot.exists()){
+
+html+=`
+
+<div style="
+text-align:center;
+padding:20px;
+color:gray;
+">
+
+Aucun élève
+
+</div>
+
+`;
+
+}
+
+snapshot.forEach(item=>{
+
+let data=item.val();
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+border-radius:15px;
+box-shadow:
+0 4px 10px rgba(0,0,0,.08);
+
+display:flex;
+justify-content:space-between;
+align-items:center;
+">
+
+<div>
+
+<b>
+
+${data.name}
+
+</b>
+
+<br>
+
+🎓 ${data.className}
+
+<br>
+
+🆔 ${data.matricule}
+
+</div>
+
+<button
+onclick="viewStudent('${data.matricule}')"
+>
+
+Voir
+
+</button>
+
+</div>
+
+`;
+
+});
+
+html+=`
+
+</div>
+
+<button
+onclick="openAdmin()"
+style="
+margin-top:15px;
+">
+
+⬅ Retour
+
+</button>
+
+`;
+
+document.querySelector(
+".login-box"
+).innerHTML=
+html;
+
+hideLoader();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+// ================= AJOUTER ELEVE =================
+
+function openAddStudent(){
+
+let adminPhone=window.currentPhone;
+
+db.ref(
+"users/"+adminPhone
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let admin=snapshot.val();
+
+window.currentSchoolId=
+admin.schoolId;
+
+return db.ref(
+"schools/"+admin.schoolId
+)
+
+.once("value");
+
+})
+
+.then(snapshot=>{
+
+let school=snapshot.val();
+
+window.currentSchool=school;
+
+let classHtml="";
+
+school.classes.forEach(c=>{
+
+classHtml+=`
+<option>${c}</option>
+`;
+
+});
+
+document.querySelector(
+".login-box"
+).innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+Nouvel élève
+
+</h2>
+
+<input
+id="nom"
+placeholder="Nom"
+>
+
+<input
+id="postnom"
+placeholder="Postnom"
+>
+
+<input
+id="prenom"
+placeholder="Prénom"
+>
+
+<select id="sexe">
+
+<option>Masculin</option>
+<option>Féminin</option>
+
+</select>
+
+<select id="studentClass">
+
+${classHtml}
+
+</select>
+
+<input
+id="fatherName"
+placeholder="Nom père"
+>
+
+<input
+id="fatherPhone"
+placeholder="Téléphone père"
+>
+
+<input
+id="motherName"
+placeholder="Nom mère"
+>
+
+<input
+id="motherPhone"
+placeholder="Téléphone mère"
+>
+
+<input
+id="province"
+placeholder="Province"
+>
+
+<input
+id="territoire"
+placeholder="Territoire"
+>
+
+<input
+id="secteur"
+placeholder="Secteur"
+>
+
+<button
+onclick="saveStudent()"
+>
+
+Enregistrer
+
+</button>
+
+`;
+
+});
+
+}
+
+
+// ================= FICHE ELEVES =================
+
+function viewStudent(studentId){
+
+showLoader();
+
+
+// chercher fiche élève
+
+db.ref(
+"eleves/"+studentId
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+
+// si trouvé dans fiches
+
+if(snapshot.exists()){
+
+return snapshot.val();
+
+}
+
+
+// sinon chercher dans users
+
+return db.ref(
+"users/"+studentId
+)
+
+.once("value")
+
+.then(userSnap=>{
+
+if(userSnap.exists()){
+
+return userSnap.val();
+
+}
+
+throw new Error(
+"Élève introuvable"
+);
+
+});
+
+})
+
+.then(student=>{
+
+document.querySelector(
+".login-box"
+).innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+Fiche élève
+
+</h2>
+
+<div style="
+background:white;
+padding:20px;
+border-radius:20px;
+box-shadow:
+0 4px 10px rgba(0,0,0,.08);
+line-height:2;
+">
+
+👤 <b>Nom :</b>
+${student.name||"-"}
+
+<br>
+
+🆔 <b>Matricule :</b>
+${student.matricule||"-"}
+
+<br>
+
+🎓 <b>Classe :</b>
+${student.className||"-"}
+
+<br>
+
+📱 <b>Téléphone :</b>
+${student.phone||"-"}
+
+<br>
+
+👨 <b>Père :</b>
+${student.fatherName||"-"}
+
+<br>
+
+📞
+${student.fatherPhone||"-"}
+
+<br>
+
+👩 <b>Mère :</b>
+${student.motherName||"-"}
+
+<br>
+
+📞
+${student.motherPhone||"-"}
+
+</div>
+
+<button onclick="studentRecords()">
+
+⬅ Retour
+
+</button>
+
+`;
+
+hideLoader();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
 
 });
 
@@ -1806,31 +2409,14 @@ ${inviteCode}
 function confirmJoin(){
 
 let code=
-
-document
-.getElementById(
+document.getElementById(
 "inviteCode"
 )
 .value
 .trim()
 .toUpperCase();
 
-
-// vide
-
-if(code===""){
-
-alert(
-"Entrez un code"
-);
-
-return;
-
-}
-
-
 showLoader();
-
 
 db.ref(
 "invitations/"+code
@@ -1842,9 +2428,6 @@ db.ref(
 
 hideLoader();
 
-
-// introuvable
-
 if(!snapshot.exists()){
 
 alert(
@@ -1855,57 +2438,28 @@ return;
 
 }
 
-
 let invite=
 snapshot.val();
 
-
-// déjà utilisé
-
-if(
-invite.used===true
-){
-
-alert(
-"Code déjà utilisé"
-);
-
-return;
-
-}
-
-
-// mémoriser
+invite.code=
+code;
 
 window.currentInvite=
 invite;
 
+document.querySelector(
+".login-box"
+).innerHTML=`
 
-// formulaire final
-
-document
-.getElementById(
-"page2"
-)
-.innerHTML=`
-
-<h2 style="
-text-align:center;
-color:#1f4cff;
-">
+<h2>
 
 Compléter profil
 
 </h2>
 
 <input
-id="fullName"
-placeholder="Nom complet"
->
-
-<input
-id="userEmail"
-placeholder="Email"
+id="matricule"
+placeholder="Matricule élève"
 >
 
 <button
@@ -1918,111 +2472,11 @@ Terminer
 
 `;
 
-})
-
-.catch(error=>{
-
-hideLoader();
-
-alert(
-error.message
-);
-
 });
 
 }
 
-// ================= MEMBRES ECOLE =================
 
-// ================= MEMBRES ECOLE RAPIDE =================
-
-function showMembers(reload=true){
-
-let phone=
-window.currentPhone;
-
-
-// utiliser cache si déjà chargé
-
-if(
-reload===false
-&&
-schoolUsersCache.length>0
-){
-
-drawMembers();
-
-return;
-
-}
-
-
-// récupérer admin
-
-db.ref(
-"users/"+phone
-)
-
-.once("value")
-
-.then(snapshot=>{
-
-let admin=
-snapshot.val();
-
-let schoolId=
-admin.schoolId;
-
-
-// vider cache
-
-schoolUsersCache=[];
-
-
-// charger utilisateurs
-
-return db.ref(
-"users"
-)
-
-.orderByChild(
-"schoolId"
-)
-
-.once("value")
-
-.then(users=>{
-
-users.forEach(user=>{
-
-let data=
-user.val();
-
-if(
-data.schoolId===
-schoolId
-){
-
-schoolUsersCache.push(
-data
-);
-
-}
-
-});
-
-
-// afficher
-
-drawMembers();
-
-});
-
-});
-
-}
-
-// ================= DESSINER MEMBRES =================
 
 // ================= DESSINER MEMBRES PRO =================
 
@@ -2581,6 +3035,2973 @@ document
 html;
 
 }
+// ================= ACTIVITES ECOLE =================
+
+function showActivities(){
+
+showLoader();
+
+db.ref(
+"users/"+window.currentPhone
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let admin=
+snapshot.val();
+
+return db.ref(
+"schools/"
++
+admin.schoolId+
+"/members"
+)
+
+.once("value");
+
+})
+
+.then(snapshot=>{
+
+let html=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+Activités récentes
+
+</h2>
+
+<div style="
+display:flex;
+flex-direction:column;
+gap:12px;
+max-height:420px;
+overflow:auto;
+">
+
+`;
+
+let activites=[];
+
+
+if(snapshot.exists()){
+
+snapshot.forEach(item=>{
+
+let data=
+item.val();
+
+activites.push(data);
+
+});
+
+}
+
+
+// trier récent → ancien
+
+activites.sort((a,b)=>{
+
+let dateA=
+a.createdAt || 0;
+
+let dateB=
+b.createdAt || 0;
+
+return dateB-dateA;
+
+});
+
+
+// afficher
+
+if(
+activites.length===0
+){
+
+html+=`
+
+<div style="
+text-align:center;
+padding:20px;
+color:gray;
+">
+
+Aucune activité
+
+</div>
+
+`;
+
+}
+
+else{
+
+activites.forEach(data=>{
+
+let dateTexte="-";
+
+if(data.createdAt){
+
+dateTexte=
+new Date(
+data.createdAt
+)
+.toLocaleString();
+
+}
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+border-radius:15px;
+box-shadow:
+0 4px 10px rgba(0,0,0,.08);
+">
+
+<b>
+
+${data.name||"Utilisateur"}
+
+</b>
+
+<br>
+
+📌 Rôle :
+${data.role||"-"}
+
+<br>
+
+🕒
+${dateTexte}
+
+</div>
+
+`;
+
+});
+
+}
+
+
+html+=`
+
+</div>
+
+<button
+onclick="openAdmin()"
+style="
+margin-top:15px;
+">
+
+⬅ Retour
+
+</button>
+
+`;
+
+document.querySelector(
+".login-box"
+).innerHTML=
+html;
+
+hideLoader();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(
+error.message
+);
+
+});
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ================= REJOINDRE ECOLE =================
+
+function joinSchool(){
+
+document.getElementById("page2").innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+margin:0;
+">
+
+Rejoindre une école
+
+</h2>
+
+<p>
+Entrez votre code d'invitation
+</p>
+
+<input
+id="inviteCode"
+placeholder="Ex : TEA-X7K2"
+style="text-transform:uppercase"
+>
+
+<button onclick="confirmJoin()">
+
+Continuer
+
+</button>
+
+`;
+
+}
+
+
+
+// ================= VALIDATION TELEPHONE =================
+
+function validatePhone(){
+
+const input=
+document.getElementById("phone");
+
+const country=
+document.getElementById("countryCode");
+
+const btn=
+document.getElementById("continueBtn");
+
+const status=
+document.getElementById("phoneStatus");
+
+
+if(
+!input ||
+!country ||
+!btn ||
+!status
+){
+return;
+}
+
+
+// garder uniquement chiffres
+
+let number=
+input.value.replace(/\D/g,"");
+
+
+// traitement RDC
+
+if(
+
+country.value==="+243" &&
+number.startsWith("0")
+
+){
+
+number=
+number.substring(1);
+
+}
+
+
+// limites
+
+const maxLength=
+
+country.value==="+243"
+?9
+:15;
+
+number=
+number.substring(0,maxLength);
+
+input.value=
+number;
+
+
+// validation
+
+const isValid=
+
+country.value==="+243"
+?number.length===9
+:number.length>=6;
+
+
+// mise à jour interface
+
+btn.disabled=!isValid;
+
+btn.classList.toggle(
+"active",
+isValid
+);
+
+input.classList.toggle(
+"validInput",
+isValid
+);
+
+
+status.innerHTML=
+
+isValid
+?"✓ Numéro valide"
+:"Numéro incomplet";
+
+
+status.style.color=
+
+isValid
+?"green"
+:"#777";
+
+}
+
+
+
+// ================= ENREGISTRER ECOLE =================
+
+async function registerSchool(){
+
+try{
+
+showLoader();
+
+
+// récupérer champs
+
+const schoolName=
+document.getElementById(
+"schoolName"
+)?.value.trim() || "";
+
+const schoolMotto=
+document.getElementById(
+"schoolMotto"
+)?.value.trim() || "";
+
+const schoolPhone=
+document.getElementById(
+"schoolPhone"
+)?.value.trim() || "";
+
+const directorName=
+document.getElementById(
+"directorName"
+)?.value.trim() || "";
+
+const email=
+document.getElementById(
+"email"
+)?.value.trim() || "";
+
+const schoolAddress=
+document.getElementById(
+"schoolAddress"
+)?.value.trim() || "";
+
+const province=
+document.getElementById(
+"province"
+)?.value.trim() || "";
+
+const territoire=
+document.getElementById(
+"territoire"
+)?.value.trim() || "";
+
+const commune=
+document.getElementById(
+"commune"
+)?.value.trim() || "";
+
+const schoolYear=
+document.getElementById(
+"schoolYear"
+)?.value.trim() || "";
+
+
+// vérifier champs
+
+let missing=[];
+
+if(!schoolName)
+missing.push("Nom école");
+
+if(!directorName)
+missing.push("Nom directeur");
+
+if(!schoolPhone)
+missing.push("Téléphone école");
+
+if(!schoolAddress)
+missing.push("Adresse");
+
+
+if(missing.length){
+
+hideLoader();
+
+alert(
+"Complétez :\n\n"+
+missing.join("\n")
+);
+
+return;
+
+}
+
+
+// niveaux
+
+let primary=
+document.getElementById(
+"primaryLevel"
+).checked;
+
+let secondary=
+document.getElementById(
+"secondaryLevel"
+).checked;
+
+
+if(
+!primary &&
+!secondary
+){
+
+hideLoader();
+
+alert(
+"Sélectionnez un niveau"
+);
+
+return;
+
+}
+
+
+// classes
+
+let classes=[];
+
+document
+.querySelectorAll(
+".schoolClass:checked"
+)
+.forEach(c=>{
+
+classes.push(
+c.value
+);
+
+});
+
+
+// options
+
+let options=[];
+
+document
+.querySelectorAll(
+".schoolOption:checked"
+)
+.forEach(c=>{
+
+options.push(
+c.value
+);
+
+});
+
+
+if(classes.length===0){
+
+hideLoader();
+
+alert(
+"Choisissez au moins une classe"
+);
+
+return;
+
+}
+
+
+// vérifier doublon
+
+const schoolsSnap=
+await db.ref(
+"schools"
+)
+.once("value");
+
+
+let existe=false;
+
+schoolsSnap.forEach(item=>{
+
+let school=
+item.val();
+
+if(
+
+school.schoolName
+?.toLowerCase()
+===
+schoolName.toLowerCase()
+
+&&
+
+school.province===
+province
+
+&&
+
+school.commune===
+commune
+
+){
+
+existe=true;
+
+}
+
+});
+
+
+if(existe){
+
+hideLoader();
+
+alert(
+"Une école avec ce nom existe déjà"
+);
+
+return;
+
+}
+
+
+// code école
+
+let schoolCode=
+
+"MAS-"+
+
+Math.floor(
+1000+
+Math.random()*9000
+);
+
+
+// créer école
+
+let schoolRef=
+
+db.ref(
+"schools"
+).push();
+
+
+await schoolRef.set({
+
+schoolName,
+schoolCode,
+
+verificationStatus:
+"pending",
+
+motto:
+schoolMotto,
+
+phone:
+schoolPhone,
+
+directorName,
+
+email,
+
+address:
+schoolAddress,
+
+province,
+
+territoire,
+
+commune,
+
+schoolYear,
+
+levels:{
+primary,
+secondary
+},
+
+classes,
+options,
+
+totalStudents:0,
+totalTeachers:0,
+totalParents:0,
+
+createdAt:
+Date.now()
+
+});
+
+
+// créer directeur
+
+let phone=
+window.currentPhone;
+
+
+let adminData={
+
+phone:phone,
+
+name:
+directorName,
+
+schoolId:
+schoolRef.key,
+
+role:
+"admin",
+
+createdAt:
+Date.now()
+
+};
+
+
+await db.ref(
+"users/"+phone
+)
+.set(
+adminData
+);
+
+
+// ajouter aussi dans membres
+
+await db.ref(
+"schools/"
++
+schoolRef.key+
+"/members/"
++
+phone.replace(
+/\D/g,
+""
+)
+)
+.set(
+adminData
+);
+
+
+hideLoader();
+
+alert(
+
+"École créée avec succès\n\n"+
+
+"Code : "+schoolCode
+
+);
+
+openAdmin();
+
+}
+
+catch(error){
+
+hideLoader();
+
+alert(
+error.message
+);
+
+}
+
+}
+
+// ================= MEMBRES ECOLE =================
+
+async function showMembers(
+reload=true
+){
+
+try{
+
+showLoader();
+
+const adminSnap=
+
+await db.ref(
+"users/"+window.currentPhone
+)
+
+.once("value");
+
+const admin=
+adminSnap.val();
+
+window.currentSchoolId=
+admin.schoolId;
+
+
+// vérifier si directeur existe
+
+const adminMemberSnap=
+
+await db.ref(
+"schools/"
++
+admin.schoolId+
+"/members/"
++
+window.currentPhone.replace(
+/\D/g,
+""
+)
+)
+
+.once("value");
+
+
+// si absent → créer automatiquement
+
+if(
+!adminMemberSnap.exists()
+){
+
+await db.ref(
+"schools/"
++
+admin.schoolId+
+"/members/"
++
+window.currentPhone.replace(
+/\D/g,
+""
+)
+)
+
+.set({
+
+name:
+admin.name,
+
+phone:
+admin.phone,
+
+role:
+"admin",
+
+createdAt:
+admin.createdAt||
+Date.now()
+
+});
+
+}
+
+
+// charger membres
+
+const membersSnap=
+
+await db.ref(
+"schools/"
++
+admin.schoolId+
+"/members"
+)
+
+.once("value");
+
+
+schoolUsersCache=[];
+
+
+if(
+membersSnap.exists()
+){
+
+membersSnap.forEach(item=>{
+
+schoolUsersCache.push(
+item.val()
+);
+
+});
+
+}
+
+
+drawMembers();
+
+}
+
+catch(error){
+
+hideLoader();
+
+alert(
+error.message
+);
+
+}
+
+}
+
+
+// ================= SAUVEGARDE ELEVE =================
+
+function saveStudent(){
+
+showLoader();
+
+const nom=
+document.getElementById("nom")
+.value.trim();
+
+const postnom=
+document.getElementById("postnom")
+.value.trim();
+
+const prenom=
+document.getElementById("prenom")
+.value.trim();
+
+if(
+!nom ||
+!postnom ||
+!prenom
+){
+
+hideLoader();
+
+alert(
+"Complétez tous les champs"
+);
+
+return;
+
+}
+
+let matricule="";
+
+db.ref(
+"schools/"+window.currentSchoolId
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let school=
+snapshot.val();
+
+let prefixe=
+school.schoolName
+.split(" ")
+.map(m=>m.substring(0,2))
+.join("")
+.toUpperCase();
+
+return db.ref(
+"schools/"
++
+window.currentSchoolId+
+"/students"
+)
+
+.once("value");
+
+})
+
+.then(students=>{
+
+let numero=
+students.numChildren()+1;
+
+matricule=
+
+"MAS-"+
+
+String(numero)
+.padStart(4,"0");
+
+
+let eleveData={
+
+matricule:matricule,
+
+nom:nom,
+
+postnom:postnom,
+
+prenom:prenom,
+
+name:
+nom+" "+
+postnom+" "+
+prenom,
+
+role:"student",
+
+sexe:
+document.getElementById(
+"sexe"
+).value,
+
+className:
+document.getElementById(
+"studentClass"
+).value,
+
+fatherName:
+document.getElementById(
+"fatherName"
+).value,
+
+fatherPhone:
+document.getElementById(
+"fatherPhone"
+).value,
+
+motherName:
+document.getElementById(
+"motherName"
+).value,
+
+motherPhone:
+document.getElementById(
+"motherPhone"
+).value,
+
+province:
+document.getElementById(
+"province"
+).value,
+
+territoire:
+document.getElementById(
+"territoire"
+).value,
+
+secteur:
+document.getElementById(
+"secteur"
+).value,
+
+schoolId:
+window.currentSchoolId,
+
+phone:"",
+linked:false,
+
+createdAt:
+Date.now()
+
+};
+
+
+return Promise.all([
+
+db.ref(
+"eleves/"+matricule
+)
+.set(eleveData),
+
+db.ref(
+"schools/"
++
+window.currentSchoolId+
+"/students/"
++
+matricule
+)
+.set(eleveData),
+
+db.ref(
+"schools/"
++
+window.currentSchoolId+
+"/members/"
++
+matricule
+)
+.set({
+
+nom:
+eleveData.nom,
+
+postnom:
+eleveData.postnom,
+
+prenom:
+eleveData.prenom,
+
+name:
+eleveData.name,
+
+role:
+"student",
+
+matricule:
+matricule,
+
+className:
+eleveData.className,
+
+createdAt:
+Date.now()
+
+})
+
+]);
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert(
+
+"Élève enregistré\n\n"+
+"Matricule : "+
+matricule
+
+);
+
+studentRecords();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(
+error.message
+);
+
+});
+
+}
+
+// ================= DEVOIRS =================
+
+
+// ouvrir espace devoirs enseignant
+
+function ouvrirDevoirs(){
+
+showLoader();
+
+let phone=window.currentPhone;
+
+db.ref(
+"users/"+phone
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let user=snapshot.val();
+
+if(!user){
+
+throw new Error(
+"Utilisateur introuvable"
+);
+
+}
+
+return db.ref(
+"schools/"+user.schoolId
+)
+
+.once("value");
+
+})
+
+.then(snapshot=>{
+
+let school=snapshot.val();
+
+if(!school){
+
+throw new Error(
+"École introuvable"
+);
+
+}
+
+
+// sécurité si classes absentes
+
+let classes=
+school.classes || [];
+
+let classesHtml="";
+
+
+// construire liste
+
+classes.forEach(c=>{
+
+classesHtml+=`
+<option value="${c}">
+${c}
+</option>
+`;
+
+});
+
+
+// aucune classe
+
+if(classes.length===0){
+
+classesHtml=`
+
+<option disabled selected>
+
+Aucune classe disponible
+
+</option>
+
+`;
+
+}
+
+
+document.querySelector(
+".login-box"
+).innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+📚 Gestion devoirs
+
+</h2>
+
+<input
+id="matiere"
+placeholder="Matière"
+>
+
+<select id="classe">
+
+${classesHtml}
+
+</select>
+
+<input
+id="titre"
+placeholder="Titre devoir"
+>
+
+<textarea
+id="description"
+placeholder="Description"
+style="
+padding:15px;
+border-radius:12px;
+border:1px solid #ccc;
+height:100px;
+resize:none;
+"
+></textarea>
+
+<input
+id="dateLimite"
+type="date"
+>
+
+<button onclick="enregistrerDevoir()">
+
+Enregistrer devoir
+
+</button>
+
+<button onclick="openTeacher()">
+
+⬅ Retour
+
+</button>
+
+`;
+
+hideLoader();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(
+error.message
+);
+
+});
+
+}
+
+// enregistrer devoir
+
+function enregistrerDevoir(){
+
+showLoader();
+
+let matiere=
+document.getElementById(
+"matiere"
+).value.trim();
+
+let classe=
+document.getElementById(
+"classe"
+).value;
+
+let titre=
+document.getElementById(
+"titre"
+).value.trim();
+
+let description=
+document.getElementById(
+"description"
+).value.trim();
+
+let dateLimite=
+document.getElementById(
+"dateLimite"
+).value;
+
+
+if(
+
+matiere==="" ||
+titre==="" ||
+description==="" ||
+dateLimite===""
+
+){
+
+hideLoader();
+
+alert(
+"Complétez tous les champs"
+);
+
+return;
+
+}
+
+
+db.ref(
+"users/"+window.currentPhone
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let user=snapshot.val();
+
+let devoirRef=
+
+db.ref(
+"devoirs"
+).push();
+
+
+return devoirRef.set({
+
+idEcole:
+user.schoolId,
+
+telephoneEnseignant:
+user.phone,
+
+classe:
+classe,
+
+matiere:
+matiere,
+
+titre:
+titre,
+
+description:
+description,
+
+dateLimite:
+dateLimite,
+
+dateCreation:
+new Date()
+.toISOString()
+
+});
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert(
+"Devoir enregistré"
+);
+
+ouvrirDevoirs();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(
+error.message
+);
+
+});
+
+}
+
+// ================= DEVOIRS ELEVE =================
+
+function chargerDevoirsEleve(){
+
+showLoader();
+
+let phone=window.currentPhone;
+
+db.ref("users/"+phone)
+
+.once("value")
+
+.then(snapshot=>{
+
+let eleve=snapshot.val();
+
+return Promise.all([
+
+Promise.resolve(eleve),
+
+db.ref("devoirs").once("value")
+
+]);
+
+})
+
+.then(([eleve,devoirsSnap])=>{
+
+let html=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+📘 Mes devoirs
+</h2>
+
+<div style="
+display:flex;
+flex-direction:column;
+gap:12px;
+">
+`;
+
+let total=0;
+
+
+// vérifier si devoirs existe
+if(devoirsSnap.exists()){
+
+devoirsSnap.forEach(item=>{
+
+let devoir=item.val();
+
+if(
+
+devoir.classe===eleve.className &&
+
+devoir.idEcole===eleve.schoolId
+
+){
+
+total++;
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+border-radius:15px;
+box-shadow:0 4px 10px rgba(0,0,0,.08);
+">
+
+<b>${devoir.matiere}</b>
+
+<br><br>
+
+📖 ${devoir.titre}
+
+<br><br>
+
+📝 ${devoir.description}
+
+<br><br>
+
+📅 Limite :
+${devoir.dateLimite}
+
+</div>
+
+`;
+
+}
+
+});
+
+}
+
+
+if(total===0){
+
+html+=`
+
+<div style="
+text-align:center;
+padding:20px;
+color:gray;
+">
+
+Aucun devoir disponible
+
+</div>
+
+`;
+
+}
+
+html+=`
+
+</div>
+
+<button onclick="openStudent()">
+
+⬅ Retour
+
+</button>
+
+`;
+
+document.querySelector(
+".login-box"
+).innerHTML=html;
+
+hideLoader();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+// ================= DEVOIRS PARENT =================
+
+function chargerDevoirsParent(){
+
+showLoader();
+
+let phone=
+window.currentPhone;
+
+
+// récupérer parent connecté
+
+db.ref(
+"users/"+phone)
+
+.once("value")
+
+.then(snapshot=>{
+
+let parent=
+snapshot.val();
+
+
+// chercher élève lié au parent
+
+return db.ref(
+"users"
+)
+
+.once("value")
+
+.then(users=>{
+
+let enfant=null;
+
+users.forEach(user=>{
+
+let data=
+user.val();
+
+
+// père ou mère
+
+if(
+
+data.role==="student"
+
+&&
+
+(
+data.fatherPhone===phone
+||
+data.motherPhone===phone
+)
+
+){
+
+enfant=data;
+
+}
+
+});
+
+
+return [
+
+parent,
+enfant
+
+];
+
+});
+
+})
+
+.then(([parent,enfant])=>{
+
+
+if(!enfant){
+
+hideLoader();
+
+alert(
+"Aucun enfant lié"
+);
+
+return;
+
+}
+
+
+// récupérer devoirs
+
+return Promise.all([
+
+Promise.resolve(enfant),
+
+db.ref(
+"devoirs"
+)
+
+.once("value")
+
+]);
+
+})
+
+.then(result=>{
+
+
+if(!result){
+return;
+}
+
+let [enfant,devoirs]=result;
+
+let html=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+👨‍👩‍👦 Mon enfant
+
+</h2>
+
+<div style="
+
+background:#f2f5ff;
+
+padding:15px;
+
+border-radius:15px;
+
+margin-bottom:15px;
+
+">
+
+<b>
+
+${enfant.name}
+
+</b>
+
+<br>
+
+Classe :
+${enfant.className}
+
+</div>
+
+
+<div style="
+display:flex;
+flex-direction:column;
+gap:12px;
+">
+
+`;
+
+let total=0;
+
+
+devoirs.forEach(item=>{
+
+let devoir=
+item.val();
+
+if(
+
+devoir.classe===
+enfant.className
+
+&&
+
+devoir.idEcole===
+enfant.schoolId
+
+){
+
+total++;
+
+html+=`
+
+<div style="
+
+background:white;
+
+padding:15px;
+
+border-radius:15px;
+
+box-shadow:
+0 4px 10px rgba(0,0,0,.08);
+
+">
+
+<b>
+
+${devoir.matiere}
+
+</b>
+
+<br><br>
+
+📖 ${devoir.titre}
+
+<br><br>
+
+📝 ${devoir.description}
+
+<br><br>
+
+📅 Limite :
+${devoir.dateLimite}
+
+</div>
+
+`;
+
+}
+
+});
+
+
+if(total===0){
+
+html+=`
+
+<div style="
+text-align:center;
+padding:20px;
+color:gray;
+">
+
+Aucun devoir trouvé
+
+</div>
+
+`;
+
+}
+
+
+html+=`
+
+</div>
+
+<button
+onclick="openParent()"
+style="
+margin-top:15px;
+"
+>
+
+⬅ Retour
+
+</button>
+
+`;
+
+document.querySelector(
+".login-box"
+).innerHTML=html;
+
+hideLoader();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(
+error.message
+);
+
+});
+
+}
+
+function ouvrirEmploiTemps(){
+
+showLoader();
+
+db.ref(
+"users/"+window.currentPhone
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let user=snapshot.val();
+
+return db.ref(
+"schools/"+user.schoolId
+)
+
+.once("value");
+
+})
+
+.then(snapshot=>{
+
+let school=snapshot.val();
+
+let classes=
+school.classes || [];
+
+let classesHtml="";
+
+classes.forEach(c=>{
+
+classesHtml+=`
+
+<option value="${c}">
+${c}
+</option>
+
+`;
+
+});
+
+if(classes.length===0){
+
+classesHtml=`
+
+<option disabled selected>
+Aucune classe disponible
+</option>
+
+`;
+
+}
+
+document.querySelector(
+".login-box"
+).innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+📅 Gestion emploi du temps
+
+</h2>
+
+<select id="classe">
+
+${classesHtml}
+
+</select>
+
+<select id="jour">
+
+<option>Lundi</option>
+<option>Mardi</option>
+<option>Mercredi</option>
+<option>Jeudi</option>
+<option>Vendredi</option>
+<option>Samedi</option>
+
+</select>
+
+<input
+type="time"
+id="heureDebut"
+>
+
+<input
+type="time"
+id="heureFin"
+>
+
+<input
+id="matiere"
+placeholder="Matière"
+>
+
+<input
+id="enseignant"
+placeholder="Nom enseignant"
+>
+
+<input
+id="salle"
+placeholder="Salle"
+>
+
+<button
+onclick="enregistrerEmploiTemps()"
+>
+
+Enregistrer
+
+</button>
+
+<button
+onclick="openTeacher()"
+>
+
+⬅ Retour
+
+</button>
+
+`;
+
+hideLoader();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function enregistrerEmploiTemps(){
+
+showLoader();
+
+let classe=
+document.getElementById(
+"classe"
+).value;
+
+let jour=
+document.getElementById(
+"jour"
+).value;
+
+let heureDebut=
+document.getElementById(
+"heureDebut"
+).value;
+
+let heureFin=
+document.getElementById(
+"heureFin"
+).value;
+
+let matiere=
+document.getElementById(
+"matiere"
+).value.trim();
+
+let enseignant=
+document.getElementById(
+"enseignant"
+).value.trim();
+
+let salle=
+document.getElementById(
+"salle"
+).value.trim();
+
+
+if(
+
+!classe ||
+!jour ||
+!heureDebut ||
+!heureFin ||
+!matiere
+
+){
+
+hideLoader();
+
+alert(
+"Complétez tous les champs"
+);
+
+return;
+
+}
+
+
+db.ref(
+"users/"+window.currentPhone
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let user=snapshot.val();
+
+return db.ref(
+"emploisTemps"
+)
+
+.push({
+
+idEcole:user.schoolId,
+
+classe:classe,
+
+jour:jour,
+
+heureDebut:heureDebut,
+
+heureFin:heureFin,
+
+matiere:matiere,
+
+enseignant:enseignant,
+
+salle:salle,
+
+dateCreation:
+new Date().toISOString()
+
+});
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert(
+"Emploi du temps enregistré"
+);
+
+ouvrirEmploiTemps();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function chargerEmploiTempsEleve(){
+
+showLoader();
+
+let phone=window.currentPhone;
+
+db.ref(
+"users/"+phone
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let eleve=snapshot.val();
+
+return Promise.all([
+
+Promise.resolve(eleve),
+
+db.ref(
+"emploisTemps"
+).once("value")
+
+]);
+
+})
+
+.then(([eleve,emploiSnap])=>{
+
+let html=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+📅 Mon emploi du temps
+
+</h2>
+
+<div style="
+display:flex;
+flex-direction:column;
+gap:12px;
+">
+
+`;
+
+let total=0;
+
+const ordreJours=[
+
+"Lundi",
+"Mardi",
+"Mercredi",
+"Jeudi",
+"Vendredi",
+"Samedi"
+
+];
+
+let cours=[];
+
+
+// sécurité si aucun emploi
+if(emploiSnap.exists()){
+
+emploiSnap.forEach(item=>{
+
+let data=item.val();
+
+if(
+
+data.idEcole===eleve.schoolId &&
+data.classe===eleve.className
+
+){
+
+cours.push(data);
+
+}
+
+});
+
+}
+
+
+// tri jours + heures
+
+cours.sort((a,b)=>{
+
+let jourA=
+ordreJours.indexOf(a.jour);
+
+let jourB=
+ordreJours.indexOf(b.jour);
+
+if(jourA!==jourB){
+
+return jourA-jourB;
+
+}
+
+return a.heureDebut.localeCompare(
+b.heureDebut
+);
+
+});
+
+
+cours.forEach(data=>{
+
+total++;
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+border-radius:15px;
+box-shadow:
+0 4px 10px rgba(0,0,0,.08);
+">
+
+<b>
+
+${data.jour}
+
+</b>
+
+<br><br>
+
+🕒
+${data.heureDebut}
+-
+${data.heureFin}
+
+<br><br>
+
+📘
+${data.matiere}
+
+<br><br>
+
+👨‍🏫
+${data.enseignant||"-"}
+
+<br><br>
+
+🏫 Salle :
+${data.salle||"-"}
+
+</div>
+
+`;
+
+});
+
+
+if(total===0){
+
+html+=`
+
+<div style="
+padding:20px;
+text-align:center;
+color:gray;
+">
+
+Aucun emploi du temps disponible
+
+</div>
+
+`;
+
+}
+
+html+=`
+
+</div>
+
+<button
+onclick="openStudent()"
+style="
+margin-top:15px;
+">
+
+⬅ Retour
+
+</button>
+
+`;
+
+document.querySelector(
+".login-box"
+).innerHTML=html;
+
+hideLoader();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function chargerEmploiTempsParent(){
+
+showLoader();
+
+let phone=window.currentPhone;
+
+db.ref(
+"users"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let enfant=null;
+
+snapshot.forEach(user=>{
+
+let data=user.val();
+
+if(
+
+data.role==="student"
+
+&&
+
+(
+data.fatherPhone===phone
+||
+data.motherPhone===phone
+)
+
+){
+
+enfant=data;
+
+}
+
+});
+
+if(!enfant){
+
+throw new Error(
+"Aucun enfant lié"
+);
+
+}
+
+window.enfantTemp=
+enfant;
+
+return db.ref(
+"emploisTemps"
+).once("value");
+
+})
+
+.then(emploiSnap=>{
+
+let enfant=
+window.enfantTemp;
+
+let html=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+👨‍👩‍👦 Emploi du temps
+
+</h2>
+
+<div style="
+background:#f2f5ff;
+padding:15px;
+border-radius:15px;
+margin-bottom:15px;
+">
+
+<b>${enfant.name}</b>
+
+<br>
+
+Classe :
+${enfant.className}
+
+</div>
+
+`;
+
+if(emploiSnap.exists()){
+
+emploiSnap.forEach(item=>{
+
+let data=item.val();
+
+if(
+
+data.idEcole===enfant.schoolId
+&&
+data.classe===enfant.className
+
+){
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+margin-bottom:10px;
+border-radius:15px;
+">
+
+<b>${data.jour}</b>
+
+<br>
+
+🕒
+${data.heureDebut}
+-
+${data.heureFin}
+
+<br>
+
+📘
+${data.matiere}
+
+</div>
+
+`;
+
+}
+
+});
+
+}
+
+html+=`
+
+<button onclick="openParent()">
+
+⬅ Retour
+
+</button>
+
+`;
+
+document.querySelector(
+".login-box"
+).innerHTML=html;
+
+hideLoader();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+// ================= LISTE ELEVES =================
+
+function ouvrirListeEleves(){
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+"/students"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let eleves=[];
+
+if(snapshot.exists()){
+
+snapshot.forEach(item=>{
+
+eleves.push(
+item.val()
+);
+
+});
+
+}
+
+window.elevesCache=
+eleves;
+
+dessinerListeEleves(
+eleves
+);
+
+hideLoader();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(
+error.message
+);
+
+});
+
+}
+
+// ================= AFFICHER TABLEAU =================
+
+function dessinerListeEleves(eleves){
+
+let html=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+📋 Liste élèves
+
+</h2>
+
+<input
+id="rechercheEleve"
+placeholder="Rechercher..."
+oninput="filtrerEleves()"
+>
+
+<select
+id="filtreClasse"
+onchange="filtrerEleves()"
+>
+
+<option value="">
+Toutes classes
+</option>
+
+</select>
+
+
+<div style="
+overflow:auto;
+margin-top:15px;
+">
+
+<table
+style="
+width:100%;
+border-collapse:collapse;
+font-size:13px;
+">
+
+<thead>
+
+<tr style="
+background:#1f4cff;
+color:white;
+">
+
+<th>Nom</th>
+<th>Postnom</th>
+<th>Prénom</th>
+<th>Sexe</th>
+<th>Classe</th>
+
+</tr>
+
+</thead>
+
+<tbody id="tableEleves">
+
+</tbody>
+
+</table>
+
+</div>
+
+
+<button
+onclick="
+${getRoleRetour()}
+"
+style="
+margin-top:15px;
+"
+>
+
+⬅ Retour
+
+</button>
+
+`;
+
+document.querySelector(
+".login-box"
+).innerHTML=html;
+
+
+// remplir classes
+
+let classes=[
+...new Set(
+eleves.map(
+e=>e.className||"-"
+)
+)
+];
+
+let select=
+document.getElementById(
+"filtreClasse"
+);
+
+classes.forEach(c=>{
+
+select.innerHTML+=`
+<option value="${c}">
+${c}
+</option>
+`;
+
+});
+
+afficherElevesTable(
+eleves
+);
+
+}
+
+
+// ================= TABLEAU =================
+
+function afficherElevesTable(eleves){
+
+let tbody =
+document.getElementById("tableEleves");
+
+tbody.innerHTML="";
+
+eleves.forEach(e=>{
+
+tbody.innerHTML += `
+
+<tr
+onclick="voirFicheEleve('${e.matricule}')"
+style="
+cursor:pointer;
+border-bottom:1px solid #ddd;
+">
+
+<td>${e.nom || ""}</td>
+<td>${e.postnom || ""}</td>
+<td>${e.prenom || ""}</td>
+<td>${e.sexe || "-"}</td>
+<td>${e.className || "-"}</td>
+
+</tr>
+
+`;
+
+});
+
+}
+
+
+// ================= FILTRE =================
+
+function filtrerEleves(){
+
+let texte=
+document
+.getElementById(
+"rechercheEleve"
+)
+.value
+.toLowerCase();
+
+let classe=
+document
+.getElementById(
+"filtreClasse"
+)
+.value;
+
+
+let resultat=
+
+window.elevesCache.filter(e=>{
+
+let nom=`
+
+${e.nom||""}
+${e.postnom||""}
+${e.prenom||e.name||""}
+
+`
+.toLowerCase();
+
+let okNom=
+nom.includes(
+texte
+);
+
+let okClasse=
+
+classe===""
+
+||
+
+e.className===
+classe;
+
+return(
+okNom &&
+okClasse
+);
+
+});
+
+
+afficherElevesTable(
+resultat
+);
+
+}
+
+
+// ================= FICHE =================
+
+function voirFicheEleve(matricule){
+
+showLoader();
+
+db.ref(
+"eleves/"+matricule
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let e=
+snapshot.val();
+
+if(!e){
+
+hideLoader();
+
+alert(
+"Élève introuvable"
+);
+
+return;
+
+}
+
+document.querySelector(
+".login-box"
+).innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+Fiche élève
+
+</h2>
+
+<div style="
+background:white;
+padding:20px;
+border-radius:20px;
+line-height:2;
+box-shadow:
+0 4px 10px rgba(0,0,0,.08);
+">
+
+👤 <b>Nom :</b>
+${e.name||"-"}
+
+<br>
+
+🆔 <b>Matricule :</b>
+${e.matricule||"-"}
+
+<br>
+
+🎓 <b>Classe :</b>
+${e.className||"-"}
+
+<br>
+
+⚥ <b>Sexe :</b>
+${e.sexe||"-"}
+
+<br>
+
+👨 <b>Père :</b>
+${e.fatherName||"-"}
+
+<br>
+
+📞 ${e.fatherPhone||"-"}
+
+<br>
+
+👩 <b>Mère :</b>
+${e.motherName||"-"}
+
+<br>
+
+📞 ${e.motherPhone||"-"}
+
+<br>
+
+📍 <b>Province :</b>
+${e.province||"-"}
+
+<br>
+
+🏠 <b>Secteur :</b>
+${e.secteur||"-"}
+
+</div>
+
+<button
+onclick="ouvrirListeEleves()"
+>
+
+⬅ Retour
+
+</button>
+
+`;
+
+hideLoader();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(
+error.message
+);
+
+});
+
+}
+
+
+// ================= IMPRIMER =================
+
+function imprimerFiche(){
+
+window.print();
+
+}
+
+
+// ================= RETOUR =================
+
+function getRoleRetour(){
+
+return `
+window.currentRole==='teacher'
+?openTeacher()
+:openAdmin()
+`;
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* function resetDatabase(){
+
+let confirmation=
+
+prompt(
+"Tapez RESET pour confirmer"
+);
+
+if(
+confirmation!=="RESET"
+){
+
+alert(
+"Réinitialisation annulée"
+);
+
+return;
+
+}
+
+showLoader();
+
+
+// supprimer anciennes données
+
+Promise.all([
+
+db.ref("users").remove(),
+
+db.ref("schools").remove(),
+
+db.ref("invitations").remove(),
+
+db.ref("devoirs").remove(),
+
+db.ref("emploisTemps").remove(),
+
+db.ref("eleves").remove()
+
+])
+
+.then(()=>{
+
+hideLoader();
+
+alert(
+"Base Firebase réinitialisée"
+);
+
+
+// recharger application
+
+location.reload();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(
+error.message
+);
+
+});
+
+} */
+
+
+
+
+
+
+
+
+
+
+
 
 
 
