@@ -650,6 +650,41 @@ firebase.database();
 // mémoire temporaire utilisateurs école
 
 let schoolUsersCache=[];
+
+// ================= SESSION UTILISATEUR =================
+
+// mémoriser connexion
+function saveSession(phone){
+
+localStorage.setItem(
+"masomoUser",
+phone
+);
+
+}
+
+// récupérer connexion
+function getSession(){
+
+return localStorage.getItem(
+"masomoUser"
+);
+
+}
+
+// supprimer connexion
+function logout(){
+
+localStorage.removeItem(
+"masomoUser"
+);
+
+window.currentPhone=null;
+
+location.reload();
+
+}
+
 // ================= CONFIG ECOLE =================
 
 const primaryClasses=[
@@ -807,6 +842,8 @@ code+number;
 
 window.currentPhone=
 phone;
+
+saveSession(phone);
 
 
 // afficher chargement
@@ -1001,19 +1038,35 @@ padding:18px;
 border-radius:20px;
 color:white;
 margin-bottom:15px;
+position:relative;
 ">
+
+<button
+onclick="logout()"
+style="
+position:absolute;
+top:10px;
+right:10px;
+background:red;
+padding:8px 12px;
+font-size:12px;
+border-radius:10px;
+"
+>
+
+🚪 Déconnexion
+
+</button>
 
 <h3>
 
-🏫
-${school.schoolName}
+🏫 ${school.schoolName}
 
 </h3>
 
 <div>
 
-🆔
-${school.schoolCode}
+🆔 ${school.schoolCode}
 
 </div>
 
@@ -1024,10 +1077,11 @@ ${badge}
 </div>
 
 <div>
-    <br> 
 
-👋
-Bienvenue : <br>
+<br>
+
+👋 Bienvenue :<br>
+
 ${user.name}
 
 </div>
@@ -1035,8 +1089,9 @@ ${user.name}
 </div>
 
 `;
-
 }
+
+
 
 function verifierEcole(schoolId){
 
@@ -1242,32 +1297,106 @@ Mes devoirs
 
 function openParent(){
 
-let phone=window.currentPhone;
+showLoader();
 
-db.ref("users/"+phone)
+let phone = window.currentPhone.replace(/\D/g,"");
 
+db.ref("users/" + window.currentPhone)
 .once("value")
 
 .then(userSnap=>{
 
 let user=userSnap.val();
 
+if(!user){
+throw new Error("Parent introuvable");
+}
+
 return Promise.all([
+
 Promise.resolve(user),
+
 db.ref(
 "schools/"+user.schoolId
+).once("value"),
+
+db.ref(
+"parents/"+phone+"/children"
 ).once("value")
+
 ]);
 
 })
 
-.then(([user,schoolSnap])=>{
+.then(([user,schoolSnap,childrenSnap])=>{
 
 let school=schoolSnap.val();
 
-document.querySelector(
-".login-box"
-).innerHTML=`
+let htmlChildren="";
+
+let total=0;
+
+if(childrenSnap.exists()){
+
+childrenSnap.forEach(item=>{
+
+let child=item.val();
+
+total++;
+
+htmlChildren += `
+
+<div style="
+background:white;
+padding:15px;
+border-radius:15px;
+margin-bottom:10px;
+box-shadow:0 4px 10px rgba(0,0,0,.08);
+">
+
+<b>${child.name}</b>
+
+<br>
+
+🎓 Classe :
+${child.className}
+
+<br><br>
+
+<button
+onclick="chargerDevoirsParent('${child.matricule}')"
+>
+
+📘 Voir devoirs
+
+</button>
+
+</div>
+
+`;
+
+});
+
+}
+
+if(total===0){
+
+htmlChildren=`
+
+<p style="
+text-align:center;
+color:gray;
+">
+
+Aucun enfant lié
+
+</p>
+
+`;
+
+}
+
+document.querySelector(".login-box").innerHTML=`
 
 ${schoolHeader(school,user)}
 
@@ -1280,24 +1409,26 @@ color:#1f4cff;
 
 </h2>
 
-<button onclick="chargerDevoirsParent()">
-Mon enfant
-</button>
-
-
-<button>Résultats</button>
-
-<button>Messages</button>
-
-<button onclick="chargerEmploiTempsParent()">
-📅 Emploi du temps
-</button>
+${htmlChildren}
 
 `;
+
+hideLoader();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
 
 });
 
 }
+
+
+
 
 function createSchool(){
 
@@ -3890,17 +4021,14 @@ function saveStudent(){
 
 showLoader();
 
-const nom=
-document.getElementById("nom")
-.value.trim();
+const nom =
+document.getElementById("nom").value.trim();
 
-const postnom=
-document.getElementById("postnom")
-.value.trim();
+const postnom =
+document.getElementById("postnom").value.trim();
 
-const prenom=
-document.getElementById("prenom")
-.value.trim();
+const prenom =
+document.getElementById("prenom").value.trim();
 
 if(
 !nom ||
@@ -3918,7 +4046,54 @@ return;
 
 }
 
+
+// ================= NORMALISER TELEPHONES =================
+
+let fatherPhone =
+(document.getElementById("fatherPhone").value || "")
+.replace(/\D/g,"");
+
+let motherPhone =
+(document.getElementById("motherPhone").value || "")
+.replace(/\D/g,"");
+
+
+// RDC : retirer le 0 au début
+if(
+fatherPhone.startsWith("0")
+){
+fatherPhone=
+fatherPhone.substring(1);
+}
+
+if(
+motherPhone.startsWith("0")
+){
+motherPhone=
+motherPhone.substring(1);
+}
+
+
+// ajouter automatiquement 243
+if(
+fatherPhone &&
+!fatherPhone.startsWith("243")
+){
+fatherPhone=
+"243"+fatherPhone;
+}
+
+if(
+motherPhone &&
+!motherPhone.startsWith("243")
+){
+motherPhone=
+"243"+motherPhone;
+}
+
+
 let matricule="";
+
 
 db.ref(
 "schools/"+window.currentSchoolId
@@ -3926,17 +4101,7 @@ db.ref(
 
 .once("value")
 
-.then(snapshot=>{
-
-let school=
-snapshot.val();
-
-let prefixe=
-school.schoolName
-.split(" ")
-.map(m=>m.substring(0,2))
-.join("")
-.toUpperCase();
+.then(()=>{
 
 return db.ref(
 "schools/"
@@ -3951,7 +4116,11 @@ window.currentSchoolId+
 
 .then(students=>{
 
+
+// ================= MATRICULE =================
+
 let numero=
+
 students.numChildren()+1;
 
 matricule=
@@ -3962,19 +4131,21 @@ String(numero)
 .padStart(4,"0");
 
 
+// ================= DONNEES ELEVE =================
+
 let eleveData={
 
-matricule:matricule,
+matricule,
 
-nom:nom,
-
-postnom:postnom,
-
-prenom:prenom,
+nom,
+postnom,
+prenom,
 
 name:
-nom+" "+
-postnom+" "+
+nom+
+" "+
+postnom+
+" "+
 prenom,
 
 role:"student",
@@ -3992,42 +4163,37 @@ document.getElementById(
 fatherName:
 document.getElementById(
 "fatherName"
-).value,
+).value.trim(),
 
-fatherPhone:
-document.getElementById(
-"fatherPhone"
-).value,
+fatherPhone,
 
 motherName:
 document.getElementById(
 "motherName"
-).value,
+).value.trim(),
 
-motherPhone:
-document.getElementById(
-"motherPhone"
-).value,
+motherPhone,
 
 province:
 document.getElementById(
 "province"
-).value,
+).value.trim(),
 
 territoire:
 document.getElementById(
 "territoire"
-).value,
+).value.trim(),
 
 secteur:
 document.getElementById(
 "secteur"
-).value,
+).value.trim(),
 
 schoolId:
 window.currentSchoolId,
 
 phone:"",
+
 linked:false,
 
 createdAt:
@@ -4036,12 +4202,27 @@ Date.now()
 };
 
 
-return Promise.all([
+// ================= TOUTES LES SAUVEGARDES =================
+
+let promises=[];
+
+
+// enregistrer élève
+
+promises.push(
 
 db.ref(
 "eleves/"+matricule
 )
-.set(eleveData),
+
+.set(eleveData)
+
+);
+
+
+// enregistrer école > élèves
+
+promises.push(
 
 db.ref(
 "schools/"
@@ -4051,7 +4232,15 @@ window.currentSchoolId+
 +
 matricule
 )
-.set(eleveData),
+
+.set(eleveData)
+
+);
+
+
+// enregistrer membres
+
+promises.push(
 
 db.ref(
 "schools/"
@@ -4061,6 +4250,7 @@ window.currentSchoolId+
 +
 matricule
 )
+
 .set({
 
 nom:
@@ -4078,7 +4268,6 @@ eleveData.name,
 role:
 "student",
 
-matricule:
 matricule,
 
 className:
@@ -4089,7 +4278,90 @@ Date.now()
 
 })
 
-]);
+);
+
+
+// ================= LIER PERE =================
+
+if(fatherPhone){
+
+promises.push(
+
+db.ref(
+"parents/"
++
+fatherPhone+
+"/children/"
++
+matricule
+)
+
+.set({
+
+matricule,
+
+name:
+eleveData.name,
+
+className:
+eleveData.className,
+
+schoolId:
+eleveData.schoolId,
+
+role:
+"student"
+
+})
+
+);
+
+}
+
+
+// ================= LIER MERE =================
+
+if(motherPhone){
+
+promises.push(
+
+db.ref(
+"parents/"
++
+motherPhone+
+"/children/"
++
+matricule
+)
+
+.set({
+
+matricule,
+
+name:
+eleveData.name,
+
+className:
+eleveData.className,
+
+schoolId:
+eleveData.schoolId,
+
+role:
+"student"
+
+})
+
+);
+
+}
+
+
+// attendre toutes écritures
+
+return Promise.all(
+promises
+);
 
 })
 
@@ -4099,9 +4371,9 @@ hideLoader();
 
 alert(
 
-"Élève enregistré\n\n"+
-"Matricule : "+
-matricule
+"Élève enregistré avec succès\n\n"+
+
+"Matricule : "+matricule
 
 );
 
@@ -4557,285 +4829,119 @@ alert(error.message);
 }
 // ================= DEVOIRS PARENT =================
 
-function chargerDevoirsParent(){
+function chargerDevoirsParent(matricule){
 
 showLoader();
 
-let phone=
-window.currentPhone;
+let parentPhone = window.currentPhone.replace(/\D/g,"");
 
-
-// récupérer parent connecté
-
-db.ref(
-"users/"+phone)
-
+// 1. récupérer enfants du parent
+db.ref("parents/" + parentPhone + "/children")
 .once("value")
 
-.then(snapshot=>{
+.then(snapshot => {
 
-let parent=
-snapshot.val();
-
-
-// chercher élève lié au parent
-
-return db.ref(
-"users"
-)
-
-.once("value")
-
-.then(users=>{
-
-let enfant=null;
-
-users.forEach(user=>{
-
-let data=
-user.val();
-
-
-// père ou mère
-
-if(
-
-data.role==="student"
-
-&&
-
-(
-data.fatherPhone===phone
-||
-data.motherPhone===phone
-)
-
-){
-
-enfant=data;
-
+if(!snapshot.exists()){
+throw new Error("Aucun enfant lié à ce parent");
 }
 
+let enfant = null;
+
+// si matricule donné → choisir enfant précis
+snapshot.forEach(child => {
+
+let c = child.val();
+
+if(!matricule || c.matricule === matricule){
+enfant = c;
+}
 });
-
-
-return [
-
-parent,
-enfant
-
-];
-
-});
-
-})
-
-.then(([parent,enfant])=>{
-
 
 if(!enfant){
-
-hideLoader();
-
-alert(
-"Aucun enfant lié"
-);
-
-return;
-
+throw new Error("Enfant introuvable");
 }
 
-
-// récupérer devoirs
-
-return Promise.all([
-
-Promise.resolve(enfant),
-
-db.ref(
-"devoirs"
-)
-
-.once("value")
-
-]);
+// 2. récupérer devoirs
+return db.ref("devoirs").once("value")
+.then(devoirsSnap => {
+return [enfant, devoirsSnap];
+});
 
 })
 
-.then(result=>{
+.then(([enfant, devoirsSnap]) => {
 
-
-if(!result){
-return;
-}
-
-let [enfant,devoirs]=result;
-
-let html=`
-
-<h2 style="
-text-align:center;
-color:#1f4cff;
-">
-
-👨‍👩‍👦 Mon enfant
-
+let html = `
+<h2 style="text-align:center;color:#1f4cff;">
+👨‍👩‍👦 ${enfant.name}
 </h2>
 
-<div style="
-
-background:#f2f5ff;
-
-padding:15px;
-
-border-radius:15px;
-
-margin-bottom:15px;
-
-">
-
-<b>
-
-${enfant.name}
-
-</b>
-
-<br>
-
-Classe :
-${enfant.className}
-
+<div style="background:#f2f5ff;padding:12px;border-radius:12px;margin-bottom:15px;">
+Classe : ${enfant.className}
 </div>
 
-
-<div style="
-display:flex;
-flex-direction:column;
-gap:12px;
-">
-
+<div style="display:flex;flex-direction:column;gap:12px;">
 `;
 
-let total=0;
+let total = 0;
 
+if(devoirsSnap.exists()){
 
-devoirs.forEach(item=>{
+devoirsSnap.forEach(item => {
 
-let devoir=
-item.val();
+let d = item.val();
 
 if(
-
-devoir.classe===
-enfant.className
-
-&&
-
-devoir.idEcole===
-enfant.schoolId
-
+d.classe === enfant.className &&
+d.idEcole === enfant.schoolId
 ){
 
 total++;
 
-html+=`
+html += `
+<div style="background:white;padding:15px;border-radius:12px;">
 
-<div style="
-
-background:white;
-
-padding:15px;
-
-border-radius:15px;
-
-box-shadow:
-0 4px 10px rgba(0,0,0,.08);
-
-">
-
-<b>
-
-${devoir.matiere}
-
-</b>
-
-<br><br>
-
-📖 ${devoir.titre}
-
-<br><br>
-
-📝 ${devoir.description}
-
-<br><br>
-
-📅 Limite :
-${devoir.dateLimite}
+<b>${d.matiere}</b><br><br>
+📖 ${d.titre}<br><br>
+📝 ${d.description}<br><br>
+📅 ${d.dateLimite}
 
 </div>
-
 `;
-
 }
 
 });
 
-
-if(total===0){
-
-html+=`
-
-<div style="
-text-align:center;
-padding:20px;
-color:gray;
-">
-
-Aucun devoir trouvé
-
-</div>
-
-`;
-
 }
 
+if(total === 0){
+html += `<p style="text-align:center;color:gray;">Aucun devoir</p>`;
+}
 
-html+=`
-
+html += `
 </div>
 
-<button
-onclick="openParent()"
-style="
-margin-top:15px;
-"
->
-
+<button onclick="openParent()">
 ⬅ Retour
-
 </button>
-
 `;
 
-document.querySelector(
-".login-box"
-).innerHTML=html;
+document.querySelector(".login-box").innerHTML = html;
 
 hideLoader();
 
 })
 
-.catch(error=>{
+.catch(err => {
 
 hideLoader();
-
-alert(
-error.message
-);
+alert(err.message);
 
 });
 
 }
+
+
 
 function ouvrirEmploiTemps(){
 
@@ -5895,6 +6001,67 @@ window.currentRole==='teacher'
 ?openTeacher()
 :openAdmin()
 `;
+
+}
+
+
+// ================= AUTO CONNEXION =================
+
+window.onload=function(){
+
+let savedPhone=getSession();
+
+if(savedPhone){
+
+window.currentPhone=savedPhone;
+
+showLoader();
+
+db.ref(
+"users/"+savedPhone
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+if(!snapshot.exists()){
+
+logout();
+return;
+}
+
+let user=snapshot.val();
+
+if(user.role==="admin"){
+openAdmin();
+}
+
+else if(user.role==="teacher"){
+openTeacher();
+}
+
+else if(user.role==="parent"){
+openParent();
+}
+
+else if(user.role==="student"){
+openStudent();
+}
+
+})
+
+.catch(()=>{
+
+hideLoader();
+
+logout();
+
+});
+
+}
 
 }
 
