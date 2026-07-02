@@ -411,6 +411,57 @@ font-weight:bold;
 }
 
 
+.action-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+    margin-top:20px;
+}
+
+.action-btn{
+    border:none;
+    padding:14px;
+    border-radius:16px;
+    font-size:15px;
+    font-weight:bold;
+    color:white;
+    cursor:pointer;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+
+    transition:all .3s ease;
+    box-shadow:0 4px 12px rgba(0,0,0,.2);
+}
+
+.editBtn{
+    background:linear-gradient(135deg,#4facfe,#00f2fe);
+}
+
+.deleteBtn{
+    background:linear-gradient(135deg,#ff4b4b,#ff0000);
+}
+
+.pdfBtn{
+    background:linear-gradient(135deg,#ff9800,#ff5722);
+}
+
+.printBtn{
+    background:linear-gradient(135deg,#673ab7,#3f51b5);
+}
+
+.action-btn:active{
+    transform:scale(.92);
+}
+
+.action-btn:hover{
+    transform:translateY(-3px);
+    box-shadow:0 8px 20px rgba(0,0,0,.3);
+}
+
+
 </style>
 
 </head>
@@ -609,6 +660,12 @@ Chargement...
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<link
+rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css"
+>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 
 <script>
 
@@ -650,6 +707,9 @@ firebase.database();
 // mémoire temporaire utilisateurs école
 
 let schoolUsersCache=[];
+let currentPhoto="";
+let cropper=null;
+let schoolLogo="";
 
 // ================= SESSION UTILISATEUR =================
 
@@ -794,6 +854,83 @@ loader.style.display=
 }
 
 
+function chargerPhoto(inputId,imageId){
+
+let file=
+document.getElementById(
+inputId
+).files[0];
+
+if(!file)return;
+
+let reader=
+new FileReader();
+
+reader.onload=function(e){
+
+let image=
+document.getElementById(
+imageId
+);
+
+image.src=
+e.target.result;
+
+image.style.display=
+"block";
+
+if(cropper){
+
+cropper.destroy();
+
+}
+
+cropper=
+new Cropper(
+
+image,
+
+{
+
+aspectRatio:1,
+
+viewMode:1,
+
+zoomable:true,
+
+rotatable:true
+
+}
+
+);
+
+};
+
+reader.readAsDataURL(file);
+
+}
+
+
+function enregistrerPhoto(){
+
+if(!cropper){
+
+return "";
+
+}
+
+currentPhoto=
+
+cropper
+.getCroppedCanvas()
+
+.toDataURL(
+"image/png"
+);
+
+return currentPhoto;
+
+}
 
 function hideLoader(){
 
@@ -1058,11 +1195,29 @@ border-radius:10px;
 
 </button>
 
+<div
+style="
+text-align:center;
+"
+>
+
+<img
+src="${school.logo||''}"
+style="
+width:80px;
+height:80px;
+border-radius:50%;
+object-fit:cover;
+margin-bottom:10px;
+">
+
 <h3>
 
 🏫 ${school.schoolName}
 
 </h3>
+
+</div>
 
 <div>
 
@@ -1225,6 +1380,14 @@ Mes devoirs
 📅 Mon emploi du temps
 </button>
 
+<button
+onclick="modifierProfil()"
+>
+
+👤 Mon profil
+
+</button>
+
 `;
 
 });
@@ -1371,7 +1534,16 @@ onclick="chargerDevoirsParent('${child.matricule}')"
 
 </button>
 
+<button
+onclick="modifierProfil()"
+>
+
+👤 Mon profil
+
+</button>
+
 </div>
+
 
 `;
 
@@ -1535,6 +1707,29 @@ placeholder="Commune/Secteur">
 <input
 id="directorName"
 placeholder="Nom directeur">
+<h3>Logo école</h3>
+
+<input
+type="file"
+id="schoolPhoto"
+accept="image/*"
+onchange="
+chargerPhoto(
+'schoolPhoto',
+'logoPreview'
+)
+">
+
+<img
+id="logoPreview"
+style="
+display:none;
+width:100px;
+height:100px;
+border-radius:15px;
+object-fit:cover;
+"
+>
 
 <input
 id="schoolYear"
@@ -1840,148 +2035,1060 @@ error.message
 // ================= DASHBOARD ADMIN =================
 
 function openAdmin(){
-    window.currentRole="admin";
 
-let phone=
-window.currentPhone;
+window.currentRole="admin";
 
+let phone=window.currentPhone;
 
-db.ref(
-"users/"+phone
-)
+db.ref("users/"+phone)
 
 .once("value")
 
 .then(userSnap=>{
 
-let user=
-userSnap.val();
+let user=userSnap.val();
 
-window.currentSchoolId=
-user.schoolId;
+window.currentSchoolId=user.schoolId;
 
 return db.ref(
 "schools/"+user.schoolId
-)
-.once("value");
+).once("value");
 
 })
 
 .then(schoolSnap=>{
 
-let school=
-schoolSnap.val();
+let school=schoolSnap.val();
 
-document
-.querySelector(
-".login-box"
-)
-.innerHTML=`
+document.querySelector(".login-box").innerHTML=`
 
-<h1 style="
+<style>
+
+.admin-header{
 text-align:center;
+margin-bottom:25px;
+}
+
+.school-title{
+font-size:28px;
+font-weight:bold;
 color:#1f4cff;
-">
+margin-bottom:5px;
+}
 
-${school.schoolName}
+.school-sub{
+color:gray;
+font-size:14px;
+}
 
-</h1>
+.select-style{
 
-<p>
+width:100%;
+padding:14px;
+border-radius:16px;
+border:none;
+background:#f5f7ff;
+margin-bottom:20px;
+font-size:15px;
 
-Bienvenue 👋
+box-shadow:
+0 4px 15px rgba(
+0,0,0,0.08
+);
 
-</p>
+}
+
+.menu-grid{
+
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:15px;
+
+}
+
+.card-btn{
+
+border:none;
+padding:20px 10px;
+border-radius:25px;
+
+background:
+linear-gradient(
+145deg,
+#ffffff,
+#e9eeff
+);
+
+display:flex;
+flex-direction:column;
+
+align-items:center;
+justify-content:center;
+
+cursor:pointer;
+
+transition:.25s;
+
+box-shadow:
+
+0 10px 20px rgba(
+0,0,0,0.15
+),
+
+0 4px 8px rgba(
+0,0,0,0.10
+),
+
+inset 0 1px 1px rgba(
+255,255,255,0.9
+);
+
+}
+
+.card-btn:hover{
+
+transform:
+translateY(-4px);
+
+box-shadow:
+
+0 14px 25px rgba(
+0,0,0,0.18
+),
+
+0 6px 10px rgba(
+0,0,0,0.12
+);
+
+}
+
+.card-btn:active{
+
+transform:
+translateY(6px)
+scale(.95);
+
+box-shadow:
+
+inset 0 6px 10px rgba(
+0,0,0,0.18
+),
+
+inset 0 -2px 4px rgba(
+255,255,255,0.6
+);
+
+}
+
+.card-icon{
+
+font-size:30px;
+margin-bottom:8px;
+
+}
+
+.card-text{
+
+font-size:14px;
+font-weight:bold;
+
+color:#333;
+
+text-align:center;
+
+}
+
+.big-card{
+
+grid-column:1/3;
+
+background:
+linear-gradient(
+135deg,
+#1f4cff,
+#5ea8ff
+);
+
+}
+
+.big-card .card-text{
+
+color:white;
+
+}
+
+.big-card .card-icon{
+
+color:white;
+
+}
+
+.danger{
+
+background:
+linear-gradient(
+135deg,
+#ff4d4d,
+#ff7777
+);
+
+}
+
+.danger .card-text{
+
+color:white;
+
+}
+
+.danger .card-icon{
+
+color:white;
+
+}
+
+</style>
+
+
+<div class="admin-header">
+
+<div class="school-title">
+
+🏫 ${school.schoolName}
+
+</div>
+
+<div class="school-sub">
+
+Panneau administrateur
+
+</div>
+
+</div>
 
 
 <select
 id="roleType"
-style="
-padding:15px;
-border-radius:12px;
-"
+class="select-style"
 >
 
 <option value="teacher">
-
-Enseignant
-
+👨‍🏫 Enseignant
 </option>
 
 <option value="parent">
-
-Parent
-
+👨‍👩‍👧 Parent
 </option>
 
 <option value="student">
-
-Élève
-
+🎓 Élève
 </option>
 
 </select>
 
 
-<button
-onclick="generateInvite()"
->
+<div class="menu-grid">
 
+<button class="card-btn big-card"
+onclick="generateInvite()">
+
+<div class="card-icon">
+🔗
+</div>
+
+<div class="card-text">
 Générer invitation
+</div>
 
 </button>
 
- <button
-style="
-background:red;
-margin-top:10px;
-"
->
 
-🗑 Réinitialiser base
+<button class="card-btn"
+onclick="openMembers()">
 
-</button>
+<div class="card-icon">
+👥
+</div>
 
-<button onclick="openMembers()">
-
-Membres de l'école
+<div class="card-text">
+Membres
+</div>
 
 </button>
 
-<div
-id="generatedInvite"
-style="
-display:none;
-padding:15px;
-background:#f2f5ff;
-border-radius:12px;
-text-align:center;
-"
->
+
+<button class="card-btn"
+onclick="showActivities()">
+
+<div class="card-icon">
+📊
+</div>
+
+<div class="card-text">
+Activités
+</div>
+
+</button>
+
+
+<button class="card-btn"
+onclick="studentRecords()">
+
+<div class="card-icon">
+🎓
+</div>
+
+<div class="card-text">
+Fiches élèves
+</div>
+
+</button>
+
+
+<button class="card-btn"
+onclick="teacherRecords()">
+
+<div class="card-icon">
+👨‍🏫
+</div>
+
+<div class="card-text">
+Fiches enseignants
+</div>
+
+</button>
+
+
+<button class="card-btn"
+onclick="ouvrirListeEleves()">
+
+<div class="card-icon">
+📋
+</div>
+
+<div class="card-text">
+Liste élèves
+</div>
+
+</button>
+
+
+<button class="card-btn"
+onclick="ouvrirListeEnseignants()">
+
+<div class="card-icon">
+📚
+</div>
+
+<div class="card-text">
+Liste enseignants
+</div>
+
+</button>
+
+
+<button class="card-btn"
+onclick="ouvrirEmploiTemps()">
+
+<div class="card-icon">
+📅
+</div>
+
+<div class="card-text">
+Horaire
+</div>
+
+</button>
+
+
+<button class="card-btn"
+onclick="modifierProfil()">
+
+<div class="card-icon">
+👤
+</div>
+
+<div class="card-text">
+Mon profil
+</div>
+
+</button>
+
+
+<button class="card-btn danger"
+onclick="resetDatabase()">
+
+<div class="card-icon">
+🗑
+</div>
+
+<div class="card-text">
+Réinitialiser
+</div>
+
+</button>
 
 </div>
 
-<button onclick="showActivities()">
 
-Activités récentes
+<div id="generatedInvite"
+style="
+display:none;
+margin-top:20px;
+padding:15px;
+border-radius:20px;
+background:#f5f7ff;
+text-align:center;
+">
+</div>
+
+`;
+
+});
+
+}
+
+// ================= FICHES ENSEIGNANTS =================
+
+function teacherRecords(){
+
+showLoader();
+
+db.ref("enseignants")
+
+.once("value")
+
+.then(snapshot=>{
+
+let html=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+Fiches enseignants
+
+</h2>
+
+<button
+onclick="openAddTeacher()"
+>
+
+➕ Ajouter enseignant
 
 </button>
 
-<button onclick="studentRecords()">
+<div style="
+display:flex;
+flex-direction:column;
+gap:10px;
+margin-top:15px;
+">
 
-Fiches élèves
+`;
+
+if(!snapshot.exists()){
+
+html+=`
+
+<div style="
+text-align:center;
+padding:20px;
+color:gray;
+">
+
+Aucun enseignant
+
+</div>
+
+`;
+
+}
+
+snapshot.forEach(item=>{
+
+let data=item.val();
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+border-radius:15px;
+box-shadow:
+0 4px 10px rgba(0,0,0,.08);
+">
+
+<b>
+
+${data.name}
+
+</b>
+
+<br>
+
+📘 ${data.matiere||"-"}
+
+<br>
+
+🆔 ${data.matricule}
+
+<br><br>
+
+<button
+onclick="viewTeacher('${data.matricule}')"
+>
+
+Voir
 
 </button>
 
-<button onclick="ouvrirListeEleves()">
-📋 Liste élèves
-</button>
+</div>
 
-<button onclick="ouvrirEmploiTemps()">
-📅 Emploi du temps
+`;
+
+});
+
+html+=`
+
+</div>
+
+<button
+onclick="openAdmin()"
+>
+
+⬅ Retour
+
 </button>
 
 `;
+
+document.querySelector(
+".login-box"
+).innerHTML=html;
+
+hideLoader();
+
+});
+
+}
+
+// ================= AJOUTER ENSEIGNANT =================
+
+function openAddTeacher(){
+
+document.querySelector(
+".login-box"
+).innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+Nouvel enseignant
+
+</h2>
+
+<input
+id="nom"
+placeholder="Nom"
+>
+
+<input
+id="postnom"
+placeholder="Postnom"
+>
+
+<input
+id="prenom"
+placeholder="Prénom"
+>
+
+<select id="sexe">
+
+<option>Masculin</option>
+
+<option>Féminin</option>
+
+</select>
+
+<input
+id="dateNaissance"
+type="date"
+>
+
+<input
+id="lieuNaissance"
+placeholder="Lieu de naissance"
+>
+
+<input
+id="dateEngagement"
+type="date"
+>
+
+<input
+id="matiere"
+placeholder="Matière"
+>
+
+<input
+id="telephone"
+placeholder="Téléphone"
+>
+
+<input
+id="adresse"
+placeholder="Adresse"
+>
+
+<button
+onclick="saveTeacher()"
+>
+
+Enregistrer
+
+</button>
+
+<button
+onclick="teacherRecords()"
+>
+
+⬅ Retour
+
+</button>
+
+`;
+
+}
+
+// ================= SAUVEGARDE ENSEIGNANT =================
+
+// ================= SAUVEGARDE ENSEIGNANT =================
+
+function saveTeacher(){
+
+showLoader();
+
+let telephone=
+
+document.getElementById(
+"telephone"
+)
+.value
+.replace(/\D/g,"");
+
+
+// retirer 0 RDC
+
+if(
+telephone.startsWith("0")
+){
+
+telephone=
+telephone.substring(1);
+
+}
+
+
+// ajouter +243 automatiquement
+
+if(
+telephone &&
+!telephone.startsWith("243")
+){
+
+telephone=
+"243"+telephone;
+
+}
+
+telephone=
+"+"+telephone;
+
+
+// matricule enseignant
+
+let matricule=
+
+"ENS-"+Date.now();
+
+let data={
+
+matricule,
+
+nom:
+document.getElementById(
+"nom"
+).value.trim(),
+
+postnom:
+document.getElementById(
+"postnom"
+).value.trim(),
+
+prenom:
+document.getElementById(
+"prenom"
+).value.trim(),
+
+name:
+
+document.getElementById(
+"nom"
+).value.trim()
+
++" "+
+
+document.getElementById(
+"postnom"
+).value.trim()
+
++" "+
+
+document.getElementById(
+"prenom"
+).value.trim(),
+
+role:"teacher",
+
+sexe:
+document.getElementById(
+"sexe"
+).value,
+
+dateNaissance:
+document.getElementById(
+"dateNaissance"
+).value,
+
+lieuNaissance:
+document.getElementById(
+"lieuNaissance"
+).value,
+
+dateEngagement:
+document.getElementById(
+"dateEngagement"
+).value,
+
+matiere:
+document.getElementById(
+"matiere"
+).value,
+
+telephone:
+telephone,
+
+adresse:
+document.getElementById(
+"adresse"
+).value,
+
+schoolId:
+window.currentSchoolId,
+
+createdAt:
+Date.now()
+
+};
+
+
+let promises=[];
+
+
+// enregistrer fiche enseignant
+
+promises.push(
+
+db.ref(
+"enseignants/"+matricule
+)
+
+.set(data)
+
+);
+
+
+// ajouter dans membres école
+
+promises.push(
+
+db.ref(
+"schools/"
++
+window.currentSchoolId+
+"/members/"
++
+matricule
+)
+
+.set({
+
+name:
+data.name,
+
+phone:
+telephone,
+
+role:
+"teacher",
+
+matricule:
+matricule,
+
+createdAt:
+Date.now()
+
+})
+
+);
+
+
+// créer compte utilisateur connecté
+
+if(telephone){
+
+promises.push(
+
+db.ref(
+"users/"+telephone
+)
+
+.set({
+
+phone:
+telephone,
+
+name:
+data.name,
+
+role:
+"teacher",
+
+schoolId:
+window.currentSchoolId,
+
+matricule:
+matricule,
+
+createdAt:
+Date.now()
+
+})
+
+);
+
+}
+
+
+Promise.all(
+promises
+)
+
+.then(()=>{
+
+hideLoader();
+
+alert(
+"Enseignant enregistré avec succès"
+);
+
+teacherRecords();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(
+error.message
+);
+
+});
+
+}
+
+function voirFicheEnseignant(
+matricule
+){
+
+showLoader();
+
+db.ref(
+"enseignants/"+matricule
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let e=snapshot.val();
+
+document.querySelector(
+".login-box"
+).innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+📚 Fiche enseignant
+
+</h2>
+
+<div
+
+id="ficheDocument"
+
+style="
+background:white;
+padding:20px;
+border-radius:20px;
+line-height:2;
+box-shadow:
+0 4px 10px rgba(0,0,0,.08);
+">
+
+👤
+<b>Nom :</b>
+
+${e.name}
+
+<br>
+
+🆔
+<b>Matricule :</b>
+
+${e.matricule}
+
+<br>
+
+⚥
+<b>Sexe :</b>
+
+${e.sexe}
+
+<br>
+
+🎂
+<b>Date naissance :</b>
+
+${e.dateNaissance}
+
+<br>
+
+📍
+<b>Lieu naissance :</b>
+
+${e.lieuNaissance}
+
+<br>
+
+📅
+<b>Engagement :</b>
+
+${e.dateEngagement}
+
+<br>
+
+📚
+<b>Matière :</b>
+
+${e.matiere}
+
+<br>
+
+📞
+<b>Téléphone :</b>
+
+${e.telephone}
+
+<br>
+
+🏠
+<b>Adresse :</b>
+
+${e.adresse}
+
+</div>
+
+<div style="
+display:flex;
+flex-direction:column;
+gap:10px;
+margin-top:15px;
+">
+
+<button
+onclick="imprimerFiche()"
+>
+
+🖨 Imprimer
+
+</button>
+
+<button
+onclick="telechargerPDF()"
+>
+
+📄 Télécharger PDF
+
+</button>
+
+<button
+onclick="telechargerWord()"
+>
+
+📝 Télécharger Word
+
+</button>
+
+<button
+onclick="telechargerExcel()"
+>
+
+📊 Télécharger Excel
+
+</button>
+
+<button
+onclick="modifierEnseignant('${e.matricule}')"
+>
+
+✏ Modifier
+
+</button>
+
+<button
+onclick="supprimerEnseignant('${e.matricule}')"
+style="
+background:red;
+"
+>
+
+🗑 Supprimer
+
+</button>
+
+<button
+onclick="
+ouvrirListeEnseignants()
+"
+>
+
+⬅ Retour
+
+</button>
+
+</div>
+
+`;
+
+hideLoader();
 
 });
 
@@ -2201,6 +3308,40 @@ placeholder="Postnom"
 <input
 id="prenom"
 placeholder="Prénom"
+>
+
+<input
+type="date"
+id="dateNaissance"
+>
+
+<input
+id="lieuNaissance"
+placeholder="Lieu de naissance"
+>
+
+<h3>Photo élève</h3>
+
+<input
+type="file"
+id="studentPhoto"
+accept="image/*"
+onchange="
+chargerPhoto(
+'studentPhoto',
+'studentPreview'
+)
+">
+
+<img
+id="studentPreview"
+style="
+display:none;
+width:120px;
+height:120px;
+border-radius:50%;
+object-fit:cover;
+"
 >
 
 <select id="sexe">
@@ -3764,6 +4905,9 @@ await schoolRef.set({
 
 schoolName,
 schoolCode,
+logo:
+enregistrerPhoto(),
+
 
 verificationStatus:
 "pending",
@@ -4137,6 +5281,9 @@ let eleveData={
 
 matricule,
 
+photo:
+enregistrerPhoto(),
+
 nom,
 postnom,
 prenom,
@@ -4149,6 +5296,16 @@ postnom+
 prenom,
 
 role:"student",
+
+dateNaissance:
+document.getElementById(
+"dateNaissance"
+).value,
+
+lieuNaissance:
+document.getElementById(
+"lieuNaissance"
+).value.trim(),
 
 sexe:
 document.getElementById(
@@ -5637,6 +6794,225 @@ error.message
 
 }
 
+// ================= LISTE ENSEIGNANTS =================
+
+function ouvrirListeEnseignants(){
+
+showLoader();
+
+db.ref(
+"enseignants"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let enseignants=[];
+
+if(snapshot.exists()){
+
+snapshot.forEach(item=>{
+
+enseignants.push(
+item.val()
+);
+
+});
+
+}
+
+window.enseignantsCache=
+enseignants;
+
+dessinerListeEnseignants(
+enseignants
+);
+
+hideLoader();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(
+error.message
+);
+
+});
+
+}
+
+function dessinerListeEnseignants(
+enseignants
+){
+
+let html=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+📚 Liste enseignants
+
+</h2>
+
+<input
+id="rechercheEns"
+placeholder="Rechercher..."
+oninput="
+filtrerEnseignants()
+">
+
+<div style="
+overflow:auto;
+margin-top:15px;
+">
+
+<table style="
+width:100%;
+border-collapse:collapse;
+font-size:13px;
+">
+
+<thead>
+
+<tr style="
+background:#1f4cff;
+color:white;
+">
+
+<th>Nom</th>
+<th>Sexe</th>
+<th>Matière</th>
+
+</tr>
+
+</thead>
+
+<tbody id="tableEns">
+
+</tbody>
+
+</table>
+
+</div>
+
+<button
+onclick="openAdmin()"
+style="
+margin-top:15px;
+">
+
+⬅ Retour
+
+</button>
+
+`;
+
+document.querySelector(
+".login-box"
+).innerHTML=
+html;
+
+afficherTableEnseignants(
+enseignants
+);
+
+}
+
+function afficherTableEnseignants(
+enseignants
+){
+
+let tbody=
+
+document.getElementById(
+"tableEns"
+);
+
+tbody.innerHTML="";
+
+enseignants.forEach(e=>{
+
+tbody.innerHTML+=`
+
+<tr
+
+onclick="
+voirFicheEnseignant(
+'${e.matricule}'
+)
+"
+
+style="
+cursor:pointer;
+border-bottom:
+1px solid #ddd;
+">
+
+<td>
+${e.name}
+</td>
+
+<td>
+${e.sexe||"-"}
+</td>
+
+<td>
+${e.matiere||"-"}
+</td>
+
+</tr>
+
+`;
+
+});
+
+}
+
+function filtrerEnseignants(){
+
+let texte=
+
+document
+.getElementById(
+"rechercheEns"
+)
+
+.value
+
+.toLowerCase();
+
+
+let resultat=
+
+window.enseignantsCache.filter(
+e=>{
+
+return (
+
+e.name||""
+
+)
+
+.toLowerCase()
+
+.includes(
+texte
+);
+
+});
+
+afficherTableEnseignants(
+resultat
+);
+
+}
+
 // ================= AFFICHER TABLEAU =================
 
 function dessinerListeEleves(eleves){
@@ -5899,7 +7275,10 @@ Fiche élève
 
 </h2>
 
-<div style="
+<div
+id="ficheDocument"
+
+style="
 background:white;
 padding:20px;
 border-radius:20px;
@@ -5927,6 +7306,18 @@ ${e.className||"-"}
 ${e.sexe||"-"}
 
 <br>
+
+<br>
+
+🎂 <b>Date naissance :</b>
+${e.dateNaissance||"-"}
+
+<br>
+
+📍 <b>Lieu naissance :</b>
+${e.lieuNaissance||"-"}
+
+<br> 
 
 👨 <b>Père :</b>
 ${e.fatherName||"-"}
@@ -5956,13 +7347,63 @@ ${e.secteur||"-"}
 
 </div>
 
+<div style="
+display:flex;
+flex-direction:column;
+gap:10px;
+margin-top:15px;
+">
+
+<button onclick="imprimerFiche()">
+
+🖨 Imprimer
+
+</button>
+
+<button onclick="telechargerPDF()">
+
+📄 Télécharger PDF
+
+</button>
+
+<button onclick="telechargerWord()">
+
+📝 Télécharger Word
+
+</button>
+
+<button onclick="telechargerExcel()">
+
+📊 Télécharger Excel
+
+</button>
+
 <button
-onclick="ouvrirListeEleves()"
+onclick="modifierEleve('${e.matricule}')"
 >
+
+✏ Modifier
+
+</button>
+
+<button
+onclick="supprimerEleve('${e.matricule}')"
+style="
+background:red;
+"
+>
+
+🗑 Supprimer
+
+</button>
+
+<button onclick="ouvrirListeEleves()">
 
 ⬅ Retour
 
 </button>
+
+</div>
 
 `;
 
@@ -5987,9 +7428,196 @@ error.message
 
 function imprimerFiche(){
 
-window.print();
+let contenu=
+
+document.getElementById(
+"ficheDocument"
+).innerHTML;
+
+let fenetre=
+window.open();
+
+fenetre.document.write(`
+
+<html>
+
+<head>
+
+<title>Impression</title>
+
+</head>
+
+<body>
+
+${contenu}
+
+</body>
+
+</html>
+
+`);
+
+fenetre.print();
+
+fenetre.close();
 
 }
+
+
+async function telechargerPDF(){
+
+let element=
+
+document.getElementById(
+"ficheDocument"
+);
+
+let canvas=
+
+await html2canvas(
+element
+);
+
+let image=
+
+canvas.toDataURL(
+"image/png"
+);
+
+const{
+
+jsPDF
+
+}=window.jspdf;
+
+let pdf=
+
+new jsPDF();
+
+pdf.addImage(
+
+image,
+
+"PNG",
+
+10,
+
+10,
+
+180,
+
+0
+
+);
+
+pdf.save(
+"fiche.pdf"
+);
+
+}
+
+function telechargerWord(){
+
+let contenu=
+
+document.getElementById(
+"ficheDocument"
+).innerText;
+
+const doc=
+
+new docx.Document({
+
+sections:[{
+
+children:[
+
+new docx.Paragraph({
+
+text:contenu
+
+})
+
+]
+
+}]
+
+});
+
+docx.Packer
+
+.toBlob(doc)
+
+.then(blob=>{
+
+saveAs(
+
+blob,
+
+"fiche.docx"
+
+);
+
+});
+
+}
+
+
+function telechargerExcel(){
+
+let texte=
+
+document.getElementById(
+"ficheDocument"
+).innerText;
+
+let lignes=
+
+texte.split("\n");
+
+let data=[];
+
+lignes.forEach(l=>{
+
+data.push({
+
+Information:l
+
+});
+
+});
+
+let feuille=
+
+XLSX.utils.json_to_sheet(
+data
+);
+
+let classeur=
+
+XLSX.utils.book_new();
+
+XLSX.utils.book_append_sheet(
+
+classeur,
+
+feuille,
+
+"Fiche"
+
+);
+
+XLSX.writeFile(
+
+classeur,
+
+"fiche.xlsx"
+
+);
+
+}
+
+
 
 
 // ================= RETOUR =================
@@ -6004,6 +7632,99 @@ window.currentRole==='teacher'
 
 }
 
+function modifierProfil(){
+
+db.ref(
+"users/"+window.currentPhone
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let user=
+snapshot.val();
+
+document.querySelector(
+".login-box"
+).innerHTML=`
+
+<h2>
+
+Mon profil
+
+</h2>
+
+<img
+src="${user.photo||''}"
+id="profilPreview"
+style="
+width:120px;
+height:120px;
+border-radius:50%;
+object-fit:cover;
+">
+
+<input
+type="file"
+id="newPhoto"
+accept="image/*"
+onchange="
+chargerPhoto(
+'newPhoto',
+'profilPreview'
+)
+">
+
+<input
+id="newName"
+value="${user.name||''}"
+>
+
+<button
+onclick="saveProfile()"
+>
+
+Enregistrer
+
+</button>
+
+`;
+
+});
+
+}
+
+
+function saveProfile(){
+
+db.ref(
+"users/"+window.currentPhone
+)
+
+.update({
+
+name:
+document.getElementById(
+"newName"
+).value,
+
+photo:
+enregistrerPhoto()
+
+})
+
+.then(()=>{
+
+alert(
+"Profil modifié"
+);
+
+location.reload();
+
+});
+
+}
 
 // ================= AUTO CONNEXION =================
 
@@ -6064,6 +7785,628 @@ logout();
 }
 
 }
+
+function modifierEleve(matricule){
+
+db.ref(
+"eleves/"+matricule
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let e=snapshot.val();
+
+document.querySelector(
+".login-box"
+).innerHTML=`
+
+<h2>
+
+Modifier élève
+
+</h2>
+
+<input
+id="nom"
+value="${e.nom||""}"
+>
+
+<input
+id="postnom"
+value="${e.postnom||""}"
+>
+
+<input
+id="prenom"
+value="${e.prenom||""}"
+>
+
+<input
+id="classe"
+value="${e.className||""}"
+>
+
+<button
+onclick="
+enregistrerModificationEleve(
+'${matricule}'
+)"
+>
+
+💾 Sauvegarder
+
+</button>
+
+`;
+
+});
+
+}
+
+function enregistrerModificationEleve(
+matricule
+){
+
+db.ref(
+"eleves/"+matricule
+)
+
+.update({
+
+nom:
+document.getElementById(
+"nom"
+).value,
+
+postnom:
+document.getElementById(
+"postnom"
+).value,
+
+prenom:
+document.getElementById(
+"prenom"
+).value,
+
+className:
+document.getElementById(
+"classe"
+).value
+
+})
+
+.then(()=>{
+
+alert(
+"Modification enregistrée"
+);
+
+voirFicheEleve(
+matricule
+);
+
+});
+
+}
+
+function supprimerEleve(
+matricule
+){
+
+let ok=
+
+confirm(
+"Supprimer cet élève ?"
+);
+
+if(!ok){
+return;
+}
+
+showLoader();
+
+Promise.all([
+
+db.ref(
+"eleves/"+matricule
+).remove(),
+
+db.ref(
+"schools/"
++
+window.currentSchoolId+
+"/students/"
++
+matricule
+).remove(),
+
+db.ref(
+"schools/"
++
+window.currentSchoolId+
+"/members/"
++
+matricule
+).remove()
+
+])
+
+.then(()=>{
+
+hideLoader();
+
+alert(
+"Élève supprimé"
+);
+
+ouvrirListeEleves();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(
+error.message
+);
+
+});
+
+}
+
+function modifierEnseignant(
+matricule
+){
+
+db.ref(
+"enseignants/"+matricule
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let e=snapshot.val();
+
+document.querySelector(
+".login-box"
+).innerHTML=`
+
+<h2>
+
+Modifier enseignant
+
+</h2>
+
+<input
+id="matiere"
+value="${e.matiere||""}"
+>
+
+<input
+id="telephone"
+value="${e.telephone||""}"
+>
+
+<button
+onclick="
+enregistrerModificationEnseignant(
+'${matricule}'
+)"
+>
+
+💾 Sauvegarder
+
+</button>
+
+`;
+
+});
+
+}
+
+function enregistrerModificationEnseignant(
+matricule
+){
+
+db.ref(
+"enseignants/"+matricule
+)
+
+.update({
+
+matiere:
+document.getElementById(
+"matiere"
+).value,
+
+telephone:
+document.getElementById(
+"telephone"
+).value
+
+})
+
+.then(()=>{
+
+alert(
+"Modification enregistrée"
+);
+
+voirFicheEnseignant(
+matricule
+);
+
+});
+
+}
+
+function supprimerEnseignant(
+matricule
+){
+
+if(
+!confirm(
+"Supprimer enseignant ?"
+)
+){
+return;
+}
+
+db.ref(
+"enseignants/"+matricule
+)
+
+.remove()
+
+.then(()=>{
+
+alert(
+"Enseignant supprimé"
+);
+
+ouvrirListeEnseignants();
+
+});
+
+}
+
+function viewTeacher(teacherId){
+
+showLoader();
+
+db.ref("teachers/"+teacherId)
+
+.once("value")
+
+.then(snapshot=>{
+
+let t=snapshot.val();
+
+if(!t){
+
+hideLoader();
+
+alert("Enseignant introuvable");
+
+return;
+
+}
+
+document.querySelector(".login-box").innerHTML=`
+
+<style>
+
+.action-grid{
+
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:15px;
+margin-top:20px;
+
+}
+
+.action-btn{
+
+background:linear-gradient(
+145deg,
+#ffffff,
+#eef2ff
+) !important;
+
+color:#333 !important;
+
+border:none !important;
+
+border-radius:22px !important;
+
+padding:20px !important;
+
+min-height:90px;
+
+display:flex !important;
+
+flex-direction:column;
+
+justify-content:center;
+align-items:center;
+
+font-size:14px !important;
+font-weight:bold;
+
+transition:.3s;
+
+box-shadow:
+
+0 12px 20px rgba(
+0,0,0,.15
+),
+
+0 5px 8px rgba(
+0,0,0,.08
+),
+
+inset 0 2px 2px rgba(
+255,255,255,.8
+);
+
+}
+
+.action-btn:active{
+
+transform:
+translateY(7px)
+scale(.93);
+
+box-shadow:
+
+inset 0 6px 12px rgba(
+0,0,0,.18
+),
+
+inset 0 -2px 5px rgba(
+255,255,255,.6
+);
+
+}
+
+.action-icon{
+
+font-size:28px;
+margin-bottom:8px;
+
+}
+
+.red-btn{
+
+background:linear-gradient(
+135deg,
+#ff4747,
+#ff7979
+) !important;
+
+color:white !important;
+
+}
+
+.blue-btn{
+
+background:linear-gradient(
+135deg,
+#1f4cff,
+#5ea8ff
+) !important;
+
+color:white !important;
+
+}
+
+.green-btn{
+
+background:linear-gradient(
+135deg,
+#28b446,
+#58d977
+) !important;
+
+color:white !important;
+
+}
+
+.teacher-card{
+
+background:white;
+
+padding:20px;
+
+border-radius:20px;
+
+line-height:2;
+
+box-shadow:
+0 4px 12px rgba(
+0,0,0,.08
+);
+
+}
+
+</style>
+
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+👨‍🏫 Fiche enseignant
+
+</h2>
+
+
+<div class="teacher-card">
+
+👤 <b>Nom :</b>
+${t.name||"-"}
+
+<br>
+
+🆔 <b>Matricule :</b>
+${t.matricule||"-"}
+
+<br>
+
+⚥ <b>Sexe :</b>
+${t.sexe||"-"}
+
+<br>
+
+🎂 <b>Date naissance :</b>
+${t.dateNaissance||"-"}
+
+<br>
+
+📍 <b>Lieu naissance :</b>
+${t.lieuNaissance||"-"}
+
+<br>
+
+📅 <b>Date engagement :</b>
+${t.dateEngagement||"-"}
+
+<br>
+
+📱 <b>Téléphone :</b>
+${t.phone||"-"}
+
+<br>
+
+🏠 <b>Adresse :</b>
+${t.adresse||"-"}
+
+<br>
+
+📚 <b>Matière :</b>
+${t.matiere||"-"}
+
+<br>
+
+🏫 <b>Classe :</b>
+${t.classe||"-"}
+
+</div>
+
+
+<div class="action-grid">
+
+<button
+class="action-btn"
+onclick="modifierTeacher('${teacherId}')">
+
+<div class="action-icon">
+✏
+</div>
+
+Modifier
+
+</button>
+
+
+<button
+class="action-btn red-btn"
+onclick="supprimerTeacher('${teacherId}')">
+
+<div class="action-icon">
+🗑
+</div>
+
+Supprimer
+
+</button>
+
+
+<button
+class="action-btn blue-btn"
+onclick="imprimerFiche()">
+
+<div class="action-icon">
+🖨
+</div>
+
+Imprimer
+
+</button>
+
+
+<button
+class="action-btn"
+onclick="telechargerPDFTeacher('${teacherId}')">
+
+<div class="action-icon">
+📄
+</div>
+
+PDF
+
+</button>
+
+
+<button
+class="action-btn"
+onclick="telechargerWordTeacher('${teacherId}')">
+
+<div class="action-icon">
+📝
+</div>
+
+Word
+
+</button>
+
+
+<button
+class="action-btn green-btn"
+onclick="telechargerExcelTeacher('${teacherId}')">
+
+<div class="action-icon">
+📊
+</div>
+
+Excel
+
+</button>
+
+</div>
+
+
+<button
+onclick="teacherRecords()"
+style="
+margin-top:15px;
+">
+
+⬅ Retour
+
+</button>
+
+`;
+
+hideLoader();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
 
 
 
@@ -6173,6 +8516,17 @@ error.message
 
 
 </script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
 
 </body>
 </html>
