@@ -1462,11 +1462,10 @@ function openParent(){
 
 showLoader();
 
-let phone = window.currentPhone.replace(/\D/g,"");
+let phone=normalizePhone(window.currentPhone);
 
-db.ref("users/" + window.currentPhone)
+db.ref("users/"+window.currentPhone)
 .once("value")
-
 .then(userSnap=>{
 
 let user=userSnap.val();
@@ -1476,17 +1475,9 @@ throw new Error("Parent introuvable");
 }
 
 return Promise.all([
-
 Promise.resolve(user),
-
-db.ref(
-"schools/"+user.schoolId
-).once("value"),
-
-db.ref(
-"parents/"+phone+"/children"
-).once("value")
-
+db.ref("schools/"+user.schoolId).once("value"),
+db.ref("parents/"+phone+"/children").once("value")
 ]);
 
 })
@@ -1682,7 +1673,14 @@ placeholder="Devise école">
 
 <input
 id="schoolPhone"
+type="tel"
+maxlength="10"
+inputmode="numeric"
+oninput="
+this.value=this.value.replace(/\D/g,'').substring(0,10);
+"
 placeholder="Téléphone école">
+
 
 <input
 id="email"
@@ -1797,241 +1795,313 @@ Créer école
 
 // ================= FINALISER INSCRIPTION =================
 
-// ================= FINALISER INSCRIPTION =================
-
 function finishJoin(){
 
-let matricule=
+    showLoader();
 
-document.getElementById(
-"matricule"
-)?.value.trim() || "";
+    let invite=window.currentInvite;
 
-let phone=
-window.currentPhone;
+    if(!invite){
+        hideLoader();
+        alert("Invitation introuvable.");
+        return;
+    }
 
-let invite=
-window.currentInvite;
+    let phone=window.currentPhone;
+    let role=invite.role;
+    let schoolId=invite.schoolId;
 
-showLoader();
+    let matricule="";
 
+    if(role=="parent"){
 
-// si matricule vide
+        matricule=document
+        .getElementById("matricule")
+        .value
+        .trim()
+        .toUpperCase();
 
-if(matricule===""){
+        if(matricule==""){
+            hideLoader();
+            alert("Veuillez saisir le matricule de votre enfant.");
+            return;
+        }
 
-db.ref(
-"users/"+phone
-)
+    }
 
-.set({
+    db.ref("invitations/"+invite.code)
 
-phone:phone,
+    .transaction(function(invitation){
 
-role:invite.role,
+        if(invitation==null){
 
-schoolId:invite.schoolId,
+            return;
 
-name:"Nouvel utilisateur",
+        }
 
-createdAt:
-new Date()
-.toISOString()
+        if(invitation.used){
 
-})
+            return;
 
-.then(()=>{
+        }
 
-hideLoader();
+        invitation.used=true;
+        invitation.usedBy=phone;
+        invitation.usedAt=Date.now();
 
-alert(
-"Compte créé"
-);
+        return invitation;
 
-if(invite.role==="student"){
-openStudent();
+    },function(error,committed,snapshot){
+
+        if(error){
+
+            hideLoader();
+            alert(error.message);
+            return;
+
+        }
+
+        if(!committed){
+
+            hideLoader();
+            alert("Ce code d'invitation a déjà été utilisé.");
+            return;
+
+        }
+
+        // ===========================
+        // PARENT
+        // ===========================
+
+        if(role=="parent"){
+
+            db.ref(
+            "schools/"+schoolId+
+            "/students/"+matricule)
+
+            .once("value")
+
+            .then(studentSnap=>{
+
+                if(!studentSnap.exists()){
+
+                    throw new Error("Matricule élève introuvable.");
+
+                }
+
+                let eleve=studentSnap.val();
+
+                let parent={
+
+                    phone:phone,
+
+                    role:"parent",
+
+                    schoolId:schoolId,
+
+                    studentMatricule:matricule,
+
+                    studentName:eleve.name,
+
+                    name:"Parent de "+eleve.name,
+
+                    createdAt:Date.now()
+
+                };
+
+                return Promise.all([
+
+                    db.ref("users/"+phone).set(parent),
+
+                    db.ref(
+                    "schools/"+schoolId+
+                    "/members/"+phone
+                    ).set({
+
+                        name:parent.name,
+
+                        phone:phone,
+
+                        role:"parent",
+
+                        studentMatricule:matricule,
+
+                        createdAt:Date.now()
+
+                    })
+
+                ]);
+
+            })
+
+            .then(()=>{
+
+                hideLoader();
+
+                alert("École rejointe avec succès.");
+
+                openParent();
+
+            })
+
+            .catch(error=>{
+
+                hideLoader();
+
+                // Libérer le code si l'inscription échoue
+                db.ref("invitations/"+invite.code).update({
+                    used:false,
+                    usedBy:null,
+                    usedAt:null
+                });
+
+                alert(error.message);
+
+            });
+
+            return;
+
+        }
+
+        // ===========================
+        // ENSEIGNANT
+        // ===========================
+
+        if(role=="teacher"){
+
+            let teacher={
+
+                phone:phone,
+
+                role:"teacher",
+
+                schoolId:schoolId,
+
+                name:"Nouvel enseignant",
+
+                createdAt:Date.now()
+
+            };
+
+            Promise.all([
+
+                db.ref("users/"+phone).set(teacher),
+
+                db.ref(
+                "schools/"+schoolId+
+                "/members/"+phone
+                ).set({
+
+                    name:teacher.name,
+
+                    phone:phone,
+
+                    role:"teacher",
+
+                    createdAt:Date.now()
+
+                })
+
+            ])
+
+            .then(()=>{
+
+                hideLoader();
+
+                alert("École rejointe.");
+
+                openTeacher();
+
+            })
+
+            .catch(error=>{
+
+                hideLoader();
+
+                db.ref("invitations/"+invite.code).update({
+                    used:false,
+                    usedBy:null,
+                    usedAt:null
+                });
+
+                alert(error.message);
+
+            });
+
+            return;
+
+        }
+
+        // ===========================
+        // ELEVE
+        // ===========================
+
+        if(role=="student"){
+
+            let student={
+
+                phone:phone,
+
+                role:"student",
+
+                schoolId:schoolId,
+
+                name:"Nouvel élève",
+
+                createdAt:Date.now()
+
+            };
+
+            Promise.all([
+
+                db.ref("users/"+phone).set(student),
+
+                db.ref(
+                "schools/"+schoolId+
+                "/members/"+phone
+                ).set({
+
+                    name:student.name,
+
+                    phone:phone,
+
+                    role:"student",
+
+                    createdAt:Date.now()
+
+                })
+
+            ])
+
+            .then(()=>{
+
+                hideLoader();
+
+                alert("École rejointe.");
+
+                openStudent();
+
+            })
+
+            .catch(error=>{
+
+                hideLoader();
+
+                db.ref("invitations/"+invite.code).update({
+                    used:false,
+                    usedBy:null,
+                    usedAt:null
+                });
+
+                alert(error.message);
+
+            });
+
+        }
+
+    });
+
 }
-else if(invite.role==="teacher"){
-openTeacher();
-}
-else{
-openParent();
-}
-
-})
-
-.catch(error=>{
-
-hideLoader();
-
-alert(
-error.message
-);
-
-});
-
-return;
-
-}
-
-
-// si matricule rempli
-
-db.ref(
-"eleves/"+matricule
-)
-
-.once("value")
-
-.then(snapshot=>{
-
-if(!snapshot.exists()){
-
-throw new Error(
-"Matricule introuvable"
-);
-
-}
-
-let eleve=
-snapshot.val();
-
-if(eleve.linked){
-
-throw new Error(
-"Élève déjà lié"
-);
-
-}
-
-
-let userData={
-
-matricule:
-eleve.matricule,
-
-nom:
-eleve.nom,
-
-postnom:
-eleve.postnom,
-
-prenom:
-eleve.prenom,
-
-name:
-eleve.name,
-
-phone:
-phone,
-
-role:
-"student",
-
-className:
-eleve.className,
-
-schoolId:
-eleve.schoolId,
-
-fatherName:
-eleve.fatherName || "",
-
-fatherPhone:
-eleve.fatherPhone || "",
-
-motherName:
-eleve.motherName || "",
-
-motherPhone:
-eleve.motherPhone || "",
-
-province:
-eleve.province || "",
-
-territoire:
-eleve.territoire || "",
-
-secteur:
-eleve.secteur || "",
-
-linked:true,
-
-createdAt:
-eleve.createdAt
-
-};
-
-return Promise.all([
-
-db.ref(
-"users/"+phone
-).set(userData),
-
-db.ref(
-"eleves/"+matricule
-)
-
-.update({
-
-phone:phone,
-linked:true
-
-}),
-
-db.ref(
-"schools/"
-+
-eleve.schoolId+
-"/members/"
-+
-phone
-)
-
-.set({
-
-name:
-eleve.name,
-
-role:
-"student",
-
-phone:
-phone,
-
-createdAt:
-Date.now()
-
-})
-
-]);
-
-})
-
-.then(()=>{
-
-hideLoader();
-
-alert(
-"Compte lié avec succès"
-);
-
-openStudent();
-
-})
-
-.catch(error=>{
-
-hideLoader();
-
-alert(
-error.message
-);
-
-});
-
-}
-
 // ================= DASHBOARD ADMIN =================
 
 function openAdmin(){
@@ -2292,7 +2362,7 @@ class="select-style"
 onclick="generateInvite()">
 
 <div class="card-icon">
-🔗
+🛎️
 </div>
 
 <div class="card-text">
@@ -2453,7 +2523,11 @@ function teacherRecords(){
 
 showLoader();
 
-db.ref("enseignants")
+db.ref(
+  "schools/" +
+  window.currentSchoolId +
+  "/teachers"
+)
 
 .once("value")
 
@@ -2634,9 +2708,28 @@ placeholder="Matière"
 >
 
 <input
-id="telephone"
-placeholder="Téléphone"
+id="password"
+type="password"
+placeholder="Mot de passe de connexion"
 >
+
+<select id="classeEns">
+
+<option value="">
+Choisir une classe
+</option>
+
+</select>
+
+<input
+id="telephone"
+type="tel"
+placeholder="Téléphone"
+maxlength="10"
+inputmode="numeric"
+oninput="
+this.value=this.value.replace(/\D/g,'').substring(0,10);
+">
 
 <input
 id="adresse"
@@ -2660,6 +2753,34 @@ onclick="teacherRecords()"
 </button>
 
 `;
+
+setTimeout(()=>{
+
+let select=document.getElementById("classeEns");
+
+db.ref(
+"schools/"+window.currentSchoolId+"/classes"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+snapshot.forEach(item=>{
+
+let classe = item.val();
+
+select.innerHTML += `
+<option value="${classe}">
+${classe}
+</option>
+`;
+
+});
+
+});
+
+},100);
 
 }
 
@@ -2727,6 +2848,12 @@ postnom:
 document.getElementById(
 "postnom"
 ).value.trim(),
+
+password:
+document.getElementById("password").value,
+
+classe:
+document.getElementById("classeEns").value,
 
 prenom:
 document.getElementById(
@@ -2803,7 +2930,10 @@ let promises=[];
 promises.push(
 
 db.ref(
-"enseignants/"+matricule
+"schools/" +
+  window.currentSchoolId +
+  "/teachers/" +
+  matricule
 )
 
 .set(data)
@@ -2867,6 +2997,12 @@ data.name,
 role:
 "teacher",
 
+password:
+document.getElementById("password").value,
+
+classe:
+document.getElementById("classeEns").value,
+
 schoolId:
 window.currentSchoolId,
 
@@ -2918,7 +3054,10 @@ matricule
 showLoader();
 
 db.ref(
-"enseignants/"+matricule
+"schools/" +
+  window.currentSchoolId +
+  "/teachers/" +
+  matricule
 )
 
 .once("value")
@@ -3364,8 +3503,14 @@ placeholder="Nom père"
 
 <input
 id="fatherPhone"
+type="tel"
 placeholder="Téléphone père"
->
+maxlength="10"
+inputmode="numeric"
+oninput="
+this.value=this.value.replace(/\D/g,'').substring(0,10);
+">
+
 
 <input
 id="motherName"
@@ -3374,8 +3519,14 @@ placeholder="Nom mère"
 
 <input
 id="motherPhone"
+type="tel"
 placeholder="Téléphone mère"
->
+maxlength="10"
+inputmode="numeric"
+oninput="
+this.value=this.value.replace(/\D/g,'').substring(0,10);
+">
+
 
 <input
 id="province"
@@ -3622,17 +3773,19 @@ return db.ref(
 
 .set({
 
-schoolId:
-admin.schoolId,
+code: inviteCode,
 
-role:
-role,
+schoolId: admin.schoolId,
 
-used:false,
+role: role,
 
-createdAt:
-new Date()
-.toISOString()
+used: false,
+
+usedBy: null,
+
+usedAt: null,
+
+createdAt: new Date().toISOString()
 
 })
 
@@ -3680,48 +3833,50 @@ ${inviteCode}
 
 function confirmJoin(){
 
-let code=
-document.getElementById(
-"inviteCode"
-)
+let code=document.getElementById("inviteCode")
 .value
 .trim()
 .toUpperCase();
 
 showLoader();
 
-db.ref(
-"invitations/"+code
-)
+db.ref("invitations/"+code)
 
 .once("value")
 
 .then(snapshot=>{
 
-hideLoader();
-
 if(!snapshot.exists()){
 
-alert(
-"Code invalide"
-);
+hideLoader();
+
+alert("Code invalide");
 
 return;
 
 }
 
-let invite=
-snapshot.val();
+let invite=snapshot.val();
 
-invite.code=
-code;
+if(invite.used === true){
 
-window.currentInvite=
-invite;
+    console.log(invite);
 
-document.querySelector(
-".login-box"
-).innerHTML=`
+    hideLoader();
+
+    alert("Ce code a déjà été utilisé par : " + (invite.usedBy || "inconnu"));
+
+    return;
+
+}
+
+invite.code=code;
+
+window.currentInvite=invite;
+
+hideLoader();
+
+document.querySelector(".login-box").innerHTML=`
 
 <h2>
 
@@ -3743,6 +3898,14 @@ Terminer
 </button>
 
 `;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
 
 });
 
@@ -5193,13 +5356,13 @@ return;
 
 // ================= NORMALISER TELEPHONES =================
 
-let fatherPhone =
-(document.getElementById("fatherPhone").value || "")
-.replace(/\D/g,"");
+let fatherPhone=normalizePhone(
+document.getElementById("fatherPhone").value
+);
 
-let motherPhone =
-(document.getElementById("motherPhone").value || "")
-.replace(/\D/g,"");
+let motherPhone=normalizePhone(
+document.getElementById("motherPhone").value
+);
 
 
 // RDC : retirer le 0 au début
@@ -6798,52 +6961,44 @@ error.message
 
 function ouvrirListeEnseignants(){
 
-showLoader();
+    showLoader();
 
-db.ref(
-"enseignants"
-)
+    if (!window.currentSchoolId) {
+        hideLoader();
+        alert("École introuvable.");
+        return;
+    }
 
-.once("value")
+    db.ref(
+        `schools/${window.currentSchoolId}/teachers`
+    )
+    .once("value")
+    .then(snapshot => {
 
-.then(snapshot=>{
+        let enseignants = [];
 
-let enseignants=[];
+        snapshot.forEach(item => {
+            enseignants.push(item.val());
+        });
 
-if(snapshot.exists()){
+        window.enseignantsCache = enseignants;
 
-snapshot.forEach(item=>{
+        dessinerListeEnseignants(
+            enseignants
+        );
 
-enseignants.push(
-item.val()
-);
+        hideLoader();
 
-});
+    })
+    .catch(error => {
 
-}
+        hideLoader();
+        alert(error.message);
 
-window.enseignantsCache=
-enseignants;
-
-dessinerListeEnseignants(
-enseignants
-);
-
-hideLoader();
-
-})
-
-.catch(error=>{
-
-hideLoader();
-
-alert(
-error.message
-);
-
-});
+    });
 
 }
+
 
 function dessinerListeEnseignants(
 enseignants
@@ -6925,52 +7080,68 @@ enseignants
 }
 
 function afficherTableEnseignants(
-enseignants
+    enseignants
 ){
 
-let tbody=
+    let tbody =
+    document.getElementById(
+        "tableEns"
+    );
 
-document.getElementById(
-"tableEns"
-);
+    tbody.innerHTML = "";
 
-tbody.innerHTML="";
+    if (!enseignants.length) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="3"
+                    style="
+                    text-align:center;
+                    padding:20px;
+                    color:gray;
+                    ">
+                    Aucun enseignant enregistré
+                </td>
+            </tr>
+        `;
+        return;
+    }
 
-enseignants.forEach(e=>{
+    enseignants.forEach(e => {
 
-tbody.innerHTML+=`
+        tbody.innerHTML += `
 
-<tr
+        <tr
+            onclick="
+            voirFicheEnseignant(
+            '${e.matricule}'
+            )
+            "
+            style="
+            cursor:pointer;
+            border-bottom:
+            1px solid #ddd;
+            ">
 
-onclick="
-voirFicheEnseignant(
-'${e.matricule}'
-)
-"
+            <td>
+                ${e.name || (
+                    (e.nom || "") + " " +
+                    (e.postnom || "") + " " +
+                    (e.prenom || "")
+                )}
+            </td>
 
-style="
-cursor:pointer;
-border-bottom:
-1px solid #ddd;
-">
+            <td>
+                ${e.sexe || "-"}
+            </td>
 
-<td>
-${e.name}
-</td>
+            <td>
+                ${e.matiere || "-"}
+            </td>
 
-<td>
-${e.sexe||"-"}
-</td>
+        </tr>
 
-<td>
-${e.matiere||"-"}
-</td>
-
-</tr>
-
-`;
-
-});
+        `;
+    });
 
 }
 
@@ -7786,23 +7957,65 @@ logout();
 
 }
 
+
 function modifierEleve(matricule){
 
+showLoader();
+
 db.ref(
-"eleves/"+matricule
+"schools/"+window.currentSchoolId
 )
 
 .once("value")
 
-.then(snapshot=>{
+.then(schoolSnap=>{
 
-let e=snapshot.val();
+let school=schoolSnap.val();
 
-document.querySelector(
-".login-box"
-).innerHTML=`
+return db.ref(
+"schools/"+window.currentSchoolId+
+"/students/"+matricule
+)
 
-<h2>
+.once("value")
+
+.then(studentSnap=>{
+
+return{
+school:school,
+e:studentSnap.val()
+};
+
+});
+
+})
+
+.then(data=>{
+
+hideLoader();
+
+let e=data.e;
+
+let classHtml="";
+
+data.school.classes.forEach(c=>{
+
+classHtml+=`
+<option
+${e.className==c?"selected":""}
+>
+${c}
+</option>
+`;
+
+});
+
+document.querySelector(".login-box").innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
 
 Modifier élève
 
@@ -7811,31 +8024,101 @@ Modifier élève
 <input
 id="nom"
 value="${e.nom||""}"
->
+placeholder="Nom">
 
 <input
 id="postnom"
 value="${e.postnom||""}"
->
+placeholder="Postnom">
 
 <input
 id="prenom"
 value="${e.prenom||""}"
->
+placeholder="Prénom">
 
 <input
-id="classe"
-value="${e.className||""}"
->
+type="date"
+id="dateNaissance"
+value="${e.dateNaissance||""}">
+
+<input
+id="lieuNaissance"
+value="${e.lieuNaissance||""}"
+placeholder="Lieu de naissance">
+
+<select id="sexe">
+
+<option ${e.sexe=="Masculin"?"selected":""}>
+Masculin
+</option>
+
+<option ${e.sexe=="Féminin"?"selected":""}>
+Féminin
+</option>
+
+</select>
+
+<select id="studentClass">
+
+${classHtml}
+
+</select>
+
+<input
+id="fatherName"
+value="${e.fatherName||""}"
+placeholder="Nom père">
+
+<input
+id="fatherPhone"
+type="tel"
+maxlength="10"
+inputmode="numeric"
+oninput="this.value=this.value.replace(/\D/g,'').substring(0,10)"
+value="${(e.fatherPhone||'').replace(/^243/,'0')}"
+placeholder="Téléphone père">
+
+
+<input
+id="motherName"
+value="${e.motherName||""}"
+placeholder="Nom mère">
+
+<input
+id="motherPhone"
+type="tel"
+maxlength="10"
+inputmode="numeric"
+oninput="this.value=this.value.replace(/\D/g,'').substring(0,10)"
+value="${(e.motherPhone||'').replace(/^243/,'0')}"
+placeholder="Téléphone mère">
+
+<input
+id="province"
+value="${e.province||""}"
+placeholder="Province">
+
+<input
+id="territoire"
+value="${e.territoire||""}"
+placeholder="Territoire">
+
+<input
+id="secteur"
+value="${e.secteur||""}"
+placeholder="Secteur">
 
 <button
-onclick="
-enregistrerModificationEleve(
-'${matricule}'
-)"
->
+onclick="enregistrerModificationEleve('${matricule}')">
 
 💾 Sauvegarder
+
+</button>
+
+<button
+onclick="voirFicheEleve('${matricule}')">
+
+⬅ Annuler
 
 </button>
 
@@ -7845,47 +8128,218 @@ enregistrerModificationEleve(
 
 }
 
-function enregistrerModificationEleve(
-matricule
-){
+
+function enregistrerModificationEleve(matricule){
+
+showLoader();
+
+let data={
+
+nom:document.getElementById("nom").value.trim(),
+
+postnom:document.getElementById("postnom").value.trim(),
+
+prenom:document.getElementById("prenom").value.trim(),
+
+name:
+document.getElementById("nom").value.trim()+" "+
+document.getElementById("postnom").value.trim()+" "+
+document.getElementById("prenom").value.trim(),
+
+dateNaissance:document.getElementById("dateNaissance").value,
+
+lieuNaissance:document.getElementById("lieuNaissance").value,
+
+sexe:document.getElementById("sexe").value,
+
+className:document.getElementById("studentClass").value,
+
+fatherName:document.getElementById("fatherName").value.trim(),
+
+fatherPhone:normalizePhone(
+document.getElementById("fatherPhone").value
+),
+
+motherName:document.getElementById("motherName").value.trim(),
+
+motherPhone:normalizePhone(
+document.getElementById("motherPhone").value
+),
+
+province:document.getElementById("province").value.trim(),
+
+territoire:document.getElementById("territoire").value.trim(),
+
+secteur:document.getElementById("secteur").value.trim()
+
+};
+
+let ancienEleve;
 
 db.ref(
-"eleves/"+matricule
+"schools/"+window.currentSchoolId+"/students/"+matricule
 )
 
-.update({
+.once("value")
 
-nom:
-document.getElementById(
-"nom"
-).value,
+.then(snapshot=>{
 
-postnom:
-document.getElementById(
-"postnom"
-).value,
+ancienEleve=snapshot.val()||{};
 
-prenom:
-document.getElementById(
-"prenom"
-).value,
+let promises=[];
 
-className:
-document.getElementById(
-"classe"
-).value
+let ancienPere=normalizePhone(ancienEleve.fatherPhone||"");
+let ancienneMere=normalizePhone(ancienEleve.motherPhone||"");
+
+if(
+ancienPere &&
+ancienPere!=data.fatherPhone
+){
+
+promises.push(
+
+db.ref(
+"parents/"+ancienPere+"/children/"+matricule
+).remove()
+
+);
+
+}
+
+if(
+ancienneMere &&
+ancienneMere!=data.motherPhone
+){
+
+promises.push(
+
+db.ref(
+"parents/"+ancienneMere+"/children/"+matricule
+).remove()
+
+);
+
+}
+
+promises.push(
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/students/"+matricule
+).update(data)
+
+);
+
+return Promise.all(promises);
 
 })
 
 .then(()=>{
 
-alert(
-"Modification enregistrée"
+return db.ref(
+"schools/"+window.currentSchoolId+
+"/members/"+matricule
+)
+
+.update({
+
+name:data.name
+
+});
+
+})
+
+.then(()=>{
+
+if(!ancienEleve.phone){
+
+return;
+
+}
+
+return db.ref(
+"users/"+ancienEleve.phone
+)
+
+.update({
+
+name:data.name,
+
+className:data.className
+
+});
+
+})
+
+.then(()=>{
+
+let enfant={
+
+matricule:matricule,
+
+name:data.name,
+
+nom:data.nom,
+
+postnom:data.postnom,
+
+prenom:data.prenom,
+
+className:data.className
+
+};
+
+let promises=[];
+
+if(data.fatherPhone){
+
+promises.push(
+
+db.ref(
+"parents/"+data.fatherPhone+
+"/children/"+matricule
+)
+
+.set(enfant)
+
 );
 
-voirFicheEleve(
-matricule
+}
+
+if(data.motherPhone){
+
+promises.push(
+
+db.ref(
+"parents/"+data.motherPhone+
+"/children/"+matricule
+)
+
+.set(enfant)
+
 );
+
+}
+
+return Promise.all(promises);
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("Élève modifié avec succès.");
+
+voirFicheEleve(matricule);
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
 
 });
 
@@ -7962,7 +8416,10 @@ matricule
 ){
 
 db.ref(
-"enseignants/"+matricule
+"schools/" +
+  window.currentSchoolId +
+  "/teachers/" +
+  matricule
 )
 
 .once("value")
@@ -8013,7 +8470,10 @@ matricule
 ){
 
 db.ref(
-"enseignants/"+matricule
+"schools/" +
+  window.currentSchoolId +
+  "/teachers/" +
+  matricule
 )
 
 .update({
@@ -8044,31 +8504,84 @@ matricule
 
 }
 
-function supprimerEnseignant(
-matricule
-){
+function supprimerEnseignant(matricule){
 
-if(
-!confirm(
-"Supprimer enseignant ?"
-)
-){
-return;
+if(!confirm("Supprimer cet enseignant ?")){
+    return;
 }
 
+showLoader();
+
 db.ref(
-"enseignants/"+matricule
+"schools/" +
+window.currentSchoolId +
+"/teachers/" +
+matricule
 )
 
-.remove()
+.once("value")
+
+.then(snapshot=>{
+
+let t=snapshot.val();
+
+if(!t){
+    throw new Error("Enseignant introuvable");
+}
+
+let telephone=t.telephone;
+
+let promises=[];
+
+// Supprimer la fiche enseignant
+promises.push(
+db.ref(
+"schools/" +
+window.currentSchoolId +
+"/teachers/" +
+matricule
+).remove()
+);
+
+// Supprimer dans les membres
+promises.push(
+db.ref(
+"schools/" +
+window.currentSchoolId +
+"/members/" +
+matricule
+).remove()
+);
+
+// Supprimer le compte utilisateur
+if(telephone){
+promises.push(
+db.ref(
+"users/" +
+telephone
+).remove()
+);
+}
+
+return Promise.all(promises);
+
+})
 
 .then(()=>{
 
-alert(
-"Enseignant supprimé"
-);
+hideLoader();
+
+alert("Enseignant supprimé avec succès.");
 
 ouvrirListeEnseignants();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
 
 });
 
@@ -8078,7 +8591,9 @@ function viewTeacher(teacherId){
 
 showLoader();
 
-db.ref("teachers/"+teacherId)
+db.ref(
+`schools/${window.currentSchoolId}/teachers/${teacherId}`
+)
 
 .once("value")
 
@@ -8279,7 +8794,7 @@ ${t.dateEngagement||"-"}
 <br>
 
 📱 <b>Téléphone :</b>
-${t.phone||"-"}
+${t.telephone||"-"}
 
 <br>
 
@@ -8404,6 +8919,337 @@ hideLoader();
 alert(error.message);
 
 });
+
+}
+
+function modifierTeacher(matricule){
+
+showLoader();
+
+db.ref(
+"schools/" +
+window.currentSchoolId +
+"/teachers/" +
+matricule
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+let t=snapshot.val();
+
+if(!t){
+
+alert("Enseignant introuvable");
+
+return;
+
+}
+
+document.querySelector(".login-box").innerHTML=`
+
+<h2 style="text-align:center;color:#1f4cff;">
+✏ Modifier enseignant
+</h2>
+
+<input id="nom" value="${t.nom||""}" placeholder="Nom">
+
+<input id="postnom" value="${t.postnom||""}" placeholder="Postnom">
+
+<input id="prenom" value="${t.prenom||""}" placeholder="Prénom">
+
+<select id="sexe">
+<option ${t.sexe=="Masculin"?"selected":""}>Masculin</option>
+<option ${t.sexe=="Féminin"?"selected":""}>Féminin</option>
+</select>
+
+<input
+id="dateNaissance"
+type="date"
+value="${t.dateNaissance||""}">
+
+<input
+id="lieuNaissance"
+value="${t.lieuNaissance||""}"
+placeholder="Lieu de naissance">
+
+<input
+id="dateEngagement"
+type="date"
+value="${t.dateEngagement||""}">
+
+<input
+id="matiere"
+value="${t.matiere||""}"
+placeholder="Matière">
+
+<input
+id="telephone"
+value="${(t.telephone||"").replace("+243","0")}"
+placeholder="Téléphone">
+
+<input
+id="password"
+type="password"
+value="${t.password||""}"
+placeholder="Mot de passe">
+
+<input
+id="classeEns"
+value="${t.classe||""}"
+placeholder="Classe">
+
+<input
+id="adresse"
+value="${t.adresse||""}"
+placeholder="Adresse">
+
+<button
+onclick="updateTeacher('${matricule}','${t.telephone}')">
+💾 Enregistrer
+</button>
+
+<button
+onclick="viewTeacher('${matricule}')">
+⬅ Annuler
+</button>
+
+`;
+
+});
+
+}
+
+// ======== Mise à jour ========
+
+function updateTeacher(
+matricule,
+ancienTelephone
+){
+
+showLoader();
+
+let telephone=
+
+document
+.getElementById("telephone")
+.value
+.replace(/\D/g,"");
+
+if(
+telephone.startsWith("0")
+){
+telephone=
+telephone.substring(1);
+}
+
+if(
+telephone &&
+!telephone.startsWith("243")
+){
+telephone=
+"243"+telephone;
+}
+
+telephone=
+"+"+telephone;
+
+let data={
+
+nom:
+document.getElementById("nom").value.trim(),
+
+postnom:
+document.getElementById("postnom").value.trim(),
+
+prenom:
+document.getElementById("prenom").value.trim(),
+
+name:
+document.getElementById("nom").value.trim()
++" "+
+document.getElementById("postnom").value.trim()
++" "+
+document.getElementById("prenom").value.trim(),
+
+sexe:
+document.getElementById("sexe").value,
+
+dateNaissance:
+document.getElementById("dateNaissance").value,
+
+lieuNaissance:
+document.getElementById("lieuNaissance").value,
+
+dateEngagement:
+document.getElementById("dateEngagement").value,
+
+password:
+document.getElementById("password").value,
+
+classe:
+document.getElementById("classeEns").value,
+
+matiere:
+document.getElementById("matiere").value,
+
+telephone:
+telephone,
+
+adresse:
+document.getElementById("adresse").value
+
+};
+
+db.ref(
+"schools/"
++
+window.currentSchoolId+
+"/teachers/"
++
+matricule
+)
+
+.update(data)
+
+.then(()=>{
+
+return db.ref(
+"schools/"
++
+window.currentSchoolId+
+"/members/"
++
+matricule
+)
+
+.update({
+
+name:data.name,
+
+phone:telephone
+
+});
+
+})
+
+.then(()=>{
+
+if(
+ancienTelephone!=telephone
+){
+
+return db.ref(
+"users/"
++
+ancienTelephone
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let user=
+snapshot.val();
+
+if(user){
+
+user.phone=
+telephone;
+
+user.name=
+data.name;
+
+return db.ref(
+"users/"
++
+telephone
+)
+
+.set(user)
+
+.then(()=>{
+
+return db.ref(
+"users/"
++
+ancienTelephone
+)
+
+.remove();
+
+});
+
+}
+
+});
+
+}
+
+return db.ref(
+"users/"
++
+telephone
+)
+
+.update({
+
+name:data.name,
+
+phone:telephone,
+
+password:data.password,
+
+classe:data.classe
+
+
+
+});
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert(
+"Enseignant modifié avec succès."
+);
+
+viewTeacher(
+matricule
+);
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(
+error.message
+);
+
+});
+
+}
+
+function normalizePhone(phone){
+
+phone=(phone||"").replace(/\D/g,"");
+
+if(phone.startsWith("0")){
+phone=phone.substring(1);
+}
+
+if(phone && !phone.startsWith("243")){
+phone="243"+phone;
+}
+
+return phone;
 
 }
 
