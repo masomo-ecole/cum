@@ -660,6 +660,8 @@ Chargement...
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
 <link
 rel="stylesheet"
 href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css"
@@ -699,6 +701,7 @@ firebase.initializeApp(
 firebaseConfig
 );
 
+const messaging = firebase.messaging();
 
 // base données
 
@@ -1893,6 +1896,7 @@ function finishJoin(){
             })
             .then(()=>{
                 hideLoader();
+                activerNotification();
                 alert("École rejointe avec succès.");
                 openParent();
             });
@@ -1927,6 +1931,7 @@ function finishJoin(){
             ])
             .then(()=>{
                 hideLoader();
+                activerNotification();
                 alert("École rejointe avec succès.");
                 openTeacher();
             });
@@ -1961,6 +1966,7 @@ function finishJoin(){
             ])
             .then(()=>{
                 hideLoader();
+                activerNotification();
                 alert("École rejointe avec succès.");
                 openStudent();
             });
@@ -9142,6 +9148,27 @@ if(permission==="granted"){
 
 console.log("Notifications activées");
 
+// Récupérer le token du téléphone
+messaging.getToken({
+ vapidKey:"BI9BU5E1zTNwa3gyxe120p6E3Yv7mu6usLEo1vfmzdwhT4WHmJMX7h0XbzSIXnSJ-m2mr16CGmjwHWA1kQqkVb0"
+})
+.then(token=>{
+
+console.log("Token :", token);
+
+
+// Enregistrer le token dans l'utilisateur connecté
+db.ref("users/"+window.currentPhone)
+.update({
+
+notificationToken: token
+
+});
+
+
+});
+
+
 }
 
 else{
@@ -9178,6 +9205,14 @@ console.log("Notifications refusées");
 <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+
+<script src="firebase-app-compat.js"></script>
+<script src="firebase-database-compat.js"></script>
+
+<!-- Ajouter celui-ci -->
+<script src="firebase-messaging-compat.js"></script>
+
 
 
 </body>
