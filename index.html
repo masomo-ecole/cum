@@ -676,7 +676,7 @@ console.log("SCRIPT CHARGÉ");
 
 const firebaseConfig={
 
-apiKey:"#",
+apiKey:"AIzaSyDcgJDckF9vejT476nYTGHAwa75dotPkMA",
 
 authDomain:"multi-ecole.firebaseapp.com",
 
@@ -1799,7 +1799,7 @@ function finishJoin(){
 
     showLoader();
 
-    let invite=window.currentInvite;
+    let invite = window.currentInvite;
 
     if(!invite){
         hideLoader();
@@ -1807,298 +1807,171 @@ function finishJoin(){
         return;
     }
 
-    let phone=window.currentPhone;
-    let role=invite.role;
-    let schoolId=invite.schoolId;
-
-    let matricule="";
+    let phone = window.currentPhone;
+    let role = invite.role;
+    let schoolId = invite.schoolId;
+    let matricule = "";
 
     if(role=="parent"){
-
-        matricule=document
-        .getElementById("matricule")
-        .value
-        .trim()
-        .toUpperCase();
+        matricule = document.getElementById("matricule")
+            .value
+            .trim()
+            .toUpperCase();
 
         if(matricule==""){
             hideLoader();
-            alert("Veuillez saisir le matricule de votre enfant.");
+            alert("Veuillez saisir le matricule de l'élève.");
             return;
         }
-
     }
 
+    // Vérifier que le code est toujours disponible
     db.ref("invitations/"+invite.code)
+    .once("value")
+    .then(inviteSnap=>{
 
-    .transaction(function(invitation){
-
-        if(invitation==null){
-
-            return;
-
+        if(!inviteSnap.exists()){
+            throw new Error("Invitation introuvable.");
         }
 
-        if(invitation.used){
+        let inv = inviteSnap.val();
 
-            return;
-
+        if(inv.used){
+            throw new Error("Ce code d'invitation a déjà été utilisé.");
         }
 
-        invitation.used=true;
-        invitation.usedBy=phone;
-        invitation.usedAt=Date.now();
+        return db.ref("users/"+phone).once("value");
 
-        return invitation;
+    })
 
-    },function(error,committed,snapshot){
+    .then(userSnap=>{
 
-        if(error){
-
-            hideLoader();
-            alert(error.message);
-            return;
-
+        if(userSnap.exists()){
+            throw new Error("Ce numéro est déjà inscrit.");
         }
-
-        if(!committed){
-
-            hideLoader();
-            alert("Ce code d'invitation a déjà été utilisé.");
-            return;
-
-        }
-
-        // ===========================
-        // PARENT
-        // ===========================
 
         if(role=="parent"){
 
-            db.ref(
-            "schools/"+schoolId+
-            "/students/"+matricule)
-
+            return db.ref("schools/"+schoolId+"/students/"+matricule)
             .once("value")
-
             .then(studentSnap=>{
 
                 if(!studentSnap.exists()){
-
                     throw new Error("Matricule élève introuvable.");
-
                 }
 
-                let eleve=studentSnap.val();
+                let eleve = studentSnap.val();
 
-                let parent={
-
-                    phone:phone,
-
-                    role:"parent",
-
-                    schoolId:schoolId,
-
-                    studentMatricule:matricule,
-
-                    studentName:eleve.name,
-
-                    name:"Parent de "+eleve.name,
-
-                    createdAt:Date.now()
-
+                let parent = {
+                    phone: phone,
+                    role: "parent",
+                    schoolId: schoolId,
+                    studentMatricule: matricule,
+                    studentName: eleve.name,
+                    name: "Parent de "+eleve.name,
+                    createdAt: Date.now()
                 };
 
                 return Promise.all([
-
                     db.ref("users/"+phone).set(parent),
 
-                    db.ref(
-                    "schools/"+schoolId+
-                    "/members/"+phone
-                    ).set({
+                    db.ref("schools/"+schoolId+"/members/"+phone).set({
+                        phone: phone,
+                        role: "parent",
+                        name: parent.name,
+                        studentMatricule: matricule,
+                        createdAt: Date.now()
+                    }),
 
-                        name:parent.name,
-
-                        phone:phone,
-
-                        role:"parent",
-
-                        studentMatricule:matricule,
-
-                        createdAt:Date.now()
-
+                    db.ref("invitations/"+invite.code).update({
+                        used:true,
+                        usedBy:phone,
+                        usedAt:Date.now()
                     })
-
                 ]);
 
             })
-
             .then(()=>{
-
                 hideLoader();
-
                 alert("École rejointe avec succès.");
-
                 openParent();
-
-            })
-
-            .catch(error=>{
-
-                hideLoader();
-
-                // Libérer le code si l'inscription échoue
-                db.ref("invitations/"+invite.code).update({
-                    used:false,
-                    usedBy:null,
-                    usedAt:null
-                });
-
-                alert(error.message);
-
             });
 
-            return;
-
         }
-
-        // ===========================
-        // ENSEIGNANT
-        // ===========================
 
         if(role=="teacher"){
 
-            let teacher={
-
-                phone:phone,
-
-                role:"teacher",
-
-                schoolId:schoolId,
-
-                name:"Nouvel enseignant",
-
-                createdAt:Date.now()
-
+            let teacher = {
+                phone: phone,
+                role: "teacher",
+                schoolId: schoolId,
+                name: "Nouvel enseignant",
+                createdAt: Date.now()
             };
 
-            Promise.all([
-
+            return Promise.all([
                 db.ref("users/"+phone).set(teacher),
 
-                db.ref(
-                "schools/"+schoolId+
-                "/members/"+phone
-                ).set({
-
-                    name:teacher.name,
-
-                    phone:phone,
-
-                    role:"teacher",
-
-                    createdAt:Date.now()
-
-                })
-
-            ])
-
-            .then(()=>{
-
-                hideLoader();
-
-                alert("École rejointe.");
-
-                openTeacher();
-
-            })
-
-            .catch(error=>{
-
-                hideLoader();
+                db.ref("schools/"+schoolId+"/members/"+phone).set({
+                    phone: phone,
+                    role: "teacher",
+                    name: teacher.name,
+                    createdAt: Date.now()
+                }),
 
                 db.ref("invitations/"+invite.code).update({
-                    used:false,
-                    usedBy:null,
-                    usedAt:null
-                });
-
-                alert(error.message);
-
+                    used:true,
+                    usedBy:phone,
+                    usedAt:Date.now()
+                })
+            ])
+            .then(()=>{
+                hideLoader();
+                alert("École rejointe avec succès.");
+                openTeacher();
             });
 
-            return;
-
         }
-
-        // ===========================
-        // ELEVE
-        // ===========================
 
         if(role=="student"){
 
-            let student={
-
-                phone:phone,
-
-                role:"student",
-
-                schoolId:schoolId,
-
-                name:"Nouvel élève",
-
-                createdAt:Date.now()
-
+            let student = {
+                phone: phone,
+                role: "student",
+                schoolId: schoolId,
+                name: "Nouvel élève",
+                createdAt: Date.now()
             };
 
-            Promise.all([
-
+            return Promise.all([
                 db.ref("users/"+phone).set(student),
 
-                db.ref(
-                "schools/"+schoolId+
-                "/members/"+phone
-                ).set({
-
-                    name:student.name,
-
-                    phone:phone,
-
-                    role:"student",
-
-                    createdAt:Date.now()
-
-                })
-
-            ])
-
-            .then(()=>{
-
-                hideLoader();
-
-                alert("École rejointe.");
-
-                openStudent();
-
-            })
-
-            .catch(error=>{
-
-                hideLoader();
+                db.ref("schools/"+schoolId+"/members/"+phone).set({
+                    phone: phone,
+                    role: "student",
+                    name: student.name,
+                    createdAt: Date.now()
+                }),
 
                 db.ref("invitations/"+invite.code).update({
-                    used:false,
-                    usedBy:null,
-                    usedAt:null
-                });
-
-                alert(error.message);
-
+                    used:true,
+                    usedBy:phone,
+                    usedAt:Date.now()
+                })
+            ])
+            .then(()=>{
+                hideLoader();
+                alert("École rejointe avec succès.");
+                openStudent();
             });
 
         }
 
+    })
+
+    .catch(error=>{
+        hideLoader();
+        alert(error.message);
     });
 
 }
@@ -2362,7 +2235,7 @@ class="select-style"
 onclick="generateInvite()">
 
 <div class="card-icon">
-🛎️
+🔗
 </div>
 
 <div class="card-text">
@@ -2408,7 +2281,7 @@ onclick="studentRecords()">
 </div>
 
 <div class="card-text">
-Fiches élèves
+Inscription Elèves
 </div>
 
 </button>
@@ -3238,15 +3111,15 @@ hideLoader();
 
 function studentRecords(){
 
-showLoader();
+    showLoader();
 
-db.ref("eleves")
+    db.ref("schools/"+window.currentSchoolId+"/students")
 
-.once("value")
+    .once("value")
 
-.then(snapshot=>{
+    .then(snapshot=>{
 
-let html=`
+        let html=`
 
 <h2 style="
 text-align:center;
@@ -3257,9 +3130,7 @@ Fiches élèves
 
 </h2>
 
-<button
-onclick="openAddStudent()"
->
+<button onclick="openAddStudent()">
 
 ➕ Ajouter élève
 
@@ -3274,9 +3145,9 @@ margin-top:15px;
 
 `;
 
-if(!snapshot.exists()){
+        if(!snapshot.exists()){
 
-html+=`
+            html+=`
 
 <div style="
 text-align:center;
@@ -3290,21 +3161,19 @@ Aucun élève
 
 `;
 
-}
+        }else{
 
-snapshot.forEach(item=>{
+            snapshot.forEach(item=>{
 
-let data=item.val();
+                let data=item.val();
 
-html+=`
+                html+=`
 
 <div style="
 background:white;
 padding:15px;
 border-radius:15px;
-box-shadow:
-0 4px 10px rgba(0,0,0,.08);
-
+box-shadow:0 4px 10px rgba(0,0,0,.08);
 display:flex;
 justify-content:space-between;
 align-items:center;
@@ -3312,11 +3181,7 @@ align-items:center;
 
 <div>
 
-<b>
-
-${data.name}
-
-</b>
+<b>${data.name}</b>
 
 <br>
 
@@ -3328,9 +3193,7 @@ ${data.name}
 
 </div>
 
-<button
-onclick="viewStudent('${data.matricule}')"
->
+<button onclick="viewStudent('${data.matricule}')">
 
 Voir
 
@@ -3340,17 +3203,17 @@ Voir
 
 `;
 
-});
+            });
 
-html+=`
+        }
+
+        html+=`
 
 </div>
 
 <button
 onclick="openAdmin()"
-style="
-margin-top:15px;
-">
+style="margin-top:15px;">
 
 ⬅ Retour
 
@@ -3358,22 +3221,19 @@ margin-top:15px;
 
 `;
 
-document.querySelector(
-".login-box"
-).innerHTML=
-html;
+        document.querySelector(".login-box").innerHTML=html;
 
-hideLoader();
+        hideLoader();
 
-})
+    })
 
-.catch(error=>{
+    .catch(error=>{
 
-hideLoader();
+        hideLoader();
 
-alert(error.message);
+        alert(error.message);
 
-});
+    });
 
 }
 
@@ -3560,141 +3420,98 @@ Enregistrer
 
 // ================= FICHE ELEVES =================
 
-function viewStudent(studentId){
+function viewStudent(matricule){
 
-showLoader();
+    showLoader();
 
+    db.ref(
+        "schools/"+window.currentSchoolId+"/students/"+matricule
+    )
 
-// chercher fiche élève
+    .once("value")
 
-db.ref(
-"eleves/"+studentId
-)
+    .then(snapshot=>{
 
-.once("value")
+        hideLoader();
 
-.then(snapshot=>{
+        if(!snapshot.exists()){
+            alert("Élève introuvable.");
+            studentRecords();
+            return;
+        }
 
+        let e = snapshot.val();
 
-// si trouvé dans fiches
+        document.querySelector(".login-box").innerHTML = `
 
-if(snapshot.exists()){
-
-return snapshot.val();
-
-}
-
-
-// sinon chercher dans users
-
-return db.ref(
-"users/"+studentId
-)
-
-.once("value")
-
-.then(userSnap=>{
-
-if(userSnap.exists()){
-
-return userSnap.val();
-
-}
-
-throw new Error(
-"Élève introuvable"
-);
-
-});
-
-})
-
-.then(student=>{
-
-document.querySelector(
-".login-box"
-).innerHTML=`
-
-<h2 style="
-text-align:center;
-color:#1f4cff;
-">
-
+<h2 style="text-align:center;color:#1f4cff;">
 Fiche élève
-
 </h2>
 
 <div style="
-background:white;
-padding:20px;
-border-radius:20px;
-box-shadow:
-0 4px 10px rgba(0,0,0,.08);
-line-height:2;
+background:#fff;
+padding:15px;
+border-radius:15px;
+box-shadow:0 4px 10px rgba(0,0,0,.08);
 ">
 
-👤 <b>Nom :</b>
-${student.name||"-"}
+<p><b>Nom :</b> ${e.name}</p>
 
-<br>
+<p><b>Matricule :</b> ${e.matricule}</p>
 
-🆔 <b>Matricule :</b>
-${student.matricule||"-"}
+<p><b>Classe :</b> ${e.className}</p>
 
-<br>
+<p><b>Sexe :</b> ${e.sexe||""}</p>
 
-🎓 <b>Classe :</b>
-${student.className||"-"}
+<p><b>Date de naissance :</b> ${e.dateNaissance||""}</p>
 
-<br>
+<p><b>Lieu de naissance :</b> ${e.lieuNaissance||""}</p>
 
-📱 <b>Téléphone :</b>
-${student.phone||"-"}
+<p><b>Père :</b> ${e.fatherName||""}</p>
 
-<br>
+<p><b>Téléphone père :</b> ${e.fatherPhone||""}</p>
 
-👨 <b>Père :</b>
-${student.fatherName||"-"}
+<p><b>Mère :</b> ${e.motherName||""}</p>
 
-<br>
-
-📞
-${student.fatherPhone||"-"}
-
-<br>
-
-👩 <b>Mère :</b>
-${student.motherName||"-"}
-
-<br>
-
-📞
-${student.motherPhone||"-"}
+<p><b>Téléphone mère :</b> ${e.motherPhone||""}</p>
 
 </div>
 
-<button onclick="studentRecords()">
+<div style="
+display:flex;
+gap:10px;
+margin-top:15px;
+">
 
+<button onclick="modifierEleve('${e.matricule}')">
+✏ Modifier
+</button>
+
+<button onclick="supprimerEleve('${e.matricule}')">
+🗑 Supprimer
+</button>
+
+</div>
+
+<button
+onclick="studentRecords()"
+style="margin-top:15px;">
 ⬅ Retour
-
 </button>
 
 `;
 
-hideLoader();
+    })
 
-})
+    .catch(error=>{
 
-.catch(error=>{
+        hideLoader();
 
-hideLoader();
+        alert(error.message);
 
-alert(error.message);
-
-});
+    });
 
 }
-
 // ================= OUVRIR MEMBRES AVEC VRAI CHARGEMENT =================
 
 function openMembers(){
@@ -3833,84 +3650,69 @@ ${inviteCode}
 
 function confirmJoin(){
 
-let code=document.getElementById("inviteCode")
-.value
-.trim()
-.toUpperCase();
+    let code = document.getElementById("inviteCode")
+        .value
+        .trim()
+        .toUpperCase();
 
-showLoader();
+    if(code==""){
+        alert("Veuillez saisir le code d'invitation.");
+        return;
+    }
 
-db.ref("invitations/"+code)
+    showLoader();
 
-.once("value")
+    db.ref("invitations/"+code)
+    .once("value")
+    .then(snapshot=>{
 
-.then(snapshot=>{
+        hideLoader();
 
-if(!snapshot.exists()){
+        if(!snapshot.exists()){
+            alert("Code d'invitation invalide.");
+            return;
+        }
 
-hideLoader();
+        let invite=snapshot.val();
 
-alert("Code invalide");
+        if(invite.used===true){
+            alert("Ce code d'invitation a déjà été utilisé.");
+            return;
+        }
 
-return;
+        invite.code=code;
+        window.currentInvite=invite;
 
-}
+        if(invite.role=="parent"){
 
-let invite=snapshot.val();
+            document.querySelector(".login-box").innerHTML=`
 
-if(invite.used === true){
+                <h2>Compléter le profil</h2>
 
-    console.log(invite);
+                <input
+                    id="matricule"
+                    placeholder="Matricule de l'élève"
+                >
 
-    hideLoader();
+                <button onclick="finishJoin()">
+                    Terminer
+                </button>
 
-    alert("Ce code a déjà été utilisé par : " + (invite.usedBy || "inconnu"));
+            `;
 
-    return;
+        }else{
 
-}
+            finishJoin();
 
-invite.code=code;
+        }
 
-window.currentInvite=invite;
-
-hideLoader();
-
-document.querySelector(".login-box").innerHTML=`
-
-<h2>
-
-Compléter profil
-
-</h2>
-
-<input
-id="matricule"
-placeholder="Matricule élève"
->
-
-<button
-onclick="finishJoin()"
->
-
-Terminer
-
-</button>
-
-`;
-
-})
-
-.catch(error=>{
-
-hideLoader();
-
-alert(error.message);
-
-});
+    })
+    .catch(error=>{
+        hideLoader();
+        alert(error.message);
+    });
 
 }
-
 
 
 // ================= DESSINER MEMBRES PRO =================
@@ -8345,72 +8147,55 @@ alert(error.message);
 
 }
 
-function supprimerEleve(
-matricule
-){
+function supprimerEleve(matricule){
 
-let ok=
+    if(!confirm("Voulez-vous vraiment supprimer cet élève ?")){
+        return;
+    }
 
-confirm(
-"Supprimer cet élève ?"
-);
+    showLoader();
 
-if(!ok){
-return;
-}
+    let promises=[];
 
-showLoader();
+    // Supprimer l'élève de l'école
+    promises.push(
 
-Promise.all([
+        db.ref(
+            "schools/"+window.currentSchoolId+"/students/"+matricule
+        ).remove()
 
-db.ref(
-"eleves/"+matricule
-).remove(),
+    );
 
-db.ref(
-"schools/"
-+
-window.currentSchoolId+
-"/students/"
-+
-matricule
-).remove(),
+    // Supprimer des membres de l'école
+    promises.push(
 
-db.ref(
-"schools/"
-+
-window.currentSchoolId+
-"/members/"
-+
-matricule
-).remove()
+        db.ref(
+            "schools/"+window.currentSchoolId+"/members/"+matricule
+        ).remove()
 
-])
+    );
 
-.then(()=>{
+    Promise.all(promises)
 
-hideLoader();
+    .then(()=>{
 
-alert(
-"Élève supprimé"
-);
+        hideLoader();
 
-ouvrirListeEleves();
+        alert("Élève supprimé avec succès.");
 
-})
+        studentRecords();
 
-.catch(error=>{
+    })
 
-hideLoader();
+    .catch(error=>{
 
-alert(
-error.message
-);
+        hideLoader();
 
-});
+        alert(error.message);
+
+    });
 
 }
-
 function modifierEnseignant(
 matricule
 ){
@@ -9347,6 +9132,27 @@ error.message
 });
 
 } */
+
+function activerNotification(){
+
+Notification.requestPermission()
+.then(permission=>{
+
+if(permission==="granted"){
+
+console.log("Notifications activées");
+
+}
+
+else{
+
+console.log("Notifications refusées");
+
+}
+
+});
+
+}
 
 
 
