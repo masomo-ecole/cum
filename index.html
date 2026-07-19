@@ -38,7 +38,7 @@ linear-gradient(
 
 .login-box{
 
-width:90%;
+width:80%;
 max-width:420px;
 
 background:white;
@@ -559,6 +559,12 @@ maxlength="10"
 
 </div>
 
+<input
+id="loginPassword"
+type="password"
+placeholder="Mot de passe"
+style="display:none;">
+
 <button
 id="continueBtn"
 onclick="checkPhone()"
@@ -701,7 +707,8 @@ firebase.initializeApp(
 firebaseConfig
 );
 
-const messaging = firebase.messaging();
+//const storage = firebase.storage();
+//const messaging = firebase.messaging();
 
 // base données
 
@@ -719,32 +726,27 @@ let schoolLogo="";
 // mémoriser connexion
 function saveSession(phone){
 
-localStorage.setItem(
-"masomoUser",
-phone
-);
+    localStorage.setItem("masomoUser", normalizePhone(phone));
 
 }
 
 // récupérer connexion
 function getSession(){
 
-return localStorage.getItem(
-"masomoUser"
-);
+    return localStorage.getItem("masomoUser");
 
 }
 
 // supprimer connexion
 function logout(){
 
-localStorage.removeItem(
-"masomoUser"
-);
+    localStorage.removeItem("masomoUser");
 
-window.currentPhone=null;
+    window.currentPhone = null;
+    window.loginUserData = null;
+    window.currentInvite = null;
 
-location.reload();
+    location.reload();
 
 }
 
@@ -957,150 +959,45 @@ loader.style.display=
 
 function checkPhone(){
 
-let code=
+let code=document.getElementById("countryCode").value;
+let number=document.getElementById("phone").value;
 
-document
-.getElementById(
-"countryCode"
-)
-.value;
+let phone=normalizePhone(code+number);
 
-
-let number=
-
-document
-.getElementById(
-"phone"
-)
-.value;
-
-
-let phone=
-code+number;
-
-// mémoriser utilisateur connecté
-
-window.currentPhone=
-phone;
-
-saveSession(phone);
-
-
-// afficher chargement
+// NE PAS sauvegarder la session ici
+window.currentPhone=phone;
 
 showLoader();
 
-
-// chercher utilisateur
-
-db.ref(
-"users/"+phone
-)
+db.ref("users/"+phone)
 
 .once("value")
 
 .then(snapshot=>{
 
-
-// utilisateur existe
+hideLoader();
 
 if(snapshot.exists()){
 
-let user=
-snapshot.val();
+    let user = snapshot.val();
+
+    window.loginUserData = user;
+
+    document.getElementById("loginPassword").style.display = "block";
+
+    document.getElementById("continueBtn").innerText = "Se connecter";
+
+    document.getElementById("continueBtn").onclick = loginUser;
 
 
-// attendre un peu pour effet app
+}else{
 
-setTimeout(()=>{
-
-hideLoader();
-
-
-// directeur
-
-if(
-user.role==="admin"
-){
-
-openAdmin();
-
-}
-
-
-// enseignant
-
-else if(
-user.role==="teacher"
-){
-
-openTeacher();
-
-}
-
-
-// parent
-
-else if(
-user.role==="parent"
-){
-
-openParent();
-
-}
-
-
-// élève
-
-else if(
-user.role==="student"
-){
-
-openStudent();
-
-}
-
-},1500);
-
-}
-
-
-// utilisateur inexistant
-
-else{
-
-hideLoader();
-
-
-// cacher écran connexion
-
-document
-.querySelector("h1")
-.style.display="none";
-
-document
-.querySelector("p")
-.style.display="none";
-
-document
-.querySelector(".phone-box")
-.style.display="none";
-
-document
-.querySelector(
-"#continueBtn"
-)
-.style.display="none";
-
-
-// afficher page choix
-
-document
-.getElementById(
-"page2"
-)
-.style.display=
-"flex";
+    // Première connexion : demander le code
+    document.querySelector("h1").style.display="none";
+    document.querySelector("p").style.display="none";
+    document.querySelector(".phone-box").style.display="none";
+    document.getElementById("continueBtn").style.display="none";
+    document.getElementById("page2").style.display="flex";
 
 }
 
@@ -1110,13 +1007,58 @@ document
 
 hideLoader();
 
-alert(
-error.message
-);
+alert(error.message);
 
 });
 
 }
+
+
+function loginUser(){
+
+    let password=document.getElementById("loginPassword").value.trim();
+
+    let user=window.loginUserData;
+
+    if(!user){
+        alert("Utilisateur introuvable.");
+        return;
+    }
+
+    if(password!==user.password){
+        alert("Mot de passe incorrect.");
+        return;
+    }
+
+    window.currentPhone=user.phone;
+
+    saveSession(user.phone);
+
+    switch(user.role){
+
+        case "admin":
+            openAdmin();
+            break;
+
+        case "teacher":
+            openTeacher();
+            break;
+
+        case "parent":
+            openParent();
+            break;
+
+        case "student":
+            openStudent();
+            break;
+
+        default:
+            alert("Type de compte inconnu.");
+
+    }
+
+}
+
 
 // ================= CARTE ECOLE =================
 
@@ -1397,10 +1339,13 @@ onclick="modifierProfil()"
 
 }
 
-function openTeacher(){
-    window.currentRole="teacher";
 
-let phone=window.currentPhone;
+function openTeacher(){
+
+window.currentRole="teacher";
+
+let phone=normalizePhone(window.currentPhone);
+window.currentPhone=phone;
 
 db.ref("users/"+phone)
 
@@ -1409,6 +1354,8 @@ db.ref("users/"+phone)
 .then(userSnap=>{
 
 let user=userSnap.val();
+
+ window.currentSchoolId=user.schoolId;
 
 return Promise.all([
 Promise.resolve(user),
@@ -1423,9 +1370,7 @@ db.ref(
 
 let school=schoolSnap.val();
 
-document.querySelector(
-".login-box"
-).innerHTML=`
+document.querySelector(".login-box").innerHTML=`
 
 ${schoolHeader(school,user)}
 
@@ -1434,32 +1379,1142 @@ text-align:center;
 color:#1f4cff;
 ">
 
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
 📚 Espace Enseignant
-
 </h2>
 
+<div style="
+display:grid;
+grid-template-columns:repeat(2,1fr);
+gap:12px;
+margin-top:15px;
+">
+
+<div style="position:relative;">
+
+<button
+style="width:100%;height:60px;"
+onclick="ouvrirNotificationsEnseignant()">
+
+🔔 Notifications
+
+<span
+id="teacherNotifBadge"
+style="
+display:none;
+position:absolute;
+top:8px;
+right:12px;
+width:14px;
+height:14px;
+background:#00c853;
+border-radius:50%;
+border:2px solid white;
+">
+</span>
+
+</button>
+
+</div>
+
 <button onclick="ouvrirDevoirs()">
-Mes devoirs
+📘 Mes devoirs
 </button>
 
 <button onclick="ouvrirEmploiTemps()">
 📅 Emploi du temps
 </button>
 
-<button>Présence</button>
+<button onclick="ouvrirPresence()">
+✅ Présence
+</button>
 
-<button>Notes</button>
+<button onclick="ouvrirNotes()">
+📝 Notes
+</button>
 
 <button onclick="ouvrirListeEleves()">
 📋 Liste élèves
 </button>
 
+<button onclick="ouvrirPreparations()">
+📑 Fiche de préparation
+</button>
+
+<button onclick="ouvrirJournalClasse()">
+📔 Journal de classe
+</button>
+
+<button onclick="ouvrirCahierTexte()">
+📚 Cahier de texte
+</button>
+
+<button onclick="ouvrirBulletins()">
+📄 Bulletins
+</button>
+
+<button onclick="ouvrirStatistiquesClasse()">
+📊 Statistiques
+</button>
+
+<button onclick="ouvrirAbsences()">
+🚫 Absences
+</button>
+
+<button onclick="ouvrirCalendrierExamens()">
+🗓️ Examens
+</button>
+
+<button onclick="ouvrirDocumentsPedagogiques()">
+📂 Documents
+</button>
+
+<button onclick="ouvrirMessagesParents()">
+👨‍👩‍👧 Parents
+</button>
+
+<button onclick="ouvrirReunions()">
+🤝 Réunions
+</button>
+
+<button onclick="ouvrirTableauBordEnseignant()">
+📊 Tableau de bord
+</button>
+
+<button onclick="ouvrirProfilEnseignant()">
+👤 Mon profil
+</button>
+
+</div>
+
 `;
+
+verifierNotificationsEnseignant(phone);
 
 });
 
 }
 
+
+function ouvrirNotes(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<button
+class="back-btn"
+onclick="openTeacher()">
+
+⬅ Retour
+
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+📝 Gestion des notes
+
+</h2>
+
+<p style="
+text-align:center;
+color:gray;
+">
+
+Choisissez une opération.
+
+</p>
+
+<button onclick="saisirNotes()">
+
+➕ Saisir les notes
+
+</button>
+
+<button onclick="consulterNotes()">
+
+📋 Consulter les notes
+
+</button>
+
+<button onclick="modifierNotes()">
+
+✏ Modifier les notes
+
+</button>
+
+<button onclick="bulletinsClasse()">
+
+📄 Bulletins
+
+</button>
+
+<button onclick="statistiquesNotes()">
+
+📊 Statistiques
+
+</button>
+
+`;
+
+}
+
+function saisirNotes(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<button
+class="back-btn"
+onclick="ouvrirNotes()">
+
+⬅ Retour
+
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+➕ Saisie des notes
+
+</h2>
+
+<select
+id="classeNotes"
+onchange="chargerElevesNotes()">
+
+<option value="">
+Choisir une classe
+</option>
+
+</select>
+
+<select
+id="coursNotes">
+
+<option value="">
+Choisir le cours
+</option>
+
+</select>
+
+<select
+id="periodeNotes">
+
+<option value="">
+Choisir la période
+</option>
+
+<option value="Interrogation 1">
+Interrogation 1
+</option>
+
+<option value="Interrogation 2">
+Interrogation 2
+</option>
+
+<option value="Devoir">
+Devoir
+</option>
+
+<option value="Examen">
+Examen
+</option>
+
+<option value="1er Semestre">
+1er Semestre
+</option>
+
+<option value="2ème Semestre">
+2ème Semestre
+</option>
+
+</select>
+
+<input
+id="coteMax"
+type="number"
+placeholder="Cotation (20,40,100...)">
+
+<input
+id="dateEvaluation"
+type="date">
+
+<div id="listeElevesNotes">
+
+</div>
+
+<button
+onclick="enregistrerNotes()">
+
+💾 Enregistrer les notes
+
+</button>
+
+`;
+
+chargerClassesNotes();
+chargerCoursNotes();
+
+document.getElementById("dateEvaluation").value=
+new Date().toISOString().split("T")[0];
+
+}
+
+
+function consulterNotes(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<button
+class="back-btn"
+onclick="ouvrirNotes()">
+
+⬅ Retour
+
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+📋 Consultation des notes
+
+</h2>
+
+<select
+id="classeConsultation"
+onchange="chargerNotesClasse()">
+
+<option value="">
+Choisir une classe
+</option>
+
+</select>
+
+<div
+id="resultatNotes">
+
+</div>
+
+`;
+
+chargerClassesConsultation();
+
+}
+
+function modifierNotes(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<button
+class="back-btn"
+onclick="ouvrirNotes()">
+
+⬅ Retour
+
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+✏ Modification des notes
+
+</h2>
+
+<select
+id="classeModification"
+onchange="chargerNotesModification()">
+
+<option value="">
+Choisir une classe
+</option>
+
+</select>
+
+<div
+id="listeModificationNotes">
+
+</div>
+
+`;
+
+chargerClassesModification();
+
+}
+
+function chargerClassesNotes(){
+
+let schoolId=window.currentSchoolId;
+
+let select=document.getElementById("classeNotes");
+
+select.innerHTML=`
+<option value="">
+Choisir une classe
+</option>
+`;
+
+db.ref("schools/"+schoolId)
+
+.once("value")
+
+.then(snapshot=>{
+
+if(!snapshot.exists()) return;
+
+let school=snapshot.val();
+
+(school.classes||[]).forEach(classe=>{
+
+select.innerHTML+=`
+
+<option value="${classe}">
+
+${classe}
+
+</option>
+
+`;
+
+});
+
+});
+
+}
+
+function chargerCoursNotes(){
+
+let schoolId=window.currentSchoolId;
+
+let select=document.getElementById("coursNotes");
+
+select.innerHTML=`
+
+<option value="">
+
+Choisir le cours
+
+</option>
+
+`;
+
+db.ref(
+"schools/"+schoolId+"/courses"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+snapshot.forEach(item=>{
+
+let coursData=item.val();
+
+select.innerHTML+=`
+
+<option
+value="${item.key}"
+data-name="${coursData.name}"
+
+${coursData.name}
+
+</option>
+
+`;
+
+});
+
+})
+
+.catch(error=>{
+
+alert(error.message);
+
+});
+
+}
+
+
+function chargerElevesNotes(){
+
+let classe=document.getElementById(
+"classeNotes"
+).value;
+
+let zone=document.getElementById(
+"listeElevesNotes"
+);
+
+zone.innerHTML="";
+
+if(!classe)return;
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/students"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let html="";
+
+snapshot.forEach(item=>{
+
+let eleve=item.val();
+
+if(eleve.className!==classe)return;
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+margin-bottom:12px;
+border-radius:15px;
+box-shadow:0 4px 10px rgba(0,0,0,.10);
+">
+
+<b style="
+font-size:16px;
+color:#1f4cff;
+">
+
+${eleve.name}
+
+</b>
+
+<br><br>
+
+<div style="
+display:flex;
+align-items:center;
+gap:10px;
+">
+
+<input
+type="number"
+min="0"
+step="0.01"
+placeholder="Note"
+id="note_${item.key}"
+style="
+flex:1;
+">
+
+<span id="sur_${item.key}">
+/ --
+</span>
+
+</div>
+
+</div>
+
+`;
+
+});
+
+zone.innerHTML=html;
+
+// Afficher automatiquement la cotation
+let cote=document.getElementById(
+"coteMax"
+);
+
+function majCotation(){
+
+let valeur=cote.value||"--";
+
+document.querySelectorAll(
+"[id^='sur_']"
+)
+
+.forEach(e=>{
+
+e.innerHTML="/ "+valeur;
+
+});
+
+}
+
+cote.oninput=majCotation;
+
+majCotation();
+
+});
+
+}
+
+function chargerNotesClasse(){
+
+let classe=document.getElementById(
+"classeConsultation"
+).value;
+
+let resultat=document.getElementById(
+"resultatNotes"
+);
+
+resultat.innerHTML="";
+
+if(!classe)return;
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+"/notes"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+let html="";
+
+let trouve=false;
+
+snapshot.forEach(eleveSnap=>{
+
+let notesEleve=[];
+
+let total=0;
+
+let nombre=0;
+
+eleveSnap.forEach(noteSnap=>{
+
+let note=noteSnap.val();
+
+if(note.classe!==classe)return;
+
+trouve=true;
+
+notesEleve.push(note);
+
+total+=Number(note.note)||0;
+
+nombre++;
+
+});
+
+if(notesEleve.length===0)return;
+
+let moyenne=(total/nombre).toFixed(2);
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+margin-bottom:15px;
+border-radius:15px;
+box-shadow:0 4px 10px rgba(0,0,0,.10);
+">
+
+<h3 style="
+margin:0;
+color:#1f4cff;
+">
+
+👨‍🎓 ${notesEleve[0].nom}
+
+</h3>
+
+<br>
+
+`;
+
+notesEleve.forEach(n=>{
+
+html+=`
+
+<div style="
+padding:8px 0;
+border-bottom:1px solid #eee;
+">
+
+<b>${n.cours}</b>
+
+<br>
+
+${n.note}/${n.coteMax}
+
+&nbsp;&nbsp;
+
+(${Number(n.pourcentage).toFixed(1)}%)
+
+&nbsp;&nbsp;
+
+${n.mention}
+
+</div>
+
+`;
+
+});
+
+html+=`
+
+<br>
+
+<div style="
+font-size:17px;
+font-weight:bold;
+color:#00c853;
+text-align:right;
+">
+
+Moyenne : ${moyenne}
+
+</div>
+
+</div>
+
+`;
+
+});
+
+if(!trouve){
+
+html=`
+
+<p style="
+text-align:center;
+color:gray;
+">
+
+Aucune note trouvée.
+
+</p>
+
+`;
+
+}
+
+resultat.innerHTML=html;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function chargerClassesConsultation(){
+
+let select=document.getElementById("classeConsultation");
+
+if(!select)return;
+
+select.innerHTML=`
+<option value="">
+Choisir une classe
+</option>
+`;
+
+db.ref(
+"schools/"+window.currentSchoolId
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+if(!snapshot.exists())return;
+
+let school=snapshot.val();
+
+(school.classes||[]).forEach(classe=>{
+
+select.innerHTML+=`
+
+<option value="${classe}">
+
+${classe}
+
+</option>
+
+`;
+
+});
+
+})
+
+.catch(error=>{
+
+alert(error.message);
+
+});
+
+}
+
+
+function enregistrerNotes(){
+
+let classe=document.getElementById("classeNotes").value;
+
+let cours=document.getElementById("coursNotes").value;
+
+
+let periode=document.getElementById("periodeNotes").value;
+
+let coteMax=parseFloat(
+document.getElementById("coteMax").value
+);
+
+let dateEvaluation=document.getElementById("dateEvaluation").value;
+
+let coursNom=
+
+document
+.getElementById("coursNotes")
+
+.options[
+document.getElementById("coursNotes").selectedIndex
+]
+
+.getAttribute("data-name")||"";
+
+if(!classe){
+
+alert("Choisissez une classe.");
+
+return;
+
+}
+
+if(!cours){
+
+alert("Choisissez un cours.");
+
+return;
+
+}
+
+if(!periode){
+
+alert("Choisissez une période.");
+
+return;
+
+}
+
+if(isNaN(coteMax)||coteMax<=0){
+
+alert("Entrez une cotation valide.");
+
+return;
+
+}
+
+showLoader();
+
+let promesses=[];
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/students"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+snapshot.forEach(item=>{
+
+let eleve=item.val();
+
+if(eleve.className!==classe)return;
+
+let note=parseFloat(
+
+document.getElementById(
+"note_"+item.key
+).value
+
+);
+
+if(isNaN(note))return;
+
+let pourcentage=(note/coteMax)*100;
+
+let mention="";
+
+if(pourcentage>=80){
+
+mention="Excellent";
+
+}else if(pourcentage>=70){
+
+mention="Très Bien";
+
+}else if(pourcentage>=60){
+
+mention="Bien";
+
+}else if(pourcentage>=50){
+
+mention="Satisfaisant";
+
+}else{
+
+mention="Échec";
+
+}
+
+let noteId="NOT-"+Date.now()+"-"+item.key;
+
+promesses.push(
+
+db.ref(
+
+"schools/"+window.currentSchoolId+
+
+"/notes/"+
+
+item.key+
+
+"/"+
+
+noteId
+
+).set({
+
+id:noteId,
+
+matricule:item.key,
+
+nom:eleve.name,
+
+classe:classe,
+
+coursId:cours,
+
+cours:coursNom,
+
+periode:periode,
+
+note:note,
+
+coteMax:coteMax,
+
+pourcentage:pourcentage,
+
+mention:mention,
+
+dateEvaluation:dateEvaluation,
+
+enseignant:window.currentPhone,
+
+timestamp:Date.now()
+
+})
+
+);
+
+});
+
+return Promise.all(promesses);
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("Les notes ont été enregistrées avec succès.");
+
+ouvrirNotes();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+
+
+function verifierNotificationsParent(phone){
+
+db.ref(
+"schools/"+window.currentSchoolId+"/notifications/"+phone
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let badge=document.getElementById("notifBadge");
+
+if(!badge)return;
+
+badge.style.display="none";
+
+if(!snapshot.exists())return;
+
+snapshot.forEach(item=>{
+
+let notif=item.val();
+
+if(notif.read===false){
+
+badge.style.display="block";
+
+}
+
+});
+
+});
+
+}
+
+
+function ouvrirNotificationsParent(){
+
+let phone=normalizePhone(window.currentPhone);
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+"/notifications/"+phone
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+let html=`
+
+<button
+onclick="openParent()"
+style="
+width:100%;
+padding:14px;
+border:none;
+border-radius:15px;
+background:#1f4cff;
+color:white;
+font-weight:bold;
+margin-bottom:20px;
+">
+
+⬅ Retour
+
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+🔔 Notifications
+
+</h2>
+
+`;
+
+if(!snapshot.exists()){
+
+html+=`
+
+<p style="
+text-align:center;
+color:gray;
+">
+
+Aucune notification.
+
+</p>
+
+`;
+
+document.querySelector(".login-box").innerHTML=html;
+
+return;
+
+}
+
+let updates={};
+
+snapshot.forEach(item=>{
+
+let notif=item.val();
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+margin-bottom:12px;
+border-radius:15px;
+box-shadow:0 4px 10px rgba(0,0,0,.08);
+">
+
+<b>${notif.title}</b>
+
+<br><br>
+
+${notif.message}
+
+<br><br>
+
+<small style="color:gray;">
+
+${notif.date}
+
+</small>
+
+</div>
+
+`;
+
+updates[item.key+"/read"]=true;
+
+});
+
+document.querySelector(".login-box").innerHTML=html;
+
+return db.ref(
+"schools/"+window.currentSchoolId+"/notifications/"+phone
+).update(updates);
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
 
 function openParent(){
 
@@ -1469,6 +2524,7 @@ let phone=normalizePhone(window.currentPhone);
 
 db.ref("users/"+window.currentPhone)
 .once("value")
+
 .then(userSnap=>{
 
 let user=userSnap.val();
@@ -1476,6 +2532,8 @@ let user=userSnap.val();
 if(!user){
 throw new Error("Parent introuvable");
 }
+
+window.currentSchoolId=user.schoolId;
 
 return Promise.all([
 Promise.resolve(user),
@@ -1501,7 +2559,7 @@ let child=item.val();
 
 total++;
 
-htmlChildren += `
+htmlChildren+=`
 
 <div style="
 background:white;
@@ -1515,29 +2573,59 @@ box-shadow:0 4px 10px rgba(0,0,0,.08);
 
 <br>
 
-🎓 Classe :
-${child.className}
+🎓 Classe : ${child.className}
 
 <br><br>
 
 <button
-onclick="chargerDevoirsParent('${child.matricule}')"
->
+onclick="chargerDevoirsParent('${child.matricule}')">
 
 📘 Voir devoirs
 
 </button>
 
+<br><br>
+
 <button
-onclick="modifierProfil()"
->
+onclick="modifierProfil()">
 
 👤 Mon profil
 
 </button>
 
+<br><br>
+
+<div style="
+position:relative;
+display:inline-block;
+">
+
+<button
+onclick="ouvrirNotificationsParent()">
+
+🔔 Notifications
+
+<span
+id="notifBadge"
+style="
+display:none;
+position:absolute;
+top:-6px;
+right:-6px;
+width:14px;
+height:14px;
+background:#00c853;
+border-radius:50%;
+border:2px solid white;
+">
+
+</span>
+
+</button>
+
 </div>
 
+</div>
 
 `;
 
@@ -1554,7 +2642,7 @@ text-align:center;
 color:gray;
 ">
 
-Aucun enfant lié
+Aucun enfant lié.
 
 </p>
 
@@ -1581,6 +2669,9 @@ ${htmlChildren}
 
 hideLoader();
 
+/* Vérifie les nouvelles notifications */
+verifierNotificationsParent(phone);
+
 })
 
 .catch(error=>{
@@ -1592,7 +2683,6 @@ alert(error.message);
 });
 
 }
-
 
 
 
@@ -1711,6 +2801,11 @@ placeholder="Nom directeur">
 <h3>Logo école</h3>
 
 <input
+id="adminPassword"
+type="password"
+placeholder="Mot de passe administrateur">
+
+<input
 type="file"
 id="schoolPhoto"
 accept="image/*"
@@ -1800,185 +2895,305 @@ Créer école
 
 function finishJoin(){
 
-    showLoader();
+showLoader();
 
-    let invite = window.currentInvite;
+let invite=window.currentInvite;
 
-    if(!invite){
+if(!invite){
+    hideLoader();
+    alert("Invitation introuvable.");
+    return;
+}
+
+let phone=normalizePhone(window.currentPhone);
+let role=invite.role;
+let schoolId=invite.schoolId;
+let matricule="";
+
+if(role=="parent"){
+
+    matricule=document.getElementById("matricule")
+    .value
+    .trim()
+    .toUpperCase();
+
+    if(matricule==""){
         hideLoader();
-        alert("Invitation introuvable.");
+        alert("Veuillez saisir le matricule de l'élève.");
         return;
     }
 
-    let phone = window.currentPhone;
-    let role = invite.role;
-    let schoolId = invite.schoolId;
-    let matricule = "";
+}
 
-    if(role=="parent"){
-        matricule = document.getElementById("matricule")
-            .value
-            .trim()
-            .toUpperCase();
+db.ref("invitations/"+invite.code)
 
-        if(matricule==""){
-            hideLoader();
-            alert("Veuillez saisir le matricule de l'élève.");
-            return;
-        }
+.once("value")
+
+.then(inviteSnap=>{
+
+    if(!inviteSnap.exists()){
+        throw new Error("Invitation introuvable.");
     }
 
-    // Vérifier que le code est toujours disponible
-    db.ref("invitations/"+invite.code)
-    .once("value")
-    .then(inviteSnap=>{
+    let inv=inviteSnap.val();
 
-        if(!inviteSnap.exists()){
-            throw new Error("Invitation introuvable.");
-        }
+    if(inv.used){
+        throw new Error("Ce code d'invitation a déjà été utilisé.");
+    }
 
-        let inv = inviteSnap.val();
+    return db.ref("users/"+phone).once("value");
 
-        if(inv.used){
-            throw new Error("Ce code d'invitation a déjà été utilisé.");
-        }
+})
 
-        return db.ref("users/"+phone).once("value");
+.then(userSnap=>{
 
-    })
+    if(userSnap.exists()){
+        throw new Error("Ce numéro est déjà inscrit.");
+    }
 
-    .then(userSnap=>{
+    // =======================
+    // PARENT
+    // =======================
 
-        if(userSnap.exists()){
-            throw new Error("Ce numéro est déjà inscrit.");
-        }
+    if(role=="parent"){
 
-        if(role=="parent"){
+        return db.ref(
+        "schools/"+schoolId+"/students/"+matricule
+        )
 
-            return db.ref("schools/"+schoolId+"/students/"+matricule)
-            .once("value")
-            .then(studentSnap=>{
+        .once("value")
 
-                if(!studentSnap.exists()){
-                    throw new Error("Matricule élève introuvable.");
+        .then(studentSnap=>{
+
+            if(!studentSnap.exists()){
+                throw new Error("Matricule élève introuvable.");
+            }
+
+            let eleve=studentSnap.val();
+
+            let parent={
+
+                phone:phone,
+
+                role:"parent",
+
+                schoolId:schoolId,
+
+                studentMatricule:matricule,
+
+                studentName:eleve.name,
+
+                name:"Parent de "+eleve.name,
+
+                createdAt:Date.now()
+
+            };
+
+            return Promise.all([
+
+                db.ref("users/"+phone).set(parent),
+
+                db.ref(
+                "schools/"+schoolId+"/members/"+phone
+                ).set({
+
+                    phone:phone,
+
+                    role:"parent",
+
+                    name:parent.name,
+
+                    studentMatricule:matricule,
+
+                    createdAt:Date.now()
+
+                }),
+
+                db.ref(
+                "invitations/"+invite.code
+                ).update({
+
+                    used:true,
+
+                    usedBy:phone,
+
+                    usedAt:Date.now()
+
+                })
+
+            ]);
+
+        })
+
+        .then(()=>{
+
+            hideLoader();
+
+            alert("École rejointe avec succès.");
+
+            openParent();
+
+        });
+
+    }
+
+    // =======================
+    // ENSEIGNANT
+    // =======================
+
+    if(role=="teacher"){
+
+        return db.ref(
+        "schools/"+schoolId+"/teachers"
+        )
+
+        .once("value")
+
+        .then(snapshot=>{
+
+            if(!snapshot.exists()){
+                throw new Error("Aucun enseignant trouvé.");
+            }
+
+            let teacher=null;
+
+            snapshot.forEach(child=>{
+
+                let t=child.val();
+
+                if(normalizePhone(t.telephone)==phone){
+                    teacher=t;
                 }
 
-                let eleve = studentSnap.val();
-
-                let parent = {
-                    phone: phone,
-                    role: "parent",
-                    schoolId: schoolId,
-                    studentMatricule: matricule,
-                    studentName: eleve.name,
-                    name: "Parent de "+eleve.name,
-                    createdAt: Date.now()
-                };
-
-                return Promise.all([
-                    db.ref("users/"+phone).set(parent),
-
-                    db.ref("schools/"+schoolId+"/members/"+phone).set({
-                        phone: phone,
-                        role: "parent",
-                        name: parent.name,
-                        studentMatricule: matricule,
-                        createdAt: Date.now()
-                    }),
-
-                    db.ref("invitations/"+invite.code).update({
-                        used:true,
-                        usedBy:phone,
-                        usedAt:Date.now()
-                    })
-                ]);
-
-            })
-            .then(()=>{
-                hideLoader();
-                activerNotification();
-                alert("École rejointe avec succès.");
-                openParent();
             });
 
-        }
+            if(!teacher){
+                throw new Error("Cet enseignant n'est pas enregistré dans cette école.");
+            }
 
-        if(role=="teacher"){
-
-            let teacher = {
-                phone: phone,
-                role: "teacher",
-                schoolId: schoolId,
-                name: "Nouvel enseignant",
-                createdAt: Date.now()
-            };
+            // <<< LA SUITE EST DANS LA PARTIE 3B >>>
+            
+                        teacher.phone=phone;
+            teacher.linked=true;
 
             return Promise.all([
+
                 db.ref("users/"+phone).set(teacher),
 
-                db.ref("schools/"+schoolId+"/members/"+phone).set({
-                    phone: phone,
-                    role: "teacher",
-                    name: teacher.name,
-                    createdAt: Date.now()
+                db.ref(
+                "schools/"+schoolId+"/teachers/"+teacher.matricule
+                ).update({
+                    linked:true
                 }),
 
-                db.ref("invitations/"+invite.code).update({
-                    used:true,
-                    usedBy:phone,
-                    usedAt:Date.now()
-                })
-            ])
-            .then(()=>{
-                hideLoader();
-                activerNotification();
-                alert("École rejointe avec succès.");
-                openTeacher();
-            });
-
-        }
-
-        if(role=="student"){
-
-            let student = {
-                phone: phone,
-                role: "student",
-                schoolId: schoolId,
-                name: "Nouvel élève",
-                createdAt: Date.now()
-            };
-
-            return Promise.all([
-                db.ref("users/"+phone).set(student),
-
-                db.ref("schools/"+schoolId+"/members/"+phone).set({
-                    phone: phone,
-                    role: "student",
-                    name: student.name,
-                    createdAt: Date.now()
+                db.ref(
+                "schools/"+schoolId+"/members/"+teacher.matricule
+                ).update({
+                    phone:phone,
+                    linked:true
                 }),
 
-                db.ref("invitations/"+invite.code).update({
+                db.ref(
+                "invitations/"+invite.code
+                ).update({
+
                     used:true,
+
                     usedBy:phone,
+
                     usedAt:Date.now()
+
                 })
-            ])
-            .then(()=>{
-                hideLoader();
-                activerNotification();
-                alert("École rejointe avec succès.");
-                openStudent();
-            });
 
-        }
+            ]);
 
-    })
+        })
 
-    .catch(error=>{
-        hideLoader();
-        alert(error.message);
-    });
+        .then(()=>{
+
+            hideLoader();
+
+            alert("École rejointe avec succès.");
+
+            openTeacher();
+
+        });
+
+    }
+
+    // =======================
+    // ÉLÈVE
+    // =======================
+
+    if(role=="student"){
+
+        let student={
+
+            phone:phone,
+
+            role:"student",
+
+            schoolId:schoolId,
+
+            name:"Nouvel élève",
+
+            createdAt:Date.now()
+
+        };
+
+        return Promise.all([
+
+            db.ref("users/"+phone).set(student),
+
+            db.ref(
+            "schools/"+schoolId+"/members/"+phone
+            ).set({
+
+                phone:phone,
+
+                role:"student",
+
+                name:student.name,
+
+                createdAt:Date.now()
+
+            }),
+
+            db.ref(
+            "invitations/"+invite.code
+            ).update({
+
+                used:true,
+
+                usedBy:phone,
+
+                usedAt:Date.now()
+
+            })
+
+        ])
+
+        .then(()=>{
+
+            hideLoader();
+
+            alert("École rejointe avec succès.");
+
+            openStudent();
+
+        });
+
+    }
+
+})
+
+.catch(error=>{
+
+    hideLoader();
+
+    alert(error.message);
+
+});
 
 }
 // ================= DASHBOARD ADMIN =================
@@ -2334,6 +3549,19 @@ Liste enseignants
 
 </button>
 
+<button class="card-btn"
+onclick="ouvrirPreparationsAdmin()">
+
+<div class="card-icon">
+📑 
+</div>
+
+<div class="card-text">
+Fiches de préparation
+</div>
+
+</button>
+
 
 <button class="card-btn"
 onclick="ouvrirEmploiTemps()">
@@ -2372,6 +3600,20 @@ onclick="resetDatabase()">
 
 <div class="card-text">
 Réinitialiser
+</div>
+
+</button>
+
+<button class="card-btn"
+onclick="pageFinance()">
+
+
+<div class="card-icon">
+💰
+</div>
+
+<div class="card-text">
+Finance
 </div>
 
 </button>
@@ -2671,244 +3913,97 @@ function saveTeacher(){
 
 showLoader();
 
-let telephone=
+let telephone=document.getElementById("telephone").value.replace(/\D/g,"");
 
-document.getElementById(
-"telephone"
-)
-.value
-.replace(/\D/g,"");
-
-
-// retirer 0 RDC
-
-if(
-telephone.startsWith("0")
-){
-
-telephone=
-telephone.substring(1);
-
+// retirer le 0 initial
+if(telephone.startsWith("0")){
+    telephone=telephone.substring(1);
 }
 
-
-// ajouter +243 automatiquement
-
-if(
-telephone &&
-!telephone.startsWith("243")
-){
-
-telephone=
-"243"+telephone;
-
+// ajouter 243
+if(telephone && !telephone.startsWith("243")){
+    telephone="243"+telephone;
 }
 
-telephone=
-"+"+telephone;
-
+telephone=normalizePhone(telephone);
 
 // matricule enseignant
-
-let matricule=
-
-"ENS-"+Date.now();
+let matricule="ENS-"+Date.now();
 
 let data={
 
-matricule,
+    matricule:matricule,
 
-nom:
-document.getElementById(
-"nom"
-).value.trim(),
+    nom:document.getElementById("nom").value.trim(),
 
-postnom:
-document.getElementById(
-"postnom"
-).value.trim(),
+    postnom:document.getElementById("postnom").value.trim(),
 
-password:
-document.getElementById("password").value,
+    prenom:document.getElementById("prenom").value.trim(),
 
-classe:
-document.getElementById("classeEns").value,
+    name:
+        document.getElementById("nom").value.trim()+" "+
+        document.getElementById("postnom").value.trim()+" "+
+        document.getElementById("prenom").value.trim(),
 
-prenom:
-document.getElementById(
-"prenom"
-).value.trim(),
+    password:document.getElementById("password").value,
 
-name:
+    classe:document.getElementById("classeEns").value,
 
-document.getElementById(
-"nom"
-).value.trim()
+    role:"teacher",
 
-+" "+
+    sexe:document.getElementById("sexe").value,
 
-document.getElementById(
-"postnom"
-).value.trim()
+    dateNaissance:document.getElementById("dateNaissance").value,
 
-+" "+
+    lieuNaissance:document.getElementById("lieuNaissance").value,
 
-document.getElementById(
-"prenom"
-).value.trim(),
+    dateEngagement:document.getElementById("dateEngagement").value,
 
-role:"teacher",
+    matiere:document.getElementById("matiere").value,
 
-sexe:
-document.getElementById(
-"sexe"
-).value,
+    telephone:telephone,
 
-dateNaissance:
-document.getElementById(
-"dateNaissance"
-).value,
+    adresse:document.getElementById("adresse").value,
 
-lieuNaissance:
-document.getElementById(
-"lieuNaissance"
-).value,
+    schoolId:window.currentSchoolId,
 
-dateEngagement:
-document.getElementById(
-"dateEngagement"
-).value,
+    linked:false,
 
-matiere:
-document.getElementById(
-"matiere"
-).value,
-
-telephone:
-telephone,
-
-adresse:
-document.getElementById(
-"adresse"
-).value,
-
-schoolId:
-window.currentSchoolId,
-
-createdAt:
-Date.now()
+    createdAt:Date.now()
 
 };
 
-
-let promises=[];
-
-
-// enregistrer fiche enseignant
-
-promises.push(
+Promise.all([
 
 db.ref(
-"schools/" +
-  window.currentSchoolId +
-  "/teachers/" +
-  matricule
-)
-
-.set(data)
-
-);
-
-
-// ajouter dans membres école
-
-promises.push(
+"schools/"+window.currentSchoolId+"/teachers/"+matricule
+).set(data),
 
 db.ref(
-"schools/"
-+
-window.currentSchoolId+
-"/members/"
-+
-matricule
-)
+"schools/"+window.currentSchoolId+"/members/"+matricule
+).set({
 
-.set({
+    matricule:matricule,
 
-name:
-data.name,
+    name:data.name,
 
-phone:
-telephone,
+    phone:telephone,
 
-role:
-"teacher",
+    role:"teacher",
 
-matricule:
-matricule,
+    linked:false,
 
-createdAt:
-Date.now()
+    createdAt:Date.now()
 
 })
 
-);
-
-
-// créer compte utilisateur connecté
-
-if(telephone){
-
-promises.push(
-
-db.ref(
-"users/"+telephone
-)
-
-.set({
-
-phone:
-telephone,
-
-name:
-data.name,
-
-role:
-"teacher",
-
-password:
-document.getElementById("password").value,
-
-classe:
-document.getElementById("classeEns").value,
-
-schoolId:
-window.currentSchoolId,
-
-matricule:
-matricule,
-
-createdAt:
-Date.now()
-
-})
-
-);
-
-}
-
-
-Promise.all(
-promises
-)
+])
 
 .then(()=>{
 
 hideLoader();
 
-alert(
-"Enseignant enregistré avec succès"
-);
+alert("Enseignant enregistré avec succès.\n\nGénérez maintenant un code d'invitation pour qu'il rejoigne l'école.");
 
 teacherRecords();
 
@@ -2918,9 +4013,7 @@ teacherRecords();
 
 hideLoader();
 
-alert(
-error.message
-);
+alert(error.message);
 
 });
 
@@ -3656,70 +4749,87 @@ ${inviteCode}
 
 function confirmJoin(){
 
-    let code = document.getElementById("inviteCode")
-        .value
-        .trim()
-        .toUpperCase();
+let code=document.getElementById("inviteCode")
+.value
+.trim()
+.toUpperCase();
 
-    if(code==""){
-        alert("Veuillez saisir le code d'invitation.");
+if(code==""){
+    alert("Veuillez saisir le code d'invitation.");
+    return;
+}
+
+showLoader();
+
+db.ref("invitations/"+code)
+
+.once("value")
+
+.then(snapshot=>{
+
+    hideLoader();
+
+    if(!snapshot.exists()){
+        alert("Code d'invitation invalide.");
         return;
     }
 
-    showLoader();
+    let invite=snapshot.val();
 
-    db.ref("invitations/"+code)
-    .once("value")
-    .then(snapshot=>{
+    if(invite.used){
+        alert("Ce code d'invitation a déjà été utilisé.");
+        return;
+    }
 
-        hideLoader();
+    // Vérifier que le rôle est valide
+    if(
+        invite.role!="teacher" &&
+        invite.role!="student" &&
+        invite.role!="parent"
+    ){
+        alert("Invitation invalide.");
+        return;
+    }
 
-        if(!snapshot.exists()){
-            alert("Code d'invitation invalide.");
-            return;
-        }
+    invite.code=code;
 
-        let invite=snapshot.val();
+    window.currentInvite=invite;
 
-        if(invite.used===true){
-            alert("Ce code d'invitation a déjà été utilisé.");
-            return;
-        }
+    // Parent : demander le matricule
+    if(invite.role=="parent"){
 
-        invite.code=code;
-        window.currentInvite=invite;
+        document.querySelector(".login-box").innerHTML=`
 
-        if(invite.role=="parent"){
+        <h2>Compléter le profil</h2>
 
-            document.querySelector(".login-box").innerHTML=`
+        <input
+        id="matricule"
+        placeholder="Matricule de l'élève">
 
-                <h2>Compléter le profil</h2>
+        <button onclick="finishJoin()">
+        Terminer
+        </button>
 
-                <input
-                    id="matricule"
-                    placeholder="Matricule de l'élève"
-                >
+        `;
 
-                <button onclick="finishJoin()">
-                    Terminer
-                </button>
+        return;
 
-            `;
+    }
 
-        }else{
+    // Enseignant et élève
+    finishJoin();
 
-            finishJoin();
+})
 
-        }
+.catch(error=>{
 
-    })
-    .catch(error=>{
-        hideLoader();
-        alert(error.message);
-    });
+    hideLoader();
+
+    alert(error.message);
+
+});
 
 }
-
 
 // ================= DESSINER MEMBRES PRO =================
 
@@ -4471,6 +5581,147 @@ error.message
 
 }
 
+function bulletinsClasse(){
+
+showLoader();
+
+db.ref("schools/"+window.currentSchoolId+"/students")
+.once("value")
+.then(snapshot=>{
+
+hideLoader();
+
+let html=`
+
+<button class="back-btn"
+onclick="openNotes()">
+⬅ Retour
+</button>
+
+<h2 style="text-align:center;color:#1f4cff;">
+📄 Bulletins de la classe
+</h2>
+
+<div class="card">
+<p>Sélectionnez un élève pour générer son bulletin.</p>
+</div>
+
+`;
+
+if(!snapshot.exists()){
+
+html+=`
+<div class="card">
+Aucun élève trouvé.
+</div>
+`;
+
+}else{
+
+snapshot.forEach(child=>{
+
+let e=child.val();
+
+html+=`
+
+<div class="list-item"
+onclick="ouvrirBulletin('${child.key}')">
+
+<div>
+<b>${e.nom||""}</b><br>
+${e.classe||""}
+</div>
+
+<div>
+📄
+</div>
+
+</div>
+
+`;
+
+});
+
+}
+
+document.querySelector(".login-box").innerHTML = html;
+
+});
+
+}
+
+function statistiquesNotes(){
+
+showLoader();
+
+db.ref("schools/"+window.currentSchoolId+"/notes")
+.once("value")
+.then(snapshot=>{
+
+hideLoader();
+
+let total=0;
+let somme=0;
+
+snapshot.forEach(eleve=>{
+
+eleve.forEach(note=>{
+
+let n=parseFloat(note.val().note);
+
+if(!isNaN(n)){
+
+total++;
+somme+=n;
+
+}
+
+});
+
+});
+
+let moyenne=0;
+
+if(total>0){
+
+moyenne=(somme/total).toFixed(2);
+
+}
+
+let html=`
+
+<button class="back-btn"
+onclick="openNotes()">
+⬅ Retour
+</button>
+
+<h2 style="text-align:center;color:#1f4cff;">
+📊 Statistiques des notes
+</h2>
+
+<div class="card">
+
+<h3>Résumé</h3>
+
+<p><b>Nombre de notes :</b> ${total}</p>
+
+<p><b>Moyenne générale :</b> ${moyenne}/20</p>
+
+</div>
+
+`;
+
+document.querySelector(".login-box").innerHTML = html;
+
+});
+
+}
+
+function ouvrirBulletin(id){
+
+alert("Le bulletin de cet élève sera généré ici.\n\nID : "+id);
+
+}
 
 
 
@@ -4658,6 +5909,10 @@ document.getElementById(
 "directorName"
 )?.value.trim() || "";
 
+const adminPassword =
+document.getElementById("adminPassword")
+?.value.trim() || "";
+
 const email=
 document.getElementById(
 "email"
@@ -4704,6 +5959,9 @@ missing.push("Téléphone école");
 
 if(!schoolAddress)
 missing.push("Adresse");
+
+if(!adminPassword)
+missing.push("Mot de passe administrateur");
 
 
 if(missing.length){
@@ -4932,20 +6190,17 @@ let adminData={
 
 phone:phone,
 
-name:
-directorName,
+name:directorName,
 
-schoolId:
-schoolRef.key,
+schoolId:schoolRef.key,
 
-role:
-"admin",
+role:"admin",
 
-createdAt:
-Date.now()
+password:adminPassword,
+
+createdAt:Date.now()
 
 };
-
 
 await db.ref(
 "users/"+phone
@@ -7707,63 +8962,68 @@ location.reload();
 
 // ================= AUTO CONNEXION =================
 
-window.onload=function(){
+window.onload = function(){
 
-let savedPhone=getSession();
+    let savedPhone = getSession();
 
-if(savedPhone){
+    if(!savedPhone){
+        hideLoader();
+        return;
+    }
 
-window.currentPhone=savedPhone;
+    savedPhone = normalizePhone(savedPhone);
+    window.currentPhone = savedPhone;
 
-showLoader();
+    showLoader();
 
-db.ref(
-"users/"+savedPhone
-)
+    db.ref("users/"+savedPhone)
+    .once("value")
+    .then(snapshot=>{
 
-.once("value")
+        hideLoader();
 
-.then(snapshot=>{
+        if(!snapshot.exists()){
+            logout();
+            return;
+        }
 
-hideLoader();
+        let user = snapshot.val();
 
-if(!snapshot.exists()){
+        switch(user.role){
 
-logout();
-return;
+            case "admin":
+                openAdmin();
+                break;
+
+            case "teacher":
+                openTeacher();
+                break;
+
+            case "parent":
+                openParent();
+                break;
+
+            case "student":
+                openStudent();
+                break;
+
+            default:
+                logout();
+
+        }
+
+    })
+
+    .catch(error=>{
+
+        hideLoader();
+
+        logout();
+
+    });
+
 }
 
-let user=snapshot.val();
-
-if(user.role==="admin"){
-openAdmin();
-}
-
-else if(user.role==="teacher"){
-openTeacher();
-}
-
-else if(user.role==="parent"){
-openParent();
-}
-
-else if(user.role==="student"){
-openStudent();
-}
-
-})
-
-.catch(()=>{
-
-hideLoader();
-
-logout();
-
-});
-
-}
-
-}
 
 
 function modifierEleve(matricule){
@@ -9071,7 +10331,7 @@ return phone;
 
 
 
-/* function resetDatabase(){
+ function resetDatabase(){
 
 let confirmation=
 
@@ -9137,9 +10397,9 @@ error.message
 
 });
 
-} */
+}
 
-function activerNotification(){
+/* function activerNotification(){
 
 Notification.requestPermission()
 .then(permission=>{
@@ -9179,7 +10439,10398 @@ console.log("Notifications refusées");
 
 });
 
+} */
+
+
+
+// FINANCE 
+
+function pageFinance(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<style>
+
+.finance-header{
+text-align:center;
+margin-bottom:25px;
 }
+
+.finance-title{
+font-size:28px;
+font-weight:bold;
+color:#1f4cff;
+}
+
+.finance-sub{
+color:gray;
+font-size:14px;
+margin-top:5px;
+}
+
+.finance-grid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:15px;
+margin-top:25px;
+}
+
+.finance-card{
+
+border:none;
+padding:20px 10px;
+border-radius:22px;
+
+background:linear-gradient(
+145deg,
+#ffffff,
+#edf2ff
+);
+
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+
+cursor:pointer;
+
+box-shadow:
+0 8px 18px rgba(0,0,0,.15);
+
+transition:.2s;
+
+}
+
+.finance-card:hover{
+
+transform:translateY(-4px);
+
+}
+
+.finance-icon{
+
+font-size:30px;
+margin-bottom:8px;
+
+}
+
+.finance-text{
+    font-weight: bold;
+    font-size: 14px;
+    text-align: center;
+    color: #222 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    text-shadow: none;
+}
+
+.back-btn{
+
+width:100%;
+padding:14px;
+border:none;
+border-radius:15px;
+
+background:#1f4cff;
+color:white;
+
+font-size:15px;
+font-weight:bold;
+
+margin-bottom:20px;
+
+}
+
+</style>
+
+<button
+class="back-btn"
+onclick="openAdmin()">
+
+⬅ Retour à l'administration
+
+</button>
+
+<div class="finance-header">
+
+<div class="finance-title">
+
+💰 Finances
+
+</div>
+
+<div class="finance-sub">
+
+Gestion financière de l'école
+
+</div>
+
+</div>
+
+<div class="finance-grid">
+
+<button class="finance-card"
+onclick="dashboardFinance()">
+
+<div class="finance-icon">📊</div>
+
+<div class="finance-text">
+
+Tableau de bord
+
+</div>
+
+</button>
+
+
+<button class="finance-card"
+onclick="paiementEleves()">
+
+<div class="finance-icon">🎓</div>
+
+<div class="finance-text">
+
+Paiements élèves
+
+</div>
+
+</button>
+
+
+<button class="finance-card"
+onclick="paiementPersonnel()">
+
+<div class="finance-icon">👨‍🏫</div>
+
+<div class="finance-text">
+
+Paiements personnel
+
+</div>
+
+</button>
+
+
+<button class="finance-card"
+onclick="depensesFinance()">
+
+<div class="finance-icon">📤</div>
+
+<div class="finance-text">
+
+Dépenses
+
+</div>
+
+</button>
+
+
+<button class="finance-card"
+onclick="recettesFinance()">
+
+<div class="finance-icon">📥</div>
+
+<div class="finance-text">
+
+Recettes
+
+</div>
+
+</button>
+
+
+<button class="finance-card"
+onclick="recusFinance()">
+
+<div class="finance-icon">🧾</div>
+
+<div class="finance-text">
+
+Reçus
+
+</div>
+
+</button>
+
+
+<button class="finance-card"
+onclick="rapportsFinance()">
+
+<div class="finance-icon">📈</div>
+
+<div class="finance-text">
+
+Rapports
+
+</div>
+
+</button>
+
+
+<button class="finance-card"
+style="position:relative;"
+onclick="notificationsFinance()">
+
+<div class="finance-icon">🔔</div>
+
+<div class="finance-text">
+Notifications
+</div>
+
+<span
+id="financeNotifBadge"
+style="
+display:none;
+position:absolute;
+top:12px;
+right:12px;
+width:14px;
+height:14px;
+background:#00c853;
+border-radius:50%;
+border:2px solid white;
+">
+</span>
+
+</button>
+
+<button class="finance-card"
+onclick="parametresFinance()">
+
+<div class="finance-icon">⚙️</div>
+
+<div class="finance-text">
+
+Paramètres
+
+</div>
+
+</button>
+
+
+<button class="finance-card"
+onclick="historiqueFinance()">
+
+<div class="finance-icon">📜</div>
+
+<div class="finance-text">
+
+Historique
+
+</div>
+
+</button>
+
+</div>
+
+`;
+verifierNotifFinance();
+
+}
+
+
+
+function paiementEleves(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<style>
+
+.pay-header{
+text-align:center;
+margin-bottom:20px;
+}
+
+.pay-title{
+font-size:26px;
+font-weight:bold;
+color:#1f4cff;
+}
+
+.pay-sub{
+color:gray;
+font-size:14px;
+margin-top:5px;
+}
+
+.pay-card{
+background:white;
+padding:20px;
+border-radius:20px;
+box-shadow:0 5px 15px rgba(0,0,0,.12);
+margin-top:20px;
+}
+
+.pay-card input,
+.pay-card select{
+
+width:100%;
+padding:14px;
+margin-top:12px;
+
+border:none;
+outline:none;
+
+border-radius:15px;
+
+background:#f4f6ff;
+
+font-size:15px;
+
+box-sizing:border-box;
+
+}
+
+.pay-btn{
+
+width:100%;
+padding:15px;
+margin-top:18px;
+
+border:none;
+border-radius:15px;
+
+background:#1f4cff;
+color:white;
+
+font-size:16px;
+font-weight:bold;
+
+cursor:pointer;
+
+}
+
+.back-btn{
+
+width:100%;
+padding:14px;
+
+margin-bottom:20px;
+
+border:none;
+border-radius:15px;
+
+background:#666;
+color:white;
+
+font-weight:bold;
+
+}
+
+</style>
+
+<button
+class="back-btn"
+onclick="pageFinance()">
+
+⬅ Retour
+
+</button>
+
+<div class="pay-header">
+
+<div class="pay-title">
+
+🎓 Paiement d'un élève
+
+</div>
+
+<div class="pay-sub">
+
+Rechercher un élève avant d'enregistrer un paiement.
+
+</div>
+
+</div>
+
+<div class="pay-card">
+
+<input
+id="recherchePaiement"
+placeholder="Nom ou matricule de l'élève"
+onkeyup="rechercherElevePaiement()">
+</div>
+
+<div id="resultatPaiement"></div>
+
+`;
+
+}
+
+function rechercherElevePaiement(){
+
+let recherche=document.getElementById("recherchePaiement")
+.value
+.trim()
+.toLowerCase();
+
+if(recherche===""){
+document.getElementById("resultatPaiement").innerHTML="";
+return;
+}
+
+db.ref("schools/"+window.currentSchoolId+"/students")
+.once("value")
+
+.then(snapshot=>{
+
+let html="";
+let trouve=false;
+
+snapshot.forEach(item=>{
+
+let e=item.val();
+
+let texte=(
+
+(e.nom||"")+" "+
+(e.postnom||"")+" "+
+(e.prenom||"")+" "+
+(e.name||"")+" "+
+(e.matricule||"")
+
+).toLowerCase();
+
+if(texte.includes(recherche)){
+
+trouve=true;
+
+html+=`
+
+<div style="
+background:white;
+padding:18px;
+margin-bottom:15px;
+border-radius:18px;
+box-shadow:0 5px 15px rgba(0,0,0,.12);
+">
+
+<div style="
+display:flex;
+justify-content:space-between;
+align-items:center;
+">
+
+<div>
+
+<h3 style="
+margin:0;
+color:#1f4cff;
+">
+${e.name}
+</h3>
+
+<div style="color:gray;">
+${e.matricule}
+</div>
+
+<div style="margin-top:5px;">
+🎓 ${e.className}
+</div>
+
+</div>
+
+<button
+class="pay-btn"
+style="
+width:auto;
+padding:10px 18px;
+margin:0;
+"
+onclick="ouvrirFormulairePaiement('${e.matricule}')">
+
+💰
+
+</button>
+
+</div>
+
+</div>
+
+`;
+
+}
+
+});
+
+if(!trouve){
+
+html=`
+
+<div style="
+text-align:center;
+padding:20px;
+color:gray;
+">
+
+Aucun élève trouvé.
+
+</div>
+
+`;
+
+}
+
+document.getElementById("resultatPaiement").innerHTML=html;
+
+});
+
+}
+
+
+function ouvrirFormulairePaiement(matricule){
+
+showLoader();
+
+db.ref("schools/"+window.currentSchoolId+"/students/"+matricule)
+.once("value")
+.then(snapshot=>{
+
+hideLoader();
+
+if(!snapshot.exists()){
+alert("Élève introuvable.");
+return;
+}
+
+let e=snapshot.val();
+
+document.querySelector(".login-box").innerHTML=`
+
+<style>
+
+.pay-box{
+background:white;
+padding:20px;
+border-radius:20px;
+box-shadow:0 5px 15px rgba(0,0,0,.12);
+}
+
+.pay-box h2{
+text-align:center;
+color:#1f4cff;
+margin-bottom:20px;
+}
+
+.pay-box input,
+.pay-box select,
+.pay-box textarea{
+
+width:100%;
+padding:14px;
+margin-top:12px;
+border:none;
+outline:none;
+border-radius:15px;
+background:#f4f6ff;
+box-sizing:border-box;
+font-size:15px;
+
+}
+
+.pay-box textarea{
+resize:none;
+height:80px;
+}
+
+.pay-btn{
+
+width:100%;
+padding:15px;
+margin-top:18px;
+border:none;
+border-radius:15px;
+background:#1f4cff;
+color:white;
+font-size:16px;
+font-weight:bold;
+
+}
+
+.back-btn{
+
+width:100%;
+padding:14px;
+margin-bottom:15px;
+border:none;
+border-radius:15px;
+background:#666;
+color:white;
+font-weight:bold;
+
+}
+
+.info{
+background:#eef4ff;
+padding:12px;
+border-radius:12px;
+margin-bottom:15px;
+line-height:1.8;
+}
+
+</style>
+
+<button
+class="back-btn"
+onclick="paiementEleves()">
+
+⬅ Retour
+
+</button>
+
+<div class="pay-box">
+
+<h2>💰 Paiement élève</h2>
+
+<div class="info">
+
+<b>👨‍🎓 Nom :</b> ${e.name}<br>
+
+<b>🆔 Matricule :</b> ${e.matricule}<br>
+
+<b>🎓 Classe :</b> ${e.className}
+
+</div>
+
+<select id="typePaiement">
+
+<option value="Minerval">
+Minerval
+</option>
+
+<option value="Examen">
+Examen
+</option>
+
+<option value="Uniforme">
+Uniforme
+</option>
+
+<option value="Inscription">
+Inscription
+</option>
+
+<option value="Autre">
+Autre
+</option>
+
+</select>
+
+<input
+id="montantPaiement"
+type="number"
+placeholder="Montant payé">
+
+<input
+id="datePaiement"
+type="date">
+
+<textarea
+id="observationPaiement"
+placeholder="Observation (facultatif)">
+</textarea>
+
+<button
+class="pay-btn"
+onclick="enregistrerPaiement('${matricule}')">
+
+💾 Enregistrer le paiement
+
+</button>
+
+</div>
+
+`;
+
+document.getElementById("datePaiement").value=
+new Date().toISOString().split("T")[0];
+
+});
+
+}
+
+// Enregistre payement 
+
+function enregistrerPaiement(matricule){
+
+let type=document.getElementById("typePaiement").value;
+
+let montant=parseFloat(
+document.getElementById("montantPaiement").value
+);
+
+let date=document.getElementById("datePaiement").value;
+
+let observation=document
+.getElementById("observationPaiement")
+.value.trim();
+
+if(isNaN(montant)||montant<=0){
+alert("Montant invalide.");
+return;
+}
+
+if(!date){
+alert("Choisissez une date.");
+return;
+}
+
+showLoader();
+
+let schoolId=window.currentSchoolId;
+
+let paiementId="PAY-"+Date.now();
+
+let numeroRecu="REC-"+Date.now();
+
+let eleve=null;
+
+let totalFrais=0;
+
+let dejaPaye=0;
+
+let nouveauTotal=0;
+
+let reste=0;
+
+let statut="🟡 Partiel";
+
+db.ref(
+"schools/"+schoolId+
+"/students/"+matricule
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+if(!snapshot.exists()){
+throw new Error("Élève introuvable.");
+}
+
+eleve=snapshot.val();
+
+return db.ref(
+"schools/"+schoolId+
+"/finances/paiementsEleves"
+)
+
+.orderByChild("matricule")
+.equalTo(matricule)
+.once("value");
+
+})
+
+.then(paySnap=>{
+
+paySnap.forEach(item=>{
+
+let p=item.val();
+
+dejaPaye+=Number(p.montant)||0;
+
+});
+
+db.ref(
+"schools/"+
+schoolId+
+"/finances/frais/"+
+eleve.className
+)
+
+nouveauTotal=dejaPaye+montant;
+
+reste=Math.max(
+0,
+totalFrais-nouveauTotal
+);
+
+if(totalFrais>0 && reste===0){
+statut="🟢 Payé";
+}
+let paiement={
+
+id:paiementId,
+
+recu:numeroRecu,
+
+matricule:matricule,
+
+nom:eleve.name||"",
+
+classe:eleve.className||"",
+
+type:type,
+
+montant:montant,
+
+totalFrais:totalFrais,
+
+totalPaye:nouveauTotal,
+
+reste:reste,
+
+statut:statut,
+
+date:date,
+
+observation:observation,
+
+caissier:window.currentPhone,
+
+timestamp:Date.now()
+
+};
+
+
+let recette={
+
+id:paiementId,
+
+numero:numeroRecu,
+
+motif:"Paiement scolaire - "+(eleve.name||""),
+
+categorie:type,
+
+montant:montant,
+
+observation:observation,
+
+eleve:eleve.name||"",
+
+matricule:matricule,
+
+classe:eleve.className||"",
+
+date:date,
+
+heure:new Date().toLocaleTimeString(),
+
+createdAt:Date.now(),
+
+createdBy:window.currentPhone
+
+};
+
+let promesses=[];
+
+
+// Enregistrer le paiement
+promesses.push(
+
+db.ref(
+"schools/"+schoolId+
+"/finances/paiementsEleves/"+
+paiementId
+).set(paiement)
+
+);
+
+// Ajouter dans les recettes générales
+promesses.push(
+
+db.ref(
+"schools/"+schoolId+
+"/finance/recettes/"+
+paiementId
+).set(recette)
+
+);
+
+// Mettre à jour la finance de l'élève
+promesses.push(
+
+db.ref(
+"schools/"+schoolId+
+"/students/"+
+matricule+
+"/finance"
+).update({
+
+totalPaye:nouveauTotal,
+
+reste:reste,
+
+statut:statut,
+
+dernierPaiement:date
+
+})
+
+);
+
+
+// Notification au père
+if(eleve.fatherPhone){
+
+promesses.push(
+
+db.ref(
+"schools/"+schoolId+
+"/notifications/"+
+eleve.fatherPhone+
+"/"+
+Date.now()
+).set({
+
+title:"💰 Paiement reçu",
+
+message:
+"Le paiement de "+
+montant+
+" FC pour "+
+eleve.name+
+" a été enregistré.\nReste à payer : "+
+reste+
+" FC.",
+
+type:"paiement",
+
+date:date,
+
+read:false,
+
+timestamp:Date.now()
+
+})
+
+);
+
+}
+
+
+// Notification à la mère
+if(eleve.motherPhone){
+
+promesses.push(
+
+db.ref(
+"schools/"+schoolId+
+"/notifications/"+
+eleve.motherPhone+
+"/"+
+(Date.now()+1)
+).set({
+
+title:"💰 Paiement reçu",
+
+message:
+"Le paiement de "+
+montant+
+" FC pour "+
+eleve.name+
+" a été enregistré.\nReste à payer : "+
+reste+
+" FC.",
+
+type:"paiement",
+
+date:date,
+
+read:false,
+
+timestamp:Date.now()
+
+})
+
+);
+
+}
+
+return Promise.all(promesses);
+
+})
+.then(()=>{
+
+hideLoader();
+
+alert(
+
+"✅ Paiement enregistré avec succès.\n\n"+
+
+"🧾 Reçu : "+numeroRecu+
+
+"\n💵 Montant payé : "+montant+" FC"+
+
+"\n📊 Total payé : "+nouveauTotal+" FC"+
+
+"\n💰 Reste : "+reste+" FC"+
+
+"\n📌 Statut : "+statut
+
+);
+
+paiementEleves();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+console.error(error);
+
+alert(
+
+"Erreur : "+error.message
+
+);
+
+});
+
+}
+
+function chargerClassesFinance(){
+
+let select=document.getElementById("classeFrais");
+
+select.innerHTML="<option value=''>Choisir une classe</option>";
+
+db.ref("schools/"+window.currentSchoolId+"/classes")
+.once("value")
+
+.then(snapshot=>{
+
+snapshot.forEach(item=>{
+
+let classe=item.val();
+
+let nom="";
+
+if(typeof classe==="string"){
+
+nom=classe;
+
+}else{
+
+nom=
+classe.name ||
+classe.className ||
+classe.nom ||
+classe.classe ||
+"";
+
+}
+
+if(nom){
+
+select.innerHTML+=`
+<option value="${nom}">
+${nom}
+</option>
+`;
+
+}
+
+});
+
+});
+
+}
+
+function parametresFinance(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<button class="back-btn"
+onclick="pageFinance()">
+
+⬅ Retour
+
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+⚙️ Paramètres financiers
+
+</h2>
+
+<select id="classeFrais">
+<option value="">Chargement des classes...</option>
+</select>
+
+<input
+id="montantFrais"
+type="number"
+placeholder="Montant des frais">
+
+<button
+class="pay-btn"
+onclick="enregistrerFraisClasse()">
+
+💾 Enregistrer
+
+</button>
+
+<div id="listeFrais"></div>
+
+`;
+
+chargerClassesFinance();
+chargerFraisClasses();
+
+}
+
+function enregistrerFraisClasse(){
+
+let classe=document
+.getElementById("classeFrais")
+.value.trim();
+
+let montant=parseFloat(
+document.getElementById("montantFrais").value
+);
+
+if(!classe){
+
+alert("Classe obligatoire.");
+
+return;
+
+}
+
+if(isNaN(montant)||montant<=0){
+
+alert("Montant invalide.");
+
+return;
+
+}
+
+db.ref(
+
+"schools/"+
+window.currentSchoolId+
+"/finances/frais/"+
+classe
+
+).set({
+
+montant:montant
+
+})
+
+.then(()=>{
+
+alert("Frais enregistrés.");
+
+document.getElementById("classeFrais").value="";
+
+document.getElementById("montantFrais").value="";
+
+chargerFraisClasses();
+
+});
+
+}
+
+function chargerFraisClasses(){
+
+db.ref(
+"schools/"+
+window.currentSchoolId+
+"/finances/frais"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let html="";
+
+snapshot.forEach(item=>{
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+margin-top:10px;
+border-radius:15px;
+box-shadow:0 4px 10px rgba(0,0,0,.08);
+">
+
+<b>${item.key}</b>
+
+<br>
+
+💰 ${item.val().montant} FC
+
+</div>
+
+`;
+
+});
+
+document.getElementById("listeFrais").innerHTML=html;
+
+});
+
+}
+
+
+
+
+function paiementPersonnel(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<button
+class="back-btn"
+onclick="pageFinance()">
+
+⬅ Retour
+
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+margin-bottom:20px;
+">
+
+👨‍🏫 Paiements du personnel
+
+</h2>
+
+<input
+id="recherchePersonnel"
+placeholder="Nom ou téléphone"
+onkeyup="rechercherPersonnelPaiement()">
+
+<div id="resultatPersonnel">
+
+<p style="
+text-align:center;
+color:gray;
+margin-top:30px;
+">
+
+Recherchez un membre du personnel.
+
+</p>
+
+</div>
+
+`;
+
+}
+
+function rechercherPersonnelPaiement(){
+
+let recherche=document.getElementById("recherchePersonnel")
+.value
+.trim()
+.toLowerCase();
+
+if(recherche===""){
+
+document.getElementById("resultatPersonnel").innerHTML=`
+<p style="
+text-align:center;
+color:gray;
+margin-top:30px;
+">
+Recherchez un membre du personnel.
+</p>
+`;
+
+return;
+
+}
+
+db.ref(
+"schools/"+window.currentSchoolId+"/teachers"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let html="";
+
+let trouve=false;
+
+snapshot.forEach(item=>{
+
+let p=item.val();
+
+let texte=(
+
+(p.name||"")+" "+
+(p.phone||"")+" "+
+(p.role||"")
+
+).toLowerCase();
+
+if(texte.includes(recherche)){
+
+trouve=true;
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+margin-bottom:12px;
+border-radius:15px;
+box-shadow:0 4px 10px rgba(0,0,0,.08);
+">
+
+<h3 style="
+margin:0;
+color:#1f4cff;
+">
+
+👨‍🏫 ${p.name}
+
+</h3>
+
+📌 ${p.role||"Personnel"}
+
+<br>
+
+📞 ${p.phone||""}
+
+<br><br>
+
+<button
+class="pay-btn"
+onclick="ouvrirPaiementPersonnel('${item.key}')">
+
+💰 Payer
+
+</button>
+
+<button
+class="pay-btn"
+style="background:#00a86b;"
+onclick="historiquePaiementPersonnel('${item.key}')">
+
+📜 Historique
+
+</button>
+
+</div>
+
+`;
+
+}
+
+});
+
+if(!trouve){
+
+html=`
+
+<p style="
+text-align:center;
+color:gray;
+">
+
+Aucun membre trouvé.
+
+</p>
+
+`;
+
+}
+
+document.getElementById("resultatPersonnel").innerHTML=html;
+
+});
+
+}
+
+function ouvrirPaiementPersonnel(idPersonnel){
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/teachers/"+idPersonnel
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+if(!snapshot.exists()){
+
+alert("Personnel introuvable.");
+
+return;
+
+}
+
+let p=snapshot.val();
+
+document.querySelector(".login-box").innerHTML=`
+
+<button
+class="back-btn"
+onclick="paiementPersonnel()">
+
+⬅ Retour
+
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+💰 Paiement du personnel
+
+</h2>
+
+<div style="
+background:white;
+padding:15px;
+border-radius:15px;
+margin-bottom:20px;
+box-shadow:0 4px 10px rgba(0,0,0,.08);
+">
+
+<b>${p.name}</b>
+
+<br>
+
+📌 ${p.role||"Personnel"}
+
+<br>
+
+📞 ${p.phone||""}
+
+</div>
+
+<label>Salaire prévu</label>
+
+<input
+id="salairePrevu"
+type="number"
+placeholder="Salaire prévu">
+
+<label>Prime</label>
+
+<input
+id="primePersonnel"
+type="number"
+value="0"
+placeholder="Prime">
+
+<label>Avance</label>
+
+<input
+id="avancePersonnel"
+type="number"
+value="0"
+placeholder="Avance">
+
+<label>Montant payé</label>
+
+<input
+id="montantPersonnel"
+type="number"
+placeholder="Montant payé">
+
+<label>Date</label>
+
+<input
+id="datePersonnel"
+type="date"
+value="${new Date().toISOString().split("T")[0]}">
+
+<label>Observation</label>
+
+<textarea
+id="observationPersonnel"
+placeholder="Observation"
+style="
+width:100%;
+height:80px;
+padding:10px;
+border-radius:10px;
+margin-top:10px;
+"></textarea>
+
+<button
+class="pay-btn"
+onclick="enregistrerPaiementPersonnel('${idPersonnel}')">
+
+💾 Enregistrer le paiement
+
+</button>
+
+`;
+
+})
+
+.catch(err=>{
+
+hideLoader();
+
+alert(err.message);
+
+});
+
+}
+
+function enregistrerPaiementPersonnel(idPersonnel){
+
+let salairePrevu=parseFloat(
+document.getElementById("salairePrevu").value
+)||0;
+
+let prime=parseFloat(
+document.getElementById("primePersonnel").value
+)||0;
+
+let avance=parseFloat(
+document.getElementById("avancePersonnel").value
+)||0;
+
+let montantPaye=parseFloat(
+document.getElementById("montantPersonnel").value
+);
+
+let date=document.getElementById("datePersonnel").value;
+
+let observation=document
+.getElementById("observationPersonnel")
+.value.trim();
+
+if(isNaN(montantPaye)||montantPaye<=0){
+
+alert("Montant invalide.");
+return;
+
+}
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/teachers/"+idPersonnel
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+if(!snapshot.exists()){
+
+throw new Error("Personnel introuvable.");
+
+}
+
+let personnel=snapshot.val();
+
+let totalSalaire=salairePrevu+prime;
+
+let reste=Math.max(
+0,
+totalSalaire-avance-montantPaye
+);
+
+// Toujours en attente tant que l'enseignant n'a pas confirmé
+let statut="🟡 En attente de confirmation";
+
+let paiementId="SAL-"+Date.now();
+
+let paiement={
+
+id:paiementId,
+
+personnelId:idPersonnel,
+
+name:personnel.name,
+
+phone:personnel.telephone||"",
+
+role:personnel.role||"Personnel",
+
+salairePrevu:salairePrevu,
+
+prime:prime,
+
+avance:avance,
+
+montantPaye:montantPaye,
+
+reste:reste,
+
+statut:statut,
+
+date:date,
+
+observation:observation,
+
+timestamp:Date.now(),
+
+caissier:window.currentPhone
+
+};
+
+let promesses=[];
+
+// Historique des paiements
+promesses.push(
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/finances/paiementsPersonnel/"+
+paiementId
+).set(paiement)
+
+);
+
+// Historique personnel
+promesses.push(
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/teachers/"+
+idPersonnel+
+"/finance"
+).update({
+
+dernierPaiement:date,
+
+montantPaye:montantPaye,
+
+reste:reste,
+
+statut:statut
+
+})
+
+);
+
+let phonePersonnel=normalizePhone(personnel.telephone||"");
+
+// Notification
+if(phonePersonnel){
+
+promesses.push(
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/notifications/"+
+phonePersonnel+
+"/"+
+Date.now()
+).set({
+
+title:"💰 Salaire enregistré",
+
+message:
+"Un paiement de "+
+montantPaye+
+" FC a été enregistré.\nVeuillez confirmer sa réception.",
+
+type:"salaire",
+
+paiementId:paiementId,
+
+read:false,
+
+confirmed:false,
+
+status:"en_attente",
+
+date:date,
+
+timestamp:Date.now()
+
+})
+
+);
+
+}
+
+return Promise.all(promesses);
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("Paiement enregistré. En attente de confirmation de l'enseignant.");
+
+paiementPersonnel();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+function verifierNotificationsEnseignant(phone){
+    phone=normalizePhone(phone);
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/notifications/"+phone
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let badge=document.getElementById(
+"teacherNotifBadge"
+);
+
+if(!badge)return;
+
+badge.style.display="none";
+
+if(!snapshot.exists())return;
+
+snapshot.forEach(item=>{
+
+let notif=item.val();
+
+if(notif.read===false){
+
+badge.style.display="block";
+
+}
+
+});
+
+});
+
+}
+
+function ouvrirNotificationsEnseignant(){
+
+showLoader();
+
+let phone=normalizePhone(window.currentPhone);
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/notifications/"+phone
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+let html=`
+
+<button
+class="back-btn"
+onclick="openTeacher()">
+
+⬅ Retour
+
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+🔔 Notifications
+
+</h2>
+
+`;
+
+if(!snapshot.exists()){
+
+html+=`
+
+<p style="
+text-align:center;
+color:gray;
+">
+
+Aucune notification.
+
+</p>
+
+`;
+
+document.querySelector(".login-box").innerHTML=html;
+
+return;
+
+}
+
+let updates={};
+let trouve=false;
+
+snapshot.forEach(item=>{
+
+let n=item.val();
+
+// Afficher uniquement les notifications de salaire
+if(n.type!=="salaire"){
+return;
+}
+
+trouve=true;
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+margin-bottom:12px;
+border-radius:15px;
+box-shadow:0 4px 10px rgba(0,0,0,.08);
+">
+
+<h3 style="margin:0;">
+${n.title}
+</h3>
+
+<br>
+
+${n.message}
+
+<br><br>
+
+<small>
+
+📅 ${n.date}
+
+</small>
+
+`;
+
+if(n.status==="confirmé"){
+
+html+=`
+
+<br><br>
+
+<div style="
+color:#00c853;
+font-weight:bold;
+">
+
+✅ Paiement confirmé
+
+</div>
+
+`;
+
+}else if(n.status==="refusé"){
+
+html+=`
+
+<br><br>
+
+<div style="
+color:#e53935;
+font-weight:bold;
+">
+
+❌ Paiement refusé
+
+</div>
+
+`;
+
+}else{
+
+html+=`
+
+<br><br>
+
+<button
+onclick="confirmerPaiementPersonnel('${item.key}')">
+
+✅ J'ai reçu
+
+</button>
+
+<br> <br>
+
+<button
+style="background:#e53935;"
+onclick="refuserPaiementPersonnel('${item.key}')">
+
+❌ Je n'ai pas reçu
+
+</button>
+
+`;
+
+}
+
+html+=`
+
+</div>
+
+`;
+
+updates[item.key+"/read"]=true;
+
+});
+
+if(!trouve){
+
+html+=`
+
+<p style="
+text-align:center;
+color:gray;
+">
+
+Aucune notification de salaire.
+
+</p>
+
+`;
+
+}
+
+document.querySelector(".login-box").innerHTML=html;
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/notifications/"+phone
+).update(updates);
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function confirmerPaiementPersonnel(idNotif){
+
+let phone=normalizePhone(window.currentPhone);
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/notifications/"+phone+
+"/"+idNotif
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+if(!snapshot.exists()){
+
+throw new Error("Notification introuvable.");
+
+}
+
+let notif=snapshot.val();
+
+return db.ref(
+"schools/"+window.currentSchoolId+
+"/finances/paiementsPersonnel/"+
+notif.paiementId
+).once("value")
+
+.then(paySnap=>{
+
+if(!paySnap.exists()){
+
+throw new Error("Paiement introuvable.");
+
+}
+
+let paiement=paySnap.val();
+
+let depense={
+
+id:paiement.id,
+
+motif:"Salaire : "+paiement.name,
+
+categorie:"Salaire personnel",
+
+montant:paiement.montantPaye,
+
+observation:paiement.observation||"",
+
+date:paiement.date,
+
+heure:new Date().toLocaleTimeString(),
+
+statut:"🟢 Confirmé",
+
+createdAt:Date.now(),
+
+createdBy:paiement.caissier
+
+};
+
+let promesses=[];
+
+// Notification enseignant
+promesses.push(
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/notifications/"+phone+
+"/"+idNotif
+).update({
+
+confirmed:true,
+
+read:true,
+
+status:"confirmé",
+
+responseAt:Date.now()
+
+})
+
+);
+
+// Historique paiement
+promesses.push(
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/finances/paiementsPersonnel/"+
+paiement.id
+).update({
+
+statut:"🟢 Confirmé",
+
+confirmed:true,
+
+confirmationDate:Date.now()
+
+})
+
+);
+
+// Création de la dépense
+promesses.push(
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/finance/depenses/"+
+paiement.id
+).set(depense)
+
+);
+
+return Promise.all(promesses);
+
+});
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("Paiement confirmé avec succès.");
+
+ouvrirNotificationsEnseignant();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+function refuserPaiementPersonnel(idNotif){
+
+window.refusNotifId=idNotif;
+
+document.querySelector(".login-box").innerHTML=`
+
+<button
+class="back-btn"
+onclick="ouvrirNotificationsEnseignant()">
+
+⬅ Retour
+
+</button>
+
+<h2 style="
+text-align:center;
+color:#e53935;
+">
+
+❌ Refuser le paiement
+
+</h2>
+
+<p style="
+text-align:center;
+color:gray;
+">
+
+Expliquez pourquoi vous refusez ce paiement.
+
+</p>
+
+<textarea
+
+id="motifRefus"
+
+placeholder="Écrivez votre motif..."
+
+style="
+width:100%;
+height:120px;
+padding:12px;
+border-radius:12px;
+border:1px solid #ddd;
+font-size:15px;
+box-sizing:border-box;
+resize:none;
+">
+
+</textarea>
+
+<br><br>
+
+<button
+
+style="
+width:100%;
+padding:14px;
+background:#e53935;
+color:white;
+border:none;
+border-radius:12px;
+font-weight:bold;
+"
+
+onclick="envoyerRefusPaiement()">
+
+📤 Envoyer le refus
+
+</button>
+
+`;
+
+}
+
+function envoyerRefusPaiement(){
+
+let motif=document
+.getElementById("motifRefus")
+.value
+.trim();
+
+if(!motif){
+
+alert("Veuillez écrire le motif du refus.");
+
+return;
+
+}
+
+showLoader();
+
+let phone=normalizePhone(window.currentPhone);
+
+let idNotif=window.refusNotifId;
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/notifications/"+phone+
+"/"+idNotif
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+if(!snapshot.exists()){
+
+throw new Error("Notification introuvable.");
+
+}
+
+let notif=snapshot.val();
+
+let promesses=[];
+
+// Notification enseignant
+promesses.push(
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/notifications/"+phone+
+"/"+idNotif
+).update({
+
+read:true,
+
+confirmed:false,
+
+status:"refusé",
+
+motif:motif,
+
+responseAt:Date.now()
+
+})
+
+);
+
+// Historique paiements personnel
+promesses.push(
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/finances/paiementsPersonnel/"+
+notif.paiementId
+).update({
+
+statut:"🔴 Refusé",
+
+motif:motif,
+
+confirmationDate:Date.now()
+
+})
+
+);
+
+// Dépenses générales
+promesses.push(
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/finance/depenses/"+
+notif.paiementId
+).update({
+
+statut:"🔴 Refusé",
+
+motif:motif,
+
+confirmationDate:Date.now()
+
+})
+
+);
+
+// Notification administrateur
+let adminNotifId="ADM-"+Date.now();
+
+promesses.push(
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/adminNotifications/"+
+adminNotifId
+).set({
+
+title:"⚠ Paiement refusé",
+
+message:
+"Le paiement du personnel a été refusé.\n\nMotif : "+motif,
+
+paiementId:notif.paiementId,
+
+enseignant:phone,
+
+date:new Date().toLocaleDateString(),
+
+heure:new Date().toLocaleTimeString(),
+
+read:false,
+
+timestamp:Date.now()
+
+})
+
+);
+
+return Promise.all(promesses);
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("Le refus a été envoyé à l'administration.");
+
+ouvrirNotificationsEnseignant();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+function notificationsFinance(){
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+"/adminNotifications"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+let html=`
+
+<button class="back-btn"
+onclick="pageFinance()">
+
+⬅ Retour
+
+</button>
+
+<h2 style="text-align:center;color:#1f4cff;">
+
+🔔 Notifications Finance
+
+</h2>
+
+`;
+
+if(!snapshot.exists()){
+
+html+=`
+
+<p style="text-align:center;color:gray;">
+
+Aucune notification.
+
+</p>
+
+`;
+
+document.querySelector(".login-box").innerHTML=html;
+return;
+
+}
+
+let updates={};
+
+let liste=[];
+
+snapshot.forEach(item=>{
+
+liste.push({
+id:item.key,
+...item.val()
+});
+
+});
+
+liste.sort((a,b)=>b.timestamp-a.timestamp);
+
+liste.forEach(n=>{
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+margin-bottom:12px;
+border-radius:15px;
+box-shadow:0 4px 10px rgba(0,0,0,.08);
+">
+
+<h3>${n.title}</h3>
+
+<p style="white-space:pre-line;">
+
+${n.message}
+
+</p>
+
+<small>
+
+📅 ${n.date}
+
+</small>
+
+</div>
+
+`;
+
+updates[n.id+"/read"]=true;
+
+});
+
+document.querySelector(".login-box").innerHTML=html;
+
+db.ref(
+"schools/"+window.currentSchoolId+"/adminNotifications"
+).update(updates);
+
+})
+
+.catch(err=>{
+
+hideLoader();
+
+alert(err.message);
+
+});
+
+}
+
+function verifierNotifFinance(){
+
+db.ref(
+"schools/"+window.currentSchoolId+"/adminNotifications"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let badge=document.getElementById("financeNotifBadge");
+
+if(!badge)return;
+
+let nonLues=false;
+
+snapshot.forEach(item=>{
+
+if(item.val().read!==true){
+
+nonLues=true;
+
+}
+
+});
+
+badge.style.display=nonLues?"block":"none";
+
+});
+
+}
+
+
+
+
+// suite Finance 
+
+function dashboardFinance(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<style>
+
+.financeDashboard{
+
+padding:15px;
+
+}
+
+.financeTitle{
+
+font-size:26px;
+
+font-weight:bold;
+
+text-align:center;
+
+color:#1f4cff;
+
+margin-bottom:15px;
+
+}
+
+.financeCards{
+
+display:grid;
+
+grid-template-columns:1fr 1fr;
+
+gap:12px;
+
+margin-bottom:20px;
+
+}
+
+.financeStat{
+
+background:white;
+
+border-radius:18px;
+
+padding:15px;
+
+box-shadow:0 5px 15px rgba(0,0,0,.15);
+
+text-align:center;
+
+}
+
+.financeStat h3{
+
+margin:0;
+
+font-size:15px;
+
+color:#666;
+
+}
+
+.financeStat h2{
+
+margin-top:8px;
+
+color:#1f4cff;
+
+}
+
+.chartBox{
+
+background:white;
+
+border-radius:20px;
+
+padding:15px;
+
+margin-top:20px;
+
+box-shadow:0 5px 15px rgba(0,0,0,.15);
+
+}
+
+canvas{
+
+width:100%!important;
+
+height:320px!important;
+
+}
+
+.backBtn{
+
+width:100%;
+
+padding:14px;
+
+margin-bottom:18px;
+
+border:none;
+
+border-radius:15px;
+
+background:#1f4cff;
+
+color:white;
+
+font-weight:bold;
+
+}
+
+</style>
+
+<div class="financeDashboard">
+
+<button
+
+class="backBtn"
+
+onclick="pageFinance()">
+
+⬅ Retour
+
+</button>
+
+<div class="financeTitle">
+
+📊 Tableau de bord financier
+
+</div>
+
+<div class="financeCards">
+
+<div class="financeStat">
+
+<h3>💰 Recettes</h3>
+
+<h2 id="totalRecettes">
+
+0 FC
+
+</h2>
+
+</div>
+
+<div class="financeStat">
+
+<h3>💸 Dépenses</h3>
+
+<h2 id="totalDepenses">
+
+0 FC
+
+</h2>
+
+</div>
+
+<div class="financeStat">
+
+<h3>💵 Solde</h3>
+
+<h2 id="soldeFinance">
+
+0 FC
+
+</h2>
+
+</div>
+
+<div class="financeStat">
+
+<h3>📈 Budget utilisé</h3>
+
+<h2 id="budgetPourcent">
+
+0%
+
+</h2>
+
+</div>
+
+</div>
+
+<div class="chartBox">
+
+<canvas id="financeChart"></canvas>
+
+</div>
+
+<div class="chartBox">
+
+<h3>
+
+🕒 Dernières opérations
+
+</h3>
+
+<div id="financeHistory">
+
+Chargement...
+
+</div>
+
+</div>
+
+</div>
+
+`;
+
+chargerDashboardFinance();
+
+}
+
+function chargerDashboardFinance(){
+
+let schoolId = window.currentSchoolId;
+
+if(!schoolId){
+    alert("École introuvable.");
+    return;
+}
+
+Promise.all([
+
+    db.ref(
+    "schools/"+schoolId+"/finance/recettes"
+    ).once("value"),
+
+    db.ref(
+    "schools/"+schoolId+"/finance/depenses"
+    ).once("value")
+
+])
+
+.then(([recettesSnap,depensesSnap])=>{
+
+    let totalRecettes = 0;
+    let totalDepenses = 0;
+
+    let historique = [];
+
+    // ===== RECETTES =====
+
+    recettesSnap.forEach(item=>{
+
+        let data = item.val();
+
+        let montant = Number(data.montant)||0;
+
+        totalRecettes += montant;
+
+        historique.push({
+
+            type:"📥 Recette",
+
+            montant:montant,
+
+            date:data.date||"",
+
+            motif:data.motif||""
+
+        });
+
+    });
+
+    // ===== DEPENSES =====
+
+    depensesSnap.forEach(item=>{
+
+        let data = item.val();
+
+        let montant = Number(data.montant)||0;
+
+        totalDepenses += montant;
+
+        historique.push({
+
+            type:"📤 Dépense",
+
+            montant:montant,
+
+            date:data.date||"",
+
+            motif:data.motif||""
+
+        });
+
+    });
+
+    let solde = totalRecettes-totalDepenses;
+
+    let budget = totalRecettes>0
+        ? Math.round((totalDepenses/totalRecettes)*100)
+        : 0;
+
+    document.getElementById(
+    "totalRecettes"
+    ).innerHTML=
+    totalRecettes.toLocaleString()+" FC";
+
+    document.getElementById(
+    "totalDepenses"
+    ).innerHTML=
+    totalDepenses.toLocaleString()+" FC";
+
+    document.getElementById(
+    "soldeFinance"
+    ).innerHTML=
+    solde.toLocaleString()+" FC";
+
+    document.getElementById(
+    "budgetPourcent"
+    ).innerHTML=
+    budget+" %";
+
+    // Trier par date décroissante
+
+    historique.sort((a,b)=>{
+
+        return new Date(b.date)-new Date(a.date);
+
+    });
+
+    let html="";
+
+    historique.slice(0,5).forEach(op=>{
+
+        html+=`
+
+        <div style="
+        padding:10px;
+        margin:8px 0;
+        border-radius:12px;
+        background:#f4f7ff;
+        ">
+
+        <b>${op.type}</b><br>
+
+        ${op.motif}<br>
+
+        <span style="color:#1f4cff;">
+
+        ${op.montant.toLocaleString()} FC
+
+        </span>
+
+        </div>
+
+        `;
+
+    });
+
+    if(html===""){
+
+        html="<center>Aucune opération.</center>";
+
+    }
+
+    document.getElementById(
+    "financeHistory"
+    ).innerHTML=html;
+
+    // Créer le graphique
+
+    dessinerGraphiqueFinance(
+        totalRecettes,
+        totalDepenses
+    );
+
+})
+
+.catch(error=>{
+
+    alert(error.message);
+
+});
+
+}
+
+function dessinerGraphiqueFinance(recettes,depenses){
+
+let canvas=document.getElementById("financeChart");
+
+if(!canvas) return;
+
+// Détruire uniquement si c'est un vrai graphique Chart.js
+if(
+window.financeChart &&
+typeof window.financeChart.destroy==="function"
+){
+window.financeChart.destroy();
+}
+
+let solde=recettes-depenses;
+
+window.financeChart=new Chart(canvas,{
+
+type:"bar",
+
+data:{
+
+labels:[
+
+"Recettes",
+
+"Dépenses",
+
+"Solde"
+
+],
+
+datasets:[{
+
+label:"Montant (FC)",
+
+data:[
+
+recettes,
+
+depenses,
+
+solde
+
+],
+
+backgroundColor:[
+
+"#00c853",
+
+"#ff5252",
+
+"#1f4cff"
+
+],
+
+borderRadius:12,
+
+borderWidth:1
+
+}]
+
+},
+
+options:{
+
+responsive:true,
+
+maintainAspectRatio:false,
+
+plugins:{
+
+legend:{
+
+display:false
+
+},
+
+title:{
+
+display:true,
+
+text:"Évaluation financière"
+
+}
+
+},
+
+scales:{
+
+y:{
+
+beginAtZero:true
+
+}
+
+},
+
+animation:{
+
+duration:1200
+
+}
+
+}
+
+}
+
+);
+
+}
+
+function recettesFinance(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<style>
+
+.recetteBox{
+
+padding:15px;
+
+}
+
+.recetteTitle{
+
+text-align:center;
+
+font-size:26px;
+
+font-weight:bold;
+
+color:#1f4cff;
+
+margin-bottom:20px;
+
+}
+
+.recetteCard{
+
+background:white;
+
+padding:18px;
+
+border-radius:20px;
+
+box-shadow:0 5px 15px rgba(0,0,0,.15);
+
+margin-bottom:20px;
+
+}
+
+.recetteCard input,
+.recetteCard select,
+.recetteCard textarea{
+
+width:100%;
+
+padding:12px;
+
+margin:8px 0;
+
+border:1px solid #ddd;
+
+border-radius:12px;
+
+font-size:15px;
+
+box-sizing:border-box;
+
+}
+
+.recetteBtn{
+
+width:100%;
+
+padding:14px;
+
+border:none;
+
+border-radius:15px;
+
+background:#1f4cff;
+
+color:white;
+
+font-size:16px;
+
+font-weight:bold;
+
+margin-top:10px;
+
+}
+
+.backBtn{
+
+width:100%;
+
+padding:14px;
+
+border:none;
+
+border-radius:15px;
+
+background:#555;
+
+color:white;
+
+font-weight:bold;
+
+margin-bottom:15px;
+
+}
+
+</style>
+
+<div class="recetteBox">
+
+<button
+class="backBtn"
+onclick="pageFinance()">
+
+⬅ Retour
+
+</button>
+
+<div class="recetteTitle">
+
+📥 Recettes
+
+</div>
+
+<div class="recetteCard">
+
+<input
+id="recetteMotif"
+placeholder="Motif de la recette">
+
+<select id="recetteCategorie">
+
+<option value="Paiement élève">
+Paiement élève
+</option>
+
+<option value="Don">
+Don
+</option>
+
+<option value="Subvention">
+Subvention
+</option>
+
+<option value="Cotisation">
+Cotisation
+</option>
+
+<option value="Autre">
+Autre
+</option>
+
+</select>
+
+<input
+id="recetteMontant"
+type="number"
+placeholder="Montant (FC)">
+
+<textarea
+id="recetteObservation"
+placeholder="Observation (facultatif)">
+</textarea>
+
+<button
+class="recetteBtn"
+onclick="saveRecette()">
+
+💾 Enregistrer
+
+</button>
+
+</div>
+
+<div id="listeRecettes">
+
+Chargement...
+
+</div>
+
+</div>
+
+`;
+
+chargerRecettes();
+
+}
+
+
+async function saveRecette(){
+
+let schoolId=window.currentSchoolId;
+
+if(!schoolId){
+alert("École introuvable.");
+return;
+}
+
+let motif=document.getElementById("recetteMotif").value.trim();
+
+let categorie=document.getElementById("recetteCategorie").value;
+
+let montant=parseFloat(
+document.getElementById("recetteMontant").value
+);
+
+let observation=document.getElementById("recetteObservation").value.trim();
+
+if(motif=="" || isNaN(montant) || montant<=0){
+
+alert("Complétez correctement les informations.");
+
+return;
+
+}
+
+showLoader();
+
+let id=db.ref(
+"schools/"+schoolId+"/finance/recettes"
+).push().key;
+
+// Générer le numéro AVANT de créer l'objet
+let numero=await genererNumeroRecu();
+
+let data={
+
+id:id,
+
+numero:numero,
+
+motif:motif,
+
+categorie:categorie,
+
+montant:montant,
+
+observation:observation,
+
+date:new Date().toLocaleDateString(),
+
+heure:new Date().toLocaleTimeString(),
+
+createdAt:Date.now(),
+
+createdBy:window.currentPhone
+
+};
+
+db.ref(
+"schools/"+schoolId+"/finance/recettes/"+id
+)
+
+.set(data)
+
+.then(()=>{
+
+hideLoader();
+
+alert("Recette enregistrée avec succès.");
+
+document.getElementById("recetteMotif").value="";
+
+document.getElementById("recetteMontant").value="";
+
+document.getElementById("recetteObservation").value="";
+
+chargerRecettes();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+function chargerRecettes(){
+
+let schoolId=window.currentSchoolId;
+
+if(!schoolId)return;
+
+let box=document.getElementById("listeRecettes");
+
+box.innerHTML="Chargement...";
+
+db.ref(
+"schools/"+schoolId+"/finance/recettes"
+)
+
+.orderByChild("createdAt")
+
+.once("value")
+
+.then(snapshot=>{
+
+if(!snapshot.exists()){
+
+box.innerHTML="<center>Aucune recette enregistrée.</center>";
+
+return;
+
+}
+
+let html="";
+
+let total=0;
+
+let liste=[];
+
+snapshot.forEach(item=>{
+
+liste.push(item.val());
+
+});
+
+liste.reverse();
+
+liste.forEach(data=>{
+
+total+=Number(data.montant)||0;
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+margin-bottom:12px;
+border-radius:18px;
+box-shadow:0 4px 10px rgba(0,0,0,.12);
+">
+
+<b style="font-size:16px;">
+
+📥 ${data.motif}
+
+</b>
+
+<br><br>
+
+Catégorie :
+<b>${data.categorie}</b>
+
+<br>
+
+Montant :
+
+<span style="
+color:#00c853;
+font-weight:bold;
+">
+
+${Number(data.montant).toLocaleString()} FC
+
+</span>
+
+<br>
+
+Date :
+${data.date} ${data.heure}
+
+${data.observation?
+"<br>Observation : "+data.observation
+:""}
+
+<div style="
+margin-top:15px;
+display:flex;
+gap:10px;
+">
+
+<button
+style="
+flex:1;
+background:#1f4cff;
+color:white;
+border:none;
+padding:10px;
+border-radius:10px;
+"
+onclick="modifierRecette('${data.id}')">
+
+✏ Modifier
+
+</button>
+
+<button
+style="
+flex:1;
+background:#ff5252;
+color:white;
+border:none;
+padding:10px;
+border-radius:10px;
+"
+onclick="supprimerRecette('${data.id}')">
+
+🗑 Supprimer
+
+</button>
+
+</div>
+
+</div>
+
+`;
+
+});
+
+html=`
+
+<div style="
+background:#1f4cff;
+color:white;
+padding:15px;
+border-radius:18px;
+margin-bottom:18px;
+text-align:center;
+font-size:18px;
+font-weight:bold;
+">
+
+💰 Total des recettes
+
+<br><br>
+
+${total.toLocaleString()} FC
+
+</div>
+
+`+html;
+
+box.innerHTML=html;
+
+})
+
+.catch(error=>{
+
+box.innerHTML="<center>"+error.message+"</center>";
+
+});
+
+}
+
+function supprimerRecette(id){
+
+if(!confirm("Supprimer cette recette ?")){
+return;
+}
+
+showLoader();
+
+db.ref(
+"schools/"
++window.currentSchoolId+
+"/finance/recettes/"
++id
+)
+
+.remove()
+
+.then(()=>{
+
+hideLoader();
+
+chargerRecettes();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function modifierRecette(id){
+
+showLoader();
+
+db.ref(
+"schools/"
++window.currentSchoolId+
+"/finance/recettes/"
++id
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+if(!snapshot.exists()) return;
+
+let data=snapshot.val();
+
+document.getElementById("recetteMotif").value=data.motif;
+
+document.getElementById("recetteCategorie").value=data.categorie;
+
+document.getElementById("recetteMontant").value=data.montant;
+
+document.getElementById("recetteObservation").value=data.observation||"";
+
+let btn=document.querySelector(".recetteBtn");
+
+btn.innerHTML="💾 Mettre à jour";
+
+btn.onclick=function(){
+
+updateRecette(id);
+
+};
+
+});
+
+}
+
+function updateRecette(id){
+
+showLoader();
+
+db.ref(
+"schools/"
++window.currentSchoolId+
+"/finance/recettes/"
++id
+)
+
+.update({
+
+motif:document.getElementById("recetteMotif").value.trim(),
+
+categorie:document.getElementById("recetteCategorie").value,
+
+montant:Number(document.getElementById("recetteMontant").value),
+
+observation:document.getElementById("recetteObservation").value.trim(),
+
+updatedAt:Date.now()
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("Recette modifiée.");
+
+document.querySelector(".recetteBtn").innerHTML="💾 Enregistrer";
+
+document.querySelector(".recetteBtn").onclick=saveRecette;
+
+document.getElementById("recetteMotif").value="";
+document.getElementById("recetteMontant").value="";
+document.getElementById("recetteObservation").value="";
+
+chargerRecettes();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+
+
+
+function depensesFinance(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<style>
+
+.depenseBox{
+
+padding:15px;
+
+}
+
+.depenseTitle{
+
+text-align:center;
+
+font-size:26px;
+
+font-weight:bold;
+
+color:#1f4cff;
+
+margin-bottom:20px;
+
+}
+
+.depenseCard{
+
+background:white;
+
+padding:18px;
+
+border-radius:20px;
+
+box-shadow:0 5px 15px rgba(0,0,0,.15);
+
+margin-bottom:20px;
+
+}
+
+.depenseCard input,
+.depenseCard select,
+.depenseCard textarea{
+
+width:100%;
+
+padding:12px;
+
+margin:8px 0;
+
+border:1px solid #ddd;
+
+border-radius:12px;
+
+font-size:15px;
+
+box-sizing:border-box;
+
+}
+
+.depenseBtn{
+
+width:100%;
+
+padding:14px;
+
+border:none;
+
+border-radius:15px;
+
+background:#e53935;
+
+color:white;
+
+font-size:16px;
+
+font-weight:bold;
+
+margin-top:10px;
+
+}
+
+.backBtn{
+
+width:100%;
+
+padding:14px;
+
+border:none;
+
+border-radius:15px;
+
+background:#555;
+
+color:white;
+
+font-weight:bold;
+
+margin-bottom:15px;
+
+}
+
+</style>
+
+<div class="depenseBox">
+
+<button
+class="backBtn"
+onclick="pageFinance()">
+
+⬅ Retour
+
+</button>
+
+<div class="depenseTitle">
+
+📤 Dépenses
+
+</div>
+
+<div class="depenseCard">
+
+<input
+id="depenseMotif"
+placeholder="Motif de la dépense">
+
+<select id="depenseCategorie">
+
+<option value="Salaire">
+Salaire
+</option>
+
+<option value="Fournitures">
+Fournitures
+</option>
+
+<option value="Transport">
+Transport
+</option>
+
+<option value="Électricité">
+Électricité
+</option>
+
+<option value="Eau">
+Eau
+</option>
+
+<option value="Internet">
+Internet
+</option>
+
+<option value="Entretien">
+Entretien
+</option>
+
+<option value="Autre">
+Autre
+</option>
+
+</select>
+
+<input
+id="depenseMontant"
+type="number"
+placeholder="Montant (FC)">
+
+<textarea
+id="depenseObservation"
+placeholder="Observation (facultatif)">
+</textarea>
+
+<button
+class="depenseBtn"
+onclick="saveDepense()">
+
+💾 Enregistrer
+
+</button>
+
+</div>
+
+<div id="listeDepenses">
+
+Chargement...
+
+</div>
+
+</div>
+
+`;
+
+chargerDepenses();
+
+}
+
+function saveDepense(){
+
+let schoolId=window.currentSchoolId;
+
+if(!schoolId){
+alert("École introuvable.");
+return;
+}
+
+let motif=document.getElementById("depenseMotif").value.trim();
+
+let categorie=document.getElementById("depenseCategorie").value;
+
+let montant=parseFloat(
+document.getElementById("depenseMontant").value
+);
+
+let observation=document.getElementById("depenseObservation").value.trim();
+
+if(motif==""||isNaN(montant)||montant<=0){
+
+alert("Complétez correctement les informations.");
+
+return;
+
+}
+
+showLoader();
+
+let id=db.ref(
+"schools/"+schoolId+"/finance/depenses"
+).push().key;
+
+let data={
+
+id:id,
+
+motif:motif,
+
+categorie:categorie,
+
+montant:montant,
+
+observation:observation,
+
+date:new Date().toLocaleDateString(),
+
+heure:new Date().toLocaleTimeString(),
+
+createdAt:Date.now(),
+
+createdBy:window.currentPhone
+
+};
+
+db.ref(
+"schools/"+schoolId+"/finance/depenses/"+id
+)
+
+.set(data)
+
+.then(()=>{
+
+hideLoader();
+
+alert("Dépense enregistrée.");
+
+document.getElementById("depenseMotif").value="";
+document.getElementById("depenseMontant").value="";
+document.getElementById("depenseObservation").value="";
+
+chargerDepenses();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+function chargerDepenses(){
+
+let schoolId=window.currentSchoolId;
+
+if(!schoolId)return;
+
+let box=document.getElementById("listeDepenses");
+
+box.innerHTML="Chargement...";
+
+db.ref(
+"schools/"+schoolId+"/finance/depenses"
+)
+
+.orderByChild("createdAt")
+
+.once("value")
+
+.then(snapshot=>{
+
+if(!snapshot.exists()){
+
+box.innerHTML="<center>Aucune dépense enregistrée.</center>";
+
+return;
+
+}
+
+let total=0;
+
+let liste=[];
+
+let html="";
+
+snapshot.forEach(item=>{
+
+liste.push(item.val());
+
+});
+
+liste.reverse();
+
+liste.forEach(data=>{
+
+total+=Number(data.montant)||0;
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+margin-bottom:12px;
+border-radius:18px;
+box-shadow:0 4px 10px rgba(0,0,0,.12);
+">
+
+<b style="font-size:16px;">
+
+📤 ${data.motif}
+
+</b>
+
+<br><br>
+
+Catégorie :
+<b>${data.categorie}</b>
+
+<br>
+
+Montant :
+
+<span style="
+color:#e53935;
+font-weight:bold;
+">
+
+${Number(data.montant).toLocaleString()} FC
+
+</span>
+
+<br>
+
+Date :
+${data.date} ${data.heure}
+
+${data.observation?
+"<br>Observation : "+data.observation
+:""}
+
+<div style="
+margin-top:15px;
+display:flex;
+gap:10px;
+">
+
+<button
+style="
+flex:1;
+background:#1f4cff;
+color:white;
+border:none;
+padding:10px;
+border-radius:10px;
+"
+onclick="modifierDepense('${data.id}')">
+
+✏ Modifier
+
+</button>
+
+<button
+style="
+flex:1;
+background:#e53935;
+color:white;
+border:none;
+padding:10px;
+border-radius:10px;
+"
+onclick="supprimerDepense('${data.id}')">
+
+🗑 Supprimer
+
+</button>
+
+</div>
+
+</div>
+
+`;
+
+});
+
+box.innerHTML=`
+
+<div style="
+background:#e53935;
+color:white;
+padding:15px;
+border-radius:18px;
+margin-bottom:18px;
+text-align:center;
+font-size:18px;
+font-weight:bold;
+">
+
+💸 Total des dépenses
+
+<br><br>
+
+${total.toLocaleString()} FC
+
+</div>
+
+`+html;
+
+})
+
+.catch(error=>{
+
+box.innerHTML=error.message;
+
+});
+
+}
+
+function modifierDepense(id){
+
+showLoader();
+
+db.ref(
+"schools/"
++window.currentSchoolId+
+"/finance/depenses/"
++id
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+if(!snapshot.exists())return;
+
+let data=snapshot.val();
+
+document.getElementById("depenseMotif").value=data.motif;
+
+document.getElementById("depenseCategorie").value=data.categorie;
+
+document.getElementById("depenseMontant").value=data.montant;
+
+document.getElementById("depenseObservation").value=data.observation||"";
+
+let btn=document.querySelector(".depenseBtn");
+
+btn.innerHTML="💾 Mettre à jour";
+
+btn.onclick=function(){
+
+updateDepense(id);
+
+};
+
+});
+
+}
+
+function updateDepense(id){
+
+showLoader();
+
+db.ref(
+"schools/"
++window.currentSchoolId+
+"/finance/depenses/"
++id
+)
+
+.update({
+
+motif:document.getElementById("depenseMotif").value.trim(),
+
+categorie:document.getElementById("depenseCategorie").value,
+
+montant:Number(document.getElementById("depenseMontant").value),
+
+observation:document.getElementById("depenseObservation").value.trim(),
+
+updatedAt:Date.now()
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("Dépense modifiée.");
+
+document.querySelector(".depenseBtn").innerHTML="💾 Enregistrer";
+
+document.querySelector(".depenseBtn").onclick=saveDepense;
+
+document.getElementById("depenseMotif").value="";
+document.getElementById("depenseMontant").value="";
+document.getElementById("depenseObservation").value="";
+
+chargerDepenses();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function supprimerDepense(id){
+
+if(!confirm("Voulez-vous vraiment supprimer cette dépense ?")){
+return;
+}
+
+showLoader();
+
+db.ref(
+"schools/"
++window.currentSchoolId+
+"/finance/depenses/"
++id
+)
+
+.remove()
+
+.then(()=>{
+
+hideLoader();
+
+alert("Dépense supprimée avec succès.");
+
+chargerDepenses();
+
+// Actualiser aussi le tableau de bord s'il est ouvert
+if(document.getElementById("totalDepenses")){
+chargerDashboardFinance();
+}
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+function recusFinance(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<style>
+
+.recuBox{
+
+padding:15px;
+
+}
+
+.recuTitle{
+
+text-align:center;
+
+font-size:26px;
+
+font-weight:bold;
+
+color:#1f4cff;
+
+margin-bottom:20px;
+
+}
+
+.backBtn{
+
+width:100%;
+
+padding:14px;
+
+border:none;
+
+border-radius:15px;
+
+background:#1f4cff;
+
+color:white;
+
+font-weight:bold;
+
+margin-bottom:15px;
+
+}
+
+.search{
+
+width:100%;
+
+padding:12px;
+
+border:1px solid #ddd;
+
+border-radius:12px;
+
+margin-bottom:15px;
+
+box-sizing:border-box;
+
+}
+
+.recuCard{
+
+background:white;
+
+padding:15px;
+
+border-radius:18px;
+
+margin-bottom:15px;
+
+box-shadow:0 4px 12px rgba(0,0,0,.12);
+
+}
+
+.btns{
+
+display:flex;
+
+gap:10px;
+
+margin-top:12px;
+
+}
+
+.btn{
+
+flex:1;
+
+padding:10px;
+
+border:none;
+
+border-radius:10px;
+
+color:white;
+
+font-weight:bold;
+
+}
+
+.print{
+
+background:#1f4cff;
+
+}
+
+.pdf{
+
+background:#00c853;
+
+}
+
+</style>
+
+<div class="recuBox">
+
+<button
+
+class="backBtn"
+
+onclick="pageFinance()">
+
+⬅ Retour
+
+</button>
+
+<div class="recuTitle">
+
+🧾 Reçus financiers
+
+</div>
+
+<input
+
+id="searchRecu"
+
+class="search"
+
+placeholder="Rechercher un reçu..."
+
+onkeyup="chargerRecusFinance()"
+
+>
+
+<div id="listeRecus">
+
+Chargement...
+
+</div>
+
+</div>
+
+`;
+
+chargerRecusFinance();
+
+}
+
+function chargerRecusFinance(){
+
+let recherche=document.getElementById("searchRecu").value.toLowerCase();
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+"/finance/recettes"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+let html="";
+
+let liste=[];
+
+snapshot.forEach(item=>{
+
+let data=item.val();
+
+data.id=item.key;
+
+liste.push(data);
+
+});
+
+// Plus récent en premier
+liste.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+
+liste.forEach(data=>{
+
+let texte=(
+
+(data.motif||"")+" "+
+
+(data.categorie||"")+" "+
+
+(data.date||"")+" "+
+
+(data.heure||"")+" "+
+
+(data.observation||"")
+
+).toLowerCase();
+
+if(recherche && !texte.includes(recherche)){
+return;
+}
+
+let numero=data.numero;
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+margin-bottom:12px;
+border-radius:18px;
+box-shadow:0 4px 12px rgba(0,0,0,.12);
+">
+
+<h3 style="
+margin:0;
+color:#1f4cff;
+">
+
+🧾 ${numero}
+
+</h3>
+
+<br>
+
+<b>
+
+${data.motif}
+
+</b>
+
+<br><br>
+
+Catégorie :
+<b>${data.categorie}</b>
+
+<br>
+
+Montant :
+
+<span style="
+color:#00c853;
+font-weight:bold;
+">
+
+${Number(data.montant).toLocaleString()} FC
+
+</span>
+
+<br>
+
+Date :
+
+${data.date}
+
+${data.heure}
+
+${data.observation?
+
+"<br>Observation : "+data.observation
+
+:""}
+
+<div style="
+display:flex;
+gap:10px;
+margin-top:15px;
+">
+
+<button
+style="
+flex:1;
+background:#1f4cff;
+color:white;
+border:none;
+padding:10px;
+border-radius:10px;
+"
+onclick="imprimerRecu('${data.id}')">
+
+🖨 Imprimer
+
+</button>
+
+<button
+style="
+flex:1;
+background:#00c853;
+color:white;
+border:none;
+padding:10px;
+border-radius:10px;
+"
+onclick="telechargerRecuPDF('${data.id}')">
+
+📄 PDF
+
+</button>
+
+</div>
+
+</div>
+
+`;
+
+});
+
+if(html===""){
+
+html=`
+
+<div style="
+text-align:center;
+padding:40px;
+color:gray;
+">
+
+Aucun reçu trouvé.
+
+</div>
+
+`;
+
+}
+
+document.getElementById("listeRecus").innerHTML=html;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+async function imprimerRecu(id){
+
+showLoader();
+
+try{
+
+let schoolId=window.currentSchoolId;
+
+let schoolSnap=await db.ref(
+"schools/"+schoolId
+).once("value");
+
+let school=schoolSnap.val()||{};
+
+let recuSnap=await db.ref(
+"schools/"+schoolId+"/finance/recettes/"+id
+).once("value");
+
+hideLoader();
+
+if(!recuSnap.exists()){
+
+alert("Reçu introuvable.");
+
+return;
+
+}
+
+let data=recuSnap.val();
+
+let numero=data.numero;
+
+let w=window.open("","_blank");
+
+w.document.write(`
+
+<html>
+
+<head>
+
+<title>Reçu ${numero}</title>
+
+<style>
+
+body{
+
+font-family:Arial;
+
+padding:30px;
+
+}
+
+h1,h2{
+
+text-align:center;
+
+margin:5px;
+
+}
+
+table{
+
+width:100%;
+
+border-collapse:collapse;
+
+margin-top:20px;
+
+}
+
+td{
+
+padding:10px;
+
+border:1px solid #ddd;
+
+}
+
+.footer{
+
+margin-top:50px;
+
+display:flex;
+
+justify-content:space-between;
+
+}
+
+.signature{
+
+margin-top:60px;
+
+text-align:center;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>
+
+${school.schoolName||"MASOMO"}
+
+</h1>
+
+<h2>
+
+REÇU DE PAIEMENT
+
+</h2>
+
+<hr>
+
+<table>
+
+<tr>
+
+<td><b>Numéro</b></td>
+
+<td>${numero}</td>
+
+</tr>
+
+<tr>
+
+<td><b>Date</b></td>
+
+<td>${data.date||""} ${data.heure||""}</td>
+
+</tr>
+
+<tr>
+
+<td><b>Motif</b></td>
+
+<td>${data.motif||""}</td>
+
+</tr>
+
+<tr>
+
+<td><b>Catégorie</b></td>
+
+<td>${data.categorie||""}</td>
+
+</tr>
+
+<tr>
+
+<td><b>Montant</b></td>
+
+<td>
+
+${Number(data.montant).toLocaleString()} FC
+
+</td>
+
+</tr>
+
+<tr>
+
+<td><b>Observation</b></td>
+
+<td>${data.observation||"-"}</td>
+
+</tr>
+
+</table>
+
+<div class="footer">
+
+<div>
+
+Directeur
+
+<br><br>
+
+_________________
+
+</div>
+
+<div>
+
+Caissier
+
+<br><br>
+
+_________________
+
+</div>
+
+</div>
+
+<div class="signature">
+
+Document généré automatiquement par MASOMO
+
+</div>
+
+</body>
+
+</html>
+
+`);
+
+w.document.close();
+
+w.focus();
+
+w.print();
+
+}
+
+catch(error){
+
+hideLoader();
+
+alert(error.message);
+
+}
+
+}
+
+async function telechargerRecuPDF(id){
+
+showLoader();
+
+try{
+
+const {jsPDF}=window.jspdf;
+
+let schoolId=window.currentSchoolId;
+
+let schoolSnap=await db.ref(
+"schools/"+schoolId
+).once("value");
+
+let school=schoolSnap.val()||{};
+
+let recuSnap=await db.ref(
+"schools/"+schoolId+"/finance/recettes/"+id
+).once("value");
+
+hideLoader();
+
+if(!recuSnap.exists()){
+
+alert("Reçu introuvable.");
+
+return;
+
+}
+
+let data=recuSnap.val();
+
+let numero=data.numero;
+
+let doc=new jsPDF();
+
+doc.setFontSize(20);
+
+doc.setTextColor(31,76,255);
+
+doc.text(
+
+school.schoolName||
+
+"MASOMO",
+
+105,
+
+18,
+
+{align:"center"}
+
+);
+
+doc.setFontSize(14);
+
+doc.setTextColor(0);
+
+doc.text(
+
+"REÇU DE PAIEMENT",
+
+105,
+
+28,
+
+{align:"center"}
+
+);
+
+doc.line(15,34,195,34);
+
+doc.setFontSize(11);
+
+let y=48;
+
+doc.text(
+
+"Numéro : "+numero,
+
+20,
+
+y
+
+);
+
+y+=10;
+
+doc.text(
+
+"Date : "+
+
+(data.date||"")+
+
+" "+
+
+(data.heure||""),
+
+20,
+
+y
+
+);
+
+y+=10;
+
+doc.text(
+
+"Catégorie : "+
+
+(data.categorie||""),
+
+20,
+
+y
+
+);
+
+y+=10;
+
+doc.text(
+
+"Motif : "+
+
+(data.motif||""),
+
+20,
+
+y
+
+);
+
+y+=10;
+
+doc.text(
+
+"Montant : "+
+
+Number(data.montant)
+
+.toLocaleString()
+
++" FC",
+
+20,
+
+y
+
+);
+
+y+=10;
+
+doc.text(
+
+"Observation : "+
+
+(data.observation||"-"),
+
+20,
+
+y
+
+);
+
+y+=25;
+
+doc.line(20,y,190,y);
+
+y+=12;
+
+doc.setFontSize(13);
+
+doc.text(
+
+"Signature du caissier",
+
+20,
+
+y
+
+);
+
+doc.text(
+
+"Signature du bénéficiaire",
+
+120,
+
+y
+
+);
+
+y+=35;
+
+doc.line(20,y,80,y);
+
+doc.line(120,y,180,y);
+
+doc.setFontSize(9);
+
+doc.setTextColor(120);
+
+doc.text(
+
+"Document généré automatiquement par MASOMO",
+
+105,
+
+285,
+
+{align:"center"}
+
+);
+
+doc.save(
+
+numero+".pdf"
+
+);
+
+}
+
+catch(error){
+
+hideLoader();
+
+alert(error.message);
+
+}
+
+}
+
+async function genererNumeroRecu(){
+
+let schoolId=window.currentSchoolId;
+
+let compteurRef=db.ref(
+"schools/"+schoolId+"/finance/compteurRecus"
+);
+
+let snap=await compteurRef.once("value");
+
+let numero=(snap.val()||0)+1;
+
+await compteurRef.set(numero);
+
+let annee=new Date().getFullYear();
+
+return "REC-"+annee+"-"+String(numero).padStart(6,"0");
+
+}
+
+
+function rapportsFinance(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<style>
+
+.reportBox{
+
+padding:15px;
+
+}
+
+.reportTitle{
+
+text-align:center;
+
+font-size:26px;
+
+font-weight:bold;
+
+color:#1f4cff;
+
+margin-bottom:20px;
+
+}
+
+.reportGrid{
+
+display:grid;
+
+grid-template-columns:1fr 1fr;
+
+gap:15px;
+
+}
+
+.reportCard{
+
+background:white;
+
+padding:20px;
+
+border-radius:18px;
+
+box-shadow:0 5px 15px rgba(0,0,0,.15);
+
+text-align:center;
+
+cursor:pointer;
+
+transition:.2s;
+
+}
+
+.reportCard:hover{
+
+transform:translateY(-3px);
+
+}
+
+.reportIcon{
+
+font-size:32px;
+
+margin-bottom:10px;
+
+}
+
+.reportText{
+
+font-weight:bold;
+
+color:#222;
+
+}
+
+.backBtn{
+
+width:100%;
+
+padding:14px;
+
+margin-bottom:18px;
+
+border:none;
+
+border-radius:15px;
+
+background:#1f4cff;
+
+color:white;
+
+font-weight:bold;
+
+}
+
+</style>
+
+<div class="reportBox">
+
+<button
+
+class="backBtn"
+
+onclick="pageFinance()">
+
+⬅ Retour
+
+</button>
+
+<div class="reportTitle">
+
+📈 Rapports financiers
+
+</div>
+
+<div class="reportGrid">
+
+<div class="reportCard"
+
+onclick="rapportJournalier()">
+
+<div class="reportIcon">
+
+📅
+
+</div>
+
+<div class="reportText">
+
+Journalier
+
+</div>
+
+</div>
+
+<div class="reportCard"
+
+onclick="rapportMensuel()">
+
+<div class="reportIcon">
+
+🗓
+
+</div>
+
+<div class="reportText">
+
+Mensuel
+
+</div>
+
+</div>
+
+<div class="reportCard"
+
+onclick="rapportAnnuel()">
+
+<div class="reportIcon">
+
+📆
+
+</div>
+
+<div class="reportText">
+
+Annuel
+
+</div>
+
+</div>
+
+<div class="reportCard"
+
+onclick="rapportGeneral()">
+
+<div class="reportIcon">
+
+📊
+
+</div>
+
+<div class="reportText">
+
+Rapport général
+
+</div>
+
+</div>
+
+<div class="reportCard"
+
+onclick="exportFinancePDF()">
+
+<div class="reportIcon">
+
+📄
+
+</div>
+
+<div class="reportText">
+
+Exporter PDF
+
+</div>
+
+</div>
+
+<div class="reportCard"
+
+onclick="exportFinanceExcel()">
+
+<div class="reportIcon">
+
+📑
+
+</div>
+
+<div class="reportText">
+
+Exporter Excel
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+`;
+
+}
+
+function rapportJournalier(){
+
+showLoader();
+
+let schoolId=window.currentSchoolId;
+
+let aujourdhui=new Date().toLocaleDateString();
+
+Promise.all([
+
+db.ref(
+"schools/"+schoolId+"/finance/recettes"
+).once("value"),
+
+db.ref(
+"schools/"+schoolId+"/finance/depenses"
+).once("value")
+
+])
+
+.then(([recettesSnap,depensesSnap])=>{
+
+hideLoader();
+
+let recettes=0;
+
+let depenses=0;
+
+let html="";
+
+recettesSnap.forEach(item=>{
+
+let data=item.val();
+
+if(data.date===aujourdhui){
+
+recettes+=Number(data.montant)||0;
+
+html+=`
+
+<div style="
+padding:10px;
+margin:8px 0;
+background:#e8f5e9;
+border-radius:12px;
+">
+
+📥 ${data.motif}
+
+<br>
+
+<b>${Number(data.montant).toLocaleString()} FC</b>
+
+</div>
+
+`;
+
+}
+
+});
+
+depensesSnap.forEach(item=>{
+
+let data=item.val();
+
+if(data.date===aujourdhui){
+
+depenses+=Number(data.montant)||0;
+
+html+=`
+
+<div style="
+padding:10px;
+margin:8px 0;
+background:#ffebee;
+border-radius:12px;
+">
+
+📤 ${data.motif}
+
+<br>
+
+<b>${Number(data.montant).toLocaleString()} FC</b>
+
+</div>
+
+`;
+
+}
+
+});
+
+let solde=recettes-depenses;
+
+document.querySelector(".login-box").innerHTML=`
+
+<button
+class="backBtn"
+onclick="rapportsFinance()">
+
+⬅ Retour
+
+</button>
+
+<h2 style="text-align:center;color:#1f4cff;">
+
+📅 Rapport journalier
+
+</h2>
+
+<div style="
+background:white;
+padding:15px;
+border-radius:18px;
+box-shadow:0 4px 12px rgba(0,0,0,.12);
+margin-bottom:15px;
+">
+
+<b>Date :</b>
+
+${aujourdhui}
+
+<br><br>
+
+💰 Recettes :
+
+<b style="color:#00c853;">
+
+${recettes.toLocaleString()} FC
+
+</b>
+
+<br><br>
+
+💸 Dépenses :
+
+<b style="color:#e53935;">
+
+${depenses.toLocaleString()} FC
+
+</b>
+
+<br><br>
+
+💵 Solde :
+
+<b style="color:#1f4cff;">
+
+${solde.toLocaleString()} FC
+
+</b>
+
+</div>
+
+${html||"<center>Aucune opération aujourd'hui.</center>"}
+
+`;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function rapportMensuel(){
+
+showLoader();
+
+let schoolId=window.currentSchoolId;
+
+let maintenant=new Date();
+
+let mois=maintenant.getMonth()+1;
+
+let annee=maintenant.getFullYear();
+
+Promise.all([
+
+db.ref(
+"schools/"+schoolId+"/finance/recettes"
+).once("value"),
+
+db.ref(
+"schools/"+schoolId+"/finance/depenses"
+).once("value")
+
+])
+
+.then(([recettesSnap,depensesSnap])=>{
+
+hideLoader();
+
+let recettes=0;
+
+let depenses=0;
+
+let html="";
+
+recettesSnap.forEach(item=>{
+
+let data=item.val();
+
+let d=new Date(data.createdAt||0);
+
+if(
+
+d.getMonth()+1===mois &&
+
+d.getFullYear()===annee
+
+){
+
+recettes+=Number(data.montant)||0;
+
+html+=`
+
+<div style="
+padding:10px;
+margin:8px 0;
+background:#e8f5e9;
+border-radius:12px;
+">
+
+📥 ${data.motif}
+
+<br>
+
+${d.toLocaleDateString()}
+
+<br>
+
+<b>
+
+${Number(data.montant).toLocaleString()} FC
+
+</b>
+
+</div>
+
+`;
+
+}
+
+});
+
+depensesSnap.forEach(item=>{
+
+let data=item.val();
+
+let d=new Date(data.createdAt||0);
+
+if(
+
+d.getMonth()+1===mois &&
+
+d.getFullYear()===annee
+
+){
+
+depenses+=Number(data.montant)||0;
+
+html+=`
+
+<div style="
+padding:10px;
+margin:8px 0;
+background:#ffebee;
+border-radius:12px;
+">
+
+📤 ${data.motif}
+
+<br>
+
+${d.toLocaleDateString()}
+
+<br>
+
+<b>
+
+${Number(data.montant).toLocaleString()} FC
+
+</b>
+
+</div>
+
+`;
+
+}
+
+});
+
+let solde=recettes-depenses;
+
+document.querySelector(".login-box").innerHTML=`
+
+<button
+class="backBtn"
+onclick="rapportsFinance()">
+
+⬅ Retour
+
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+🗓 Rapport mensuel
+
+</h2>
+
+<div style="
+background:white;
+padding:15px;
+border-radius:18px;
+box-shadow:0 4px 12px rgba(0,0,0,.12);
+margin-bottom:15px;
+">
+
+<b>Mois :</b>
+
+${maintenant.toLocaleString(
+"fr-FR",
+{month:"long"}
+)}
+
+${annee}
+
+<br><br>
+
+💰 Recettes :
+
+<b style="color:#00c853;">
+
+${recettes.toLocaleString()} FC
+
+</b>
+
+<br><br>
+
+💸 Dépenses :
+
+<b style="color:#e53935;">
+
+${depenses.toLocaleString()} FC
+
+</b>
+
+<br><br>
+
+💵 Solde :
+
+<b style="color:#1f4cff;">
+
+${solde.toLocaleString()} FC
+
+</b>
+
+</div>
+
+${html||"<center>Aucune opération ce mois.</center>"}
+
+`;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function rapportAnnuel(){
+
+showLoader();
+
+let schoolId=window.currentSchoolId;
+
+let annee=new Date().getFullYear();
+
+Promise.all([
+
+db.ref(
+"schools/"+schoolId+"/finance/recettes"
+).once("value"),
+
+db.ref(
+"schools/"+schoolId+"/finance/depenses"
+).once("value")
+
+])
+
+.then(([recettesSnap,depensesSnap])=>{
+
+hideLoader();
+
+let recettes=0;
+
+let depenses=0;
+
+let html="";
+
+recettesSnap.forEach(item=>{
+
+let data=item.val();
+
+let d=new Date(data.createdAt||0);
+
+if(d.getFullYear()===annee){
+
+recettes+=Number(data.montant)||0;
+
+html+=`
+
+<div style="
+padding:10px;
+margin:8px 0;
+background:#e8f5e9;
+border-radius:12px;
+">
+
+📥 ${data.motif}
+
+<br>
+
+${d.toLocaleDateString()}
+
+<br>
+
+<b style="color:#00c853;">
+
+${Number(data.montant).toLocaleString()} FC
+
+</b>
+
+</div>
+
+`;
+
+}
+
+});
+
+depensesSnap.forEach(item=>{
+
+let data=item.val();
+
+let d=new Date(data.createdAt||0);
+
+if(d.getFullYear()===annee){
+
+depenses+=Number(data.montant)||0;
+
+html+=`
+
+<div style="
+padding:10px;
+margin:8px 0;
+background:#ffebee;
+border-radius:12px;
+">
+
+📤 ${data.motif}
+
+<br>
+
+${d.toLocaleDateString()}
+
+<br>
+
+<b style="color:#e53935;">
+
+${Number(data.montant).toLocaleString()} FC
+
+</b>
+
+</div>
+
+`;
+
+}
+
+});
+
+let solde=recettes-depenses;
+
+document.querySelector(".login-box").innerHTML=`
+
+<button
+class="backBtn"
+onclick="rapportsFinance()">
+
+⬅ Retour
+
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+📆 Rapport annuel ${annee}
+
+</h2>
+
+<div style="
+background:white;
+padding:18px;
+border-radius:18px;
+box-shadow:0 4px 12px rgba(0,0,0,.12);
+margin-bottom:18px;
+">
+
+<div style="
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px;
+">
+
+<div>
+
+💰 <b>Recettes</b>
+
+<br>
+
+<span style="
+color:#00c853;
+font-size:18px;
+font-weight:bold;
+">
+
+${recettes.toLocaleString()} FC
+
+</span>
+
+</div>
+
+<div>
+
+💸 <b>Dépenses</b>
+
+<br>
+
+<span style="
+color:#e53935;
+font-size:18px;
+font-weight:bold;
+">
+
+${depenses.toLocaleString()} FC
+
+</span>
+
+</div>
+
+</div>
+
+<hr>
+
+<div style="
+text-align:center;
+font-size:22px;
+font-weight:bold;
+color:#1f4cff;
+">
+
+💵 Solde annuel
+
+<br>
+
+${solde.toLocaleString()} FC
+
+</div>
+
+</div>
+
+<h3 style="text-align:center;">
+
+Historique annuel
+
+</h3>
+
+${html||"<center>Aucune opération cette année.</center>"}
+
+`;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+function rapportGeneral(){
+
+showLoader();
+
+let schoolId=window.currentSchoolId;
+
+Promise.all([
+
+db.ref(
+"schools/"+schoolId+"/finance/recettes"
+).once("value"),
+
+db.ref(
+"schools/"+schoolId+"/finance/depenses"
+).once("value")
+
+])
+
+.then(([recettesSnap,depensesSnap])=>{
+
+hideLoader();
+
+let recettes=0;
+
+let depenses=0;
+
+let nbRecettes=0;
+
+let nbDepenses=0;
+
+let categories={};
+
+recettesSnap.forEach(item=>{
+
+let data=item.val();
+
+let montant=Number(data.montant)||0;
+
+recettes+=montant;
+
+nbRecettes++;
+
+let cat=data.categorie||"Autre";
+
+categories[cat]=(categories[cat]||0)+montant;
+
+});
+
+depensesSnap.forEach(item=>{
+
+let data=item.val();
+
+let montant=Number(data.montant)||0;
+
+depenses+=montant;
+
+nbDepenses++;
+
+});
+
+let solde=recettes-depenses;
+
+let budget=recettes>0
+
+?Math.round((depenses/recettes)*100)
+
+:0;
+
+let htmlCategories="";
+
+Object.keys(categories).forEach(cat=>{
+
+htmlCategories+=`
+
+<div style="
+display:flex;
+justify-content:space-between;
+padding:10px;
+margin:6px 0;
+background:#f5f7ff;
+border-radius:10px;
+">
+
+<span>${cat}</span>
+
+<b>
+
+${categories[cat].toLocaleString()} FC
+
+</b>
+
+</div>
+
+`;
+
+});
+
+document.querySelector(".login-box").innerHTML=`
+
+<button
+
+class="backBtn"
+
+onclick="rapportsFinance()">
+
+⬅ Retour
+
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+📊 Rapport général
+
+</h2>
+
+<div style="
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:12px;
+">
+
+<div class="financeStat">
+
+<h3>
+
+💰 Recettes
+
+</h3>
+
+<h2>
+
+${recettes.toLocaleString()} FC
+
+</h2>
+
+</div>
+
+<div class="financeStat">
+
+<h3>
+
+💸 Dépenses
+
+</h3>
+
+<h2>
+
+${depenses.toLocaleString()} FC
+
+</h2>
+
+</div>
+
+<div class="financeStat">
+
+<h3>
+
+💵 Solde
+
+</h3>
+
+<h2>
+
+${solde.toLocaleString()} FC
+
+</h2>
+
+</div>
+
+<div class="financeStat">
+
+<h3>
+
+📈 Budget utilisé
+
+</h3>
+
+<h2>
+
+${budget} %
+
+</h2>
+
+</div>
+
+</div>
+
+<div style="
+background:white;
+margin-top:20px;
+padding:15px;
+border-radius:18px;
+box-shadow:0 5px 15px rgba(0,0,0,.15);
+">
+
+<h3>
+
+📋 Statistiques
+
+</h3>
+
+Nombre de recettes :
+<b>${nbRecettes}</b>
+
+<br><br>
+
+Nombre de dépenses :
+<b>${nbDepenses}</b>
+
+</div>
+
+<div style="
+background:white;
+margin-top:20px;
+padding:15px;
+border-radius:18px;
+box-shadow:0 5px 15px rgba(0,0,0,.15);
+">
+
+<h3>
+
+📥 Recettes par catégorie
+
+</h3>
+
+${htmlCategories}
+
+</div>
+
+`;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+async function exportFinancePDF(){
+
+showLoader();
+
+try{
+
+const {jsPDF}=window.jspdf;
+
+let schoolId=window.currentSchoolId;
+
+let schoolSnap=await db.ref(
+"schools/"+schoolId
+).once("value");
+
+let school=schoolSnap.val()||{};
+
+let recettesSnap=await db.ref(
+"schools/"+schoolId+"/finance/recettes"
+).once("value");
+
+let depensesSnap=await db.ref(
+"schools/"+schoolId+"/finance/depenses"
+).once("value");
+
+let doc=new jsPDF();
+
+doc.setFontSize(20);
+doc.setTextColor(31,76,255);
+
+doc.text(
+school.schoolName||"MASOMO",
+105,
+18,
+{align:"center"}
+);
+
+doc.setFontSize(11);
+
+doc.setTextColor(80);
+
+doc.text(
+"Rapport financier",
+105,
+26,
+{align:"center"}
+);
+
+doc.line(15,30,195,30);
+
+let recettes=0;
+let depenses=0;
+
+let rows=[];
+
+recettesSnap.forEach(item=>{
+
+let d=item.val();
+
+let montant=Number(d.montant)||0;
+
+recettes+=montant;
+
+rows.push([
+
+"RECETTE",
+
+d.date||"",
+
+d.categorie||"",
+
+d.motif||"",
+
+montant.toLocaleString()+" FC"
+
+]);
+
+});
+
+depensesSnap.forEach(item=>{
+
+let d=item.val();
+
+let montant=Number(d.montant)||0;
+
+depenses+=montant;
+
+rows.push([
+
+"DEPENSE",
+
+d.date||"",
+
+d.categorie||"",
+
+d.motif||"",
+
+montant.toLocaleString()+" FC"
+
+]);
+
+});
+
+let solde=recettes-depenses;
+
+doc.autoTable({
+
+startY:38,
+
+head:[[
+
+"Type",
+
+"Date",
+
+"Catégorie",
+
+"Motif",
+
+"Montant"
+
+]],
+
+body:rows,
+
+styles:{
+
+fontSize:9
+
+},
+
+headStyles:{
+
+fillColor:[31,76,255]
+
+}
+
+});
+
+let y=doc.lastAutoTable.finalY+12;
+
+doc.setFontSize(12);
+
+doc.text(
+
+"Total recettes : "+
+
+recettes.toLocaleString()+" FC",
+
+15,
+
+y
+
+);
+
+y+=8;
+
+doc.text(
+
+"Total dépenses : "+
+
+depenses.toLocaleString()+" FC",
+
+15,
+
+y
+
+);
+
+y+=8;
+
+doc.setTextColor(0,120,0);
+
+doc.setFontSize(14);
+
+doc.text(
+
+"Solde : "+
+
+solde.toLocaleString()+" FC",
+
+15,
+
+y
+
+);
+
+y+=18;
+
+doc.setTextColor(120);
+
+doc.setFontSize(10);
+
+doc.text(
+
+"Document généré par MASOMO",
+
+105,
+
+285,
+
+{align:"center"}
+
+);
+
+doc.save(
+
+"Rapport_Financier_"+
+
+new Date().getTime()+
+
+".pdf"
+
+);
+
+hideLoader();
+
+}catch(error){
+
+hideLoader();
+
+alert(error.message);
+
+}
+
+}
+
+async function exportFinanceExcel(){
+
+showLoader();
+
+try{
+
+let schoolId=window.currentSchoolId;
+
+let schoolSnap=await db.ref(
+"schools/"+schoolId
+).once("value");
+
+let school=schoolSnap.val()||{};
+
+let recettesSnap=await db.ref(
+"schools/"+schoolId+"/finance/recettes"
+).once("value");
+
+let depensesSnap=await db.ref(
+"schools/"+schoolId+"/finance/depenses"
+).once("value");
+
+let donnees=[];
+
+let totalRecettes=0;
+
+let totalDepenses=0;
+
+recettesSnap.forEach(item=>{
+
+let d=item.val();
+
+let montant=Number(d.montant)||0;
+
+totalRecettes+=montant;
+
+donnees.push({
+
+Type:"RECETTE",
+
+Date:d.date||"",
+
+Heure:d.heure||"",
+
+Categorie:d.categorie||"",
+
+Motif:d.motif||"",
+
+Montant:montant,
+
+Observation:d.observation||""
+
+});
+
+});
+
+depensesSnap.forEach(item=>{
+
+let d=item.val();
+
+let montant=Number(d.montant)||0;
+
+totalDepenses+=montant;
+
+donnees.push({
+
+Type:"DEPENSE",
+
+Date:d.date||"",
+
+Heure:d.heure||"",
+
+Categorie:d.categorie||"",
+
+Motif:d.motif||"",
+
+Montant:montant,
+
+Observation:d.observation||""
+
+});
+
+});
+
+donnees.push({});
+
+donnees.push({
+
+Type:"TOTAL RECETTES",
+
+Montant:totalRecettes
+
+});
+
+donnees.push({
+
+Type:"TOTAL DEPENSES",
+
+Montant:totalDepenses
+
+});
+
+donnees.push({
+
+Type:"SOLDE",
+
+Montant:totalRecettes-totalDepenses
+
+});
+
+let wb=XLSX.utils.book_new();
+
+let ws=XLSX.utils.json_to_sheet(donnees);
+
+XLSX.utils.book_append_sheet(
+
+wb,
+
+ws,
+
+"Rapport financier"
+
+);
+
+XLSX.writeFile(
+
+wb,
+
+"Finance_"+
+
+(school.schoolName||"MASOMO")+
+
+".xlsx"
+
+);
+
+hideLoader();
+
+alert("Export Excel terminé.");
+
+}
+
+catch(error){
+
+hideLoader();
+
+alert(error.message);
+
+}
+
+}
+
+async function printFinanceReport(){
+
+showLoader();
+
+try{
+
+let schoolId=window.currentSchoolId;
+
+let schoolSnap=await db.ref(
+"schools/"+schoolId
+).once("value");
+
+let school=schoolSnap.val()||{};
+
+let recettesSnap=await db.ref(
+"schools/"+schoolId+"/finance/recettes"
+).once("value");
+
+let depensesSnap=await db.ref(
+"schools/"+schoolId+"/finance/depenses"
+).once("value");
+
+let recettes=0;
+
+let depenses=0;
+
+let lignes="";
+
+recettesSnap.forEach(item=>{
+
+let d=item.val();
+
+let montant=Number(d.montant)||0;
+
+recettes+=montant;
+
+lignes+=`
+
+<tr>
+
+<td>Recette</td>
+
+<td>${d.date||""}</td>
+
+<td>${d.categorie||""}</td>
+
+<td>${d.motif||""}</td>
+
+<td style="text-align:right;">
+
+${montant.toLocaleString()} FC
+
+</td>
+
+</tr>
+
+`;
+
+});
+
+depensesSnap.forEach(item=>{
+
+let d=item.val();
+
+let montant=Number(d.montant)||0;
+
+depenses+=montant;
+
+lignes+=`
+
+<tr>
+
+<td>Dépense</td>
+
+<td>${d.date||""}</td>
+
+<td>${d.categorie||""}</td>
+
+<td>${d.motif||""}</td>
+
+<td style="text-align:right;">
+
+${montant.toLocaleString()} FC
+
+</td>
+
+</tr>
+
+`;
+
+});
+
+let solde=recettes-depenses;
+
+let w=window.open("","_blank");
+
+w.document.write(`
+
+<html>
+
+<head>
+
+<title>
+
+Rapport financier
+
+</title>
+
+<style>
+
+body{
+
+font-family:Arial;
+
+padding:25px;
+
+}
+
+h1,h2{
+
+text-align:center;
+
+}
+
+table{
+
+width:100%;
+
+border-collapse:collapse;
+
+margin-top:20px;
+
+}
+
+th,td{
+
+border:1px solid #000;
+
+padding:8px;
+
+font-size:13px;
+
+}
+
+th{
+
+background:#1f4cff;
+
+color:white;
+
+}
+
+.resume{
+
+margin-top:20px;
+
+padding:15px;
+
+border:2px solid #1f4cff;
+
+border-radius:10px;
+
+font-size:16px;
+
+}
+
+.footer{
+
+margin-top:40px;
+
+text-align:center;
+
+color:gray;
+
+font-size:12px;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>
+
+${school.schoolName||"MASOMO"}
+
+</h1>
+
+<h2>
+
+Rapport financier
+
+</h2>
+
+<p>
+
+Date :
+
+${new Date().toLocaleDateString()}
+
+</p>
+
+<div class="resume">
+
+<b>
+
+💰 Recettes :
+
+</b>
+
+${recettes.toLocaleString()} FC
+
+<br><br>
+
+<b>
+
+💸 Dépenses :
+
+</b>
+
+${depenses.toLocaleString()} FC
+
+<br><br>
+
+<b>
+
+💵 Solde :
+
+</b>
+
+${solde.toLocaleString()} FC
+
+</div>
+
+<table>
+
+<tr>
+
+<th>Type</th>
+
+<th>Date</th>
+
+<th>Catégorie</th>
+
+<th>Motif</th>
+
+<th>Montant</th>
+
+</tr>
+
+${lignes}
+
+</table>
+
+<div class="footer">
+
+Document généré automatiquement par MASOMO
+
+</div>
+
+</body>
+
+</html>
+
+`);
+
+w.document.close();
+
+hideLoader();
+
+w.print();
+
+}
+
+catch(error){
+
+hideLoader();
+
+alert(error.message);
+
+}
+
+}
+
+
+
+
+
+function historiqueFinance(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<style>
+
+.historyBox{
+
+padding:15px;
+
+}
+
+.historyTitle{
+
+text-align:center;
+
+font-size:26px;
+
+font-weight:bold;
+
+color:#1f4cff;
+
+margin-bottom:20px;
+
+}
+
+.backBtn{
+
+width:100%;
+
+padding:14px;
+
+border:none;
+
+border-radius:15px;
+
+background:#1f4cff;
+
+color:white;
+
+font-weight:bold;
+
+margin-bottom:15px;
+
+}
+
+.resume{
+
+display:grid;
+
+grid-template-columns:1fr 1fr;
+
+gap:10px;
+
+margin-bottom:20px;
+
+}
+
+.resumeCard{
+
+background:white;
+
+padding:15px;
+
+border-radius:15px;
+
+box-shadow:0 4px 12px rgba(0,0,0,.12);
+
+text-align:center;
+
+}
+
+.resumeCard h3{
+
+margin:0;
+
+font-size:14px;
+
+color:#666;
+
+}
+
+.resumeCard h2{
+
+margin-top:8px;
+
+color:#1f4cff;
+
+}
+
+.historyItem{
+
+background:white;
+
+padding:15px;
+
+border-radius:15px;
+
+margin-bottom:12px;
+
+box-shadow:0 4px 12px rgba(0,0,0,.12);
+
+}
+
+.green{
+
+color:#00c853;
+
+font-weight:bold;
+
+}
+
+.red{
+
+color:#e53935;
+
+font-weight:bold;
+
+}
+
+</style>
+
+<div class="historyBox">
+
+<button
+
+class="backBtn"
+
+onclick="pageFinance()">
+
+⬅ Retour
+
+</button>
+
+<div class="historyTitle">
+
+📜 Historique financier
+
+</div>
+
+<div class="resume">
+
+<div class="resumeCard">
+
+<h3>
+
+💰 Recettes
+
+</h3>
+
+<h2 id="histRecettes">
+
+0 FC
+
+</h2>
+
+</div>
+
+<div class="resumeCard">
+
+<h3>
+
+💸 Dépenses
+
+</h3>
+
+<h2 id="histDepenses">
+
+0 FC
+
+</h2>
+
+</div>
+
+<div class="resumeCard">
+
+<h3>
+
+💵 Solde
+
+</h3>
+
+<h2 id="histSolde">
+
+0 FC
+
+</h2>
+
+</div>
+
+<div class="resumeCard">
+
+<h3>
+
+📋 Opérations
+
+</h3>
+
+<h2 id="histNombre">
+
+0
+
+</h2>
+
+</div>
+
+</div>
+
+<div id="financeHistoriqueListe">
+
+Chargement...
+
+</div>
+
+</div>
+
+`;
+
+chargerHistoriqueFinance();
+
+}
+
+
+function chargerHistoriqueFinance(){
+
+let schoolId=window.currentSchoolId;
+
+Promise.all([
+
+db.ref(
+"schools/"+schoolId+"/finance/recettes"
+).once("value"),
+
+db.ref(
+"schools/"+schoolId+"/finance/depenses"
+).once("value")
+
+])
+
+.then(([recettesSnap,depensesSnap])=>{
+
+let liste=[];
+
+let recettes=0;
+
+let depenses=0;
+
+recettesSnap.forEach(item=>{
+
+let d=item.val();
+
+recettes+=Number(d.montant)||0;
+
+liste.push({
+
+type:"Recette",
+
+icon:"📥",
+
+color:"green",
+
+...d
+
+});
+
+});
+
+depensesSnap.forEach(item=>{
+
+let d=item.val();
+
+depenses+=Number(d.montant)||0;
+
+liste.push({
+
+type:"Dépense",
+
+icon:"📤",
+
+color:"red",
+
+...d
+
+});
+
+});
+
+liste.sort(function(a,b){
+
+return (b.createdAt||0)-(a.createdAt||0);
+
+});
+
+document.getElementById("histRecettes").innerHTML=
+recettes.toLocaleString()+" FC";
+
+document.getElementById("histDepenses").innerHTML=
+depenses.toLocaleString()+" FC";
+
+document.getElementById("histSolde").innerHTML=
+(recettes-depenses).toLocaleString()+" FC";
+
+document.getElementById("histNombre").innerHTML=
+liste.length;
+
+let html="";
+
+liste.forEach(op=>{
+
+html+=`
+
+<div class="historyItem">
+
+<div style="
+display:flex;
+justify-content:space-between;
+align-items:center;
+">
+
+<div>
+
+<h3>
+
+${op.icon} ${op.type}
+
+</h3>
+
+<b>
+
+${op.motif}
+
+</b>
+
+<br>
+
+${op.categorie}
+
+<br>
+
+${op.date}
+
+${op.heure}
+
+</div>
+
+<div class="${op.color}">
+
+${Number(op.montant).toLocaleString()} FC
+
+</div>
+
+</div>
+
+</div>
+
+`;
+
+});
+
+if(html===""){
+
+html="<center>Aucune opération enregistrée.</center>";
+
+}
+
+document.getElementById(
+
+"financeHistoriqueListe"
+
+).innerHTML=html;
+
+})
+
+.catch(error=>{
+
+alert(error.message);
+
+});
+
+}
+
+function ouvrirPreparations(){
+
+let html=`
+
+<button
+class="back-btn"
+onclick="openTeacher()">
+⬅ Retour
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+📑 Fiche de préparation
+</h2>
+
+<input
+id="prepCours"
+placeholder="Cours">
+
+<input
+id="prepClasse"
+placeholder="Classe">
+
+<input
+id="prepDate"
+type="date">
+
+<input
+id="prepDuree"
+placeholder="Durée (Ex : 2 heures)">
+
+<textarea
+id="prepObjectif"
+placeholder="Objectif de la leçon"
+style="
+width:100%;
+height:80px;
+margin-top:10px;
+"></textarea>
+
+<textarea
+id="prepMateriel"
+placeholder="Matériel didactique"
+style="
+width:100%;
+height:80px;
+margin-top:10px;
+"></textarea>
+
+<textarea
+id="prepDeroulement"
+placeholder="Déroulement de la leçon"
+style="
+width:100%;
+height:150px;
+margin-top:10px;
+"></textarea>
+
+<button
+onclick="enregistrerPreparation()">
+💾 Enregistrer
+</button>
+
+`;
+
+document.querySelector(".login-box").innerHTML=html;
+
+}
+
+function enregistrerPreparation(){
+
+showLoader();
+
+let data={
+
+cours:
+document.getElementById("prepCours").value.trim(),
+
+classe:
+document.getElementById("prepClasse").value.trim(),
+
+date:
+document.getElementById("prepDate").value,
+
+duree:
+document.getElementById("prepDuree").value.trim(),
+
+objectif:
+document.getElementById("prepObjectif").value.trim(),
+
+materiel:
+document.getElementById("prepMateriel").value.trim(),
+
+deroulement:
+document.getElementById("prepDeroulement").value.trim(),
+
+enseignant:
+window.currentPhone,
+
+createdAt:Date.now()
+
+};
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/preparations"
+).push(data)
+
+.then(()=>{
+
+hideLoader();
+
+alert("Fiche enregistrée.");
+
+ouvrirPreparations();
+
+})
+
+.catch(err=>{
+
+hideLoader();
+
+alert(err.message);
+
+});
+
+}
+
+function enregistrerPreparation(){
+
+showLoader();
+
+let id=db.ref().push().key;
+
+let data={
+
+id:id,
+
+cours:document.getElementById("prepCours").value.trim(),
+
+classe:document.getElementById("prepClasse").value.trim(),
+
+date:document.getElementById("prepDate").value,
+
+duree:document.getElementById("prepDuree").value.trim(),
+
+objectif:document.getElementById("prepObjectif").value.trim(),
+
+materiel:document.getElementById("prepMateriel").value.trim(),
+
+deroulement:document.getElementById("prepDeroulement").value.trim(),
+
+enseignant:window.currentPhone,
+
+nomEnseignant:window.currentUserName||"Enseignant",
+
+schoolId:window.currentSchoolId,
+
+statut:"En attente",
+
+createdAt:Date.now()
+
+};
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/preparations/"+id
+)
+
+.set(data)
+
+.then(()=>{
+
+return db.ref(
+"schools/"+window.currentSchoolId+
+"/notifications/admin/"+id
+)
+
+.set({
+
+type:"preparation",
+
+titre:"Nouvelle fiche de préparation",
+
+message:
+(data.nomEnseignant||"Un enseignant")+
+" a envoyé une fiche de préparation.",
+
+preparationId:id,
+
+enseignant:window.currentPhone,
+
+lu:false,
+
+createdAt:Date.now()
+
+});
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("Fiche envoyée à l'administration avec succès.");
+
+ouvrirPreparations();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function ouvrirPreparationsAdmin(){
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/preparations"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+let html=`
+
+<button
+class="back-btn"
+onclick="openAdmin()">
+⬅ Retour
+</button>
+
+<h2 style="text-align:center;color:#1f4cff;">
+📑 Fiches de préparation
+</h2>
+
+`;
+
+if(!snapshot.exists()){
+
+html+=`
+<div class="card">
+Aucune fiche disponible.
+</div>
+`;
+
+}else{
+
+snapshot.forEach(item=>{
+
+let p=item.val();
+
+html+=`
+
+<div class="card"
+onclick="voirPreparationAdmin('${item.key}')">
+
+<b>${p.cours}</b><br>
+
+👨‍🏫 ${p.nomEnseignant}<br>
+
+🏫 ${p.classe}<br>
+
+📅 ${p.date}<br>
+
+📌 ${p.statut}
+
+</div>
+
+`;
+
+});
+
+}
+
+document.querySelector(".login-box").innerHTML=html;
+
+});
+
+}
+
+function voirPreparationAdmin(id){
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/preparations/"+id
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+let p=snapshot.val();
+
+let html=`
+
+<button
+class="back-btn"
+onclick="ouvrirPreparationsAdmin()">
+⬅ Retour
+</button>
+
+<h2 style="text-align:center;color:#1f4cff;">
+📑 Fiche de préparation
+</h2>
+
+<div class="card">
+
+<b>👨‍🏫 Enseignant :</b><br>
+${p.nomEnseignant}<br><br>
+
+<b>📚 Cours :</b><br>
+${p.cours}<br><br>
+
+<b>🏫 Classe :</b><br>
+${p.classe}<br><br>
+
+<b>📅 Date :</b><br>
+${p.date}<br><br>
+
+<b>⏱ Durée :</b><br>
+${p.duree}<br><br>
+
+<b>🎯 Objectif</b><br>
+${p.objectif}<br><br>
+
+<b>📦 Matériel</b><br>
+${p.materiel}<br><br>
+
+<b>📝 Déroulement</b><br>
+${p.deroulement}<br><br>
+
+<b>📌 Statut :</b>
+${p.statut}
+
+</div>
+
+<textarea
+id="commentairePreparation"
+placeholder="Commentaire du directeur"
+style="
+width:100%;
+height:100px;
+margin-top:15px;
+"></textarea>
+
+<button
+onclick="validerPreparation('${id}')">
+
+✅ Valider
+
+</button>
+
+<button
+style="background:#ff9800;"
+onclick="corrigerPreparation('${id}')">
+
+✏ Demander une correction
+
+</button>
+
+`;
+
+document.querySelector(".login-box").innerHTML=html;
+
+});
+
+}
+
+function validerPreparation(id){
+
+showLoader();
+
+let commentaire=
+document.getElementById(
+"commentairePreparation"
+).value.trim();
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/preparations/"+id
+)
+
+.update({
+
+statut:"Validée",
+
+commentaire:commentaire,
+
+dateValidation:Date.now()
+
+})
+
+.then(()=>{
+
+return db.ref(
+"schools/"+window.currentSchoolId+
+"/preparations/"+id
+).once("value");
+
+})
+
+.then(snapshot=>{
+
+let p=snapshot.val();
+
+return db.ref(
+"schools/"+window.currentSchoolId+
+"/notifications/"+p.enseignant
+).push({
+
+type:"preparation",
+
+titre:"📑 Fiche validée",
+
+message:"Votre fiche '"+p.cours+"' a été validée.",
+
+lu:false,
+
+createdAt:Date.now()
+
+});
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("Fiche validée avec succès.");
+
+ouvrirPreparationsAdmin();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function corrigerPreparation(id){
+
+showLoader();
+
+let commentaire=
+document.getElementById(
+"commentairePreparation"
+).value.trim();
+
+if(commentaire==""){
+
+hideLoader();
+
+alert("Ajoutez un commentaire.");
+
+return;
+
+}
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/preparations/"+id
+)
+
+.update({
+
+statut:"À corriger",
+
+commentaire:commentaire,
+
+dateCorrection:Date.now()
+
+})
+
+.then(()=>{
+
+return db.ref(
+"schools/"+window.currentSchoolId+
+"/preparations/"+id
+).once("value");
+
+})
+
+.then(snapshot=>{
+
+let p=snapshot.val();
+
+return db.ref(
+"schools/"+window.currentSchoolId+
+"/notifications/"+p.enseignant
+).push({
+
+type:"preparation",
+
+titre:"✏ Correction demandée",
+
+message:"Votre fiche '"+p.cours+"' doit être corrigée.",
+
+commentaire:commentaire,
+
+lu:false,
+
+createdAt:Date.now()
+
+});
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("La demande de correction a été envoyée.");
+
+ouvrirPreparationsAdmin();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+
+function ouvrirPresence(){
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+"/classes"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+let html=`
+
+<button
+class="back-btn"
+onclick="openTeacher()">
+⬅ Retour
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+✅ Présence
+</h2>
+
+<p style="
+text-align:center;
+color:#666;
+">
+Choisissez une classe
+</p>
+
+`;
+
+if(!snapshot.exists()){
+
+html+=`
+
+<div class="card">
+Aucune classe trouvée.
+</div>
+
+`;
+
+}else{
+
+snapshot.forEach(item=>{
+
+let c=item.val();
+
+let nomClasse=
+typeof c==="string"
+? c
+: (c.nom||item.key);
+
+html+=`
+
+<button
+onclick="ouvrirPresenceClasse('${nomClasse}')">
+
+🏫 ${nomClasse}
+
+</button>
+
+`;
+
+});
+
+}
+
+document.querySelector(".login-box").innerHTML=html;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+}
+
+
+function ouvrirPresenceClasse(classeId){
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/students"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+let html=`
+
+<button
+class="back-btn"
+onclick="ouvrirPresence()">
+⬅ Retour
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+✅ Feuille de présence
+</h2>
+
+`;
+
+let trouve=false;
+
+snapshot.forEach(item=>{
+
+let e=item.val();
+
+if(e.className!=classeId)return;
+
+trouve=true;
+
+html+=`
+
+<div style="
+background:#fff;
+padding:15px;
+margin:12px 0;
+border-radius:15px;
+box-shadow:0 4px 10px rgba(0,0,0,.08);
+">
+
+<b>
+
+👤 ${e.nom||""}
+
+</b>
+
+<br><br>
+
+<label>
+
+<input
+type="radio"
+name="presence_${item.key}"
+value="Présent"
+checked>
+
+✅ Présent
+
+</label>
+
+&nbsp;&nbsp;
+
+<label>
+
+<input
+type="radio"
+name="presence_${item.key}"
+value="Absent">
+
+❌ Absent
+
+</label>
+
+<br><br>
+
+<label>
+
+<input
+type="radio"
+name="presence_${item.key}"
+value="Retard">
+
+⏰ Retard
+
+</label>
+
+&nbsp;&nbsp;
+
+<label>
+
+<input
+type="radio"
+name="presence_${item.key}"
+value="Malade">
+
+🏥 Malade
+
+</label>
+
+</div>
+
+`;
+
+});
+
+if(!trouve){
+
+html+=`
+
+<div class="card">
+
+Aucun élève dans cette classe.
+
+</div>
+
+`;
+
+}else{
+
+html+=`
+
+<button
+onclick="enregistrerPresence('${classeId}')">
+
+💾 Enregistrer les présences
+
+</button>
+
+`;
+
+}
+
+document.querySelector(".login-box").innerHTML=html;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+
+
+function ouvrirJournalClasse(){
+
+let html=`
+
+<button
+class="back-btn"
+onclick="openTeacher()">
+⬅ Retour
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;">
+📔 Journal de classe
+</h2>
+
+<input
+id="jcDate"
+type="date">
+
+<input
+id="jcClasse"
+placeholder="Classe">
+
+<input
+id="jcCours"
+placeholder="Cours">
+
+<input
+id="jcHeureDebut"
+type="time"
+placeholder="Heure de début">
+
+<input
+id="jcHeureFin"
+type="time"
+placeholder="Heure de fin">
+
+<textarea
+id="jcLecon"
+placeholder="Leçon enseignée"
+style="
+width:100%;
+height:100px;
+margin-top:10px;
+"></textarea>
+
+<textarea
+id="jcObservation"
+placeholder="Observations"
+style="
+width:100%;
+height:80px;
+margin-top:10px;
+"></textarea>
+
+<button
+onclick="enregistrerJournalClasse()">
+
+💾 Enregistrer
+
+</button>
+
+`;
+
+document.querySelector(".login-box").innerHTML=html;
+
+}
+
+function enregistrerJournalClasse(){
+
+showLoader();
+
+let id=db.ref().push().key;
+
+let data={
+
+id:id,
+
+date:document.getElementById("jcDate").value,
+
+classe:document.getElementById("jcClasse").value.trim(),
+
+cours:document.getElementById("jcCours").value.trim(),
+
+heureDebut:document.getElementById("jcHeureDebut").value,
+
+heureFin:document.getElementById("jcHeureFin").value,
+
+lecon:document.getElementById("jcLecon").value.trim(),
+
+observation:document.getElementById("jcObservation").value.trim(),
+
+enseignant:window.currentPhone,
+
+schoolId:window.currentSchoolId,
+
+createdAt:Date.now()
+
+};
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/journalClasse/"+id
+)
+
+.set(data)
+
+.then(()=>{
+
+hideLoader();
+
+alert("Journal enregistré avec succès.");
+
+ouvrirJournalClasse();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+
+function ouvrirCahierTexte(){
+
+let html=`
+
+<button
+class="back-btn"
+onclick="openTeacher()">
+⬅ Retour
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;">
+📚 Cahier de texte
+</h2>
+
+<input
+id="ctDate"
+type="date">
+
+<select id="ctClasse">
+<option value="">🏫 Choisir une classe</option>
+</select>
+
+<input
+id="ctMatiere"
+placeholder="📖 Matière">
+
+<input
+id="ctTitre"
+placeholder="📝 Titre de la leçon">
+
+<textarea
+id="ctResume"
+placeholder="Résumé du cours..."
+style="
+width:100%;
+height:120px;
+margin-top:10px;
+"></textarea>
+
+<textarea
+id="ctDevoir"
+placeholder="✍ Devoir à domicile (facultatif)"
+style="
+width:100%;
+height:80px;
+margin-top:10px;
+"></textarea>
+
+<input
+id="ctDateRemise"
+type="date">
+
+<textarea
+id="ctRemarque"
+placeholder="Remarque (facultatif)"
+style="
+width:100%;
+height:70px;
+margin-top:10px;
+"></textarea>
+
+<button
+onclick="publierCahierTexte()">
+
+📤 Publier
+
+</button>
+
+`;
+
+document.querySelector(".login-box").innerHTML=html;
+
+db.ref(
+"schools/"+window.currentSchoolId+"/classes"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let select=document.getElementById("ctClasse");
+
+snapshot.forEach(item=>{
+
+let c=item.val();
+
+let nom=typeof c==="string"
+?c
+:(c.nom||item.key);
+
+select.innerHTML+=`
+<option value="${nom}">
+${nom}
+</option>
+`;
+
+});
+
+});
+
+}
+
+function publierCahierTexte(){
+
+showLoader();
+
+let id=db.ref().push().key;
+
+let data={
+
+id:id,
+
+date:document.getElementById("ctDate").value,
+
+classe:document.getElementById("ctClasse").value,
+
+matiere:document.getElementById("ctMatiere").value.trim(),
+
+titre:document.getElementById("ctTitre").value.trim(),
+
+resume:document.getElementById("ctResume").value.trim(),
+
+devoir:document.getElementById("ctDevoir").value.trim(),
+
+dateRemise:
+document.getElementById("ctDateRemise").value,
+
+remarque:
+document.getElementById("ctRemarque").value.trim(),
+
+enseignant:window.currentPhone,
+
+schoolId:window.currentSchoolId,
+
+createdAt:Date.now()
+
+};
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/cahierTexte/"+id
+)
+
+.set(data)
+
+.then(()=>{
+
+return db.ref(
+"schools/"+window.currentSchoolId+
+"/notifications/cahierTexte"
+).push({
+
+type:"cahierTexte",
+
+titre:"📚 Nouveau cahier de texte",
+
+message:
+"Un nouveau cours a été publié pour la classe "+data.classe+".",
+
+lu:false,
+
+createdAt:Date.now()
+
+});
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("Cahier de texte publié avec succès.");
+
+ouvrirCahierTexte();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+function ouvrirBulletins(){
+
+let html=`
+
+<button
+class="back-btn"
+onclick="openTeacher()">
+⬅ Retour
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;">
+📄 Bulletins
+</h2>
+
+<button
+onclick="bulletinsClasse()">
+
+📄 Générer les bulletins
+
+</button>
+
+<button
+onclick="consulterBulletins()">
+
+👁 Consulter les bulletins
+
+</button>
+
+<button
+onclick="historiqueBulletins()">
+
+🗂 Historique
+
+</button>
+
+<button
+onclick="statistiquesNotes()">
+
+📊 Statistiques des notes
+
+</button>
+
+<button
+onclick="publierBulletins()">
+
+📤 Publier les bulletins
+
+</button>
+
+<button onclick="configurerBulletins()">
+⚙️ Configuration des bulletins
+</button>
+
+<button onclick="palmaresClasse()">
+🏆 Palmarès de la classe
+</button>
+
+`;
+
+document.querySelector(".login-box").innerHTML=html;
+
+}
+
+function consulterBulletins(){
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/bulletins"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+let html=`
+
+<button
+class="back-btn"
+onclick="ouvrirBulletins()">
+⬅ Retour
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;">
+👁 Bulletins publiés
+</h2>
+
+`;
+
+if(!snapshot.exists()){
+
+html+=`
+
+<div class="card">
+
+Aucun bulletin disponible.
+
+</div>
+
+`;
+
+}else{
+
+snapshot.forEach(item=>{
+
+let b=item.val();
+
+html+=`
+
+<div
+class="card"
+onclick="ouvrirBulletin('${item.key}')">
+
+<h3>
+
+👤 ${b.nom||"-"}
+
+</h3>
+
+Classe :
+${b.classe||"-"}
+
+<br>
+
+Période :
+${b.periode||"-"}
+
+<br>
+
+Moyenne :
+${b.moyenne||0}/20
+
+<br>
+
+Mention :
+${b.mention||"-"}
+
+</div>
+
+`;
+
+});
+
+}
+
+document.querySelector(".login-box").innerHTML=html;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function historiqueBulletins(){
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/bulletins"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+let total=0;
+
+let html=`
+
+<button
+class="back-btn"
+onclick="ouvrirBulletins()">
+⬅ Retour
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;">
+🗂 Historique des bulletins
+</h2>
+
+`;
+
+snapshot.forEach(item=>{
+
+total++;
+
+let b=item.val();
+
+html+=`
+
+<div class="card">
+
+📄 ${b.nom}
+
+<br>
+
+🏫 ${b.classe}
+
+<br>
+
+📅 ${b.periode}
+
+</div>
+
+`;
+
+});
+
+html+=`
+
+<div class="card">
+
+<b>
+
+Total :
+
+${total} bulletin(s)
+
+</b>
+
+</div>
+
+`;
+
+document.querySelector(".login-box").innerHTML=html;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function publierBulletins(){
+
+if(!confirm(
+"Publier les bulletins à tous les élèves et parents ?"
+)){
+return;
+}
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+"/students"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let promesses=[];
+
+snapshot.forEach(item=>{
+
+let eleve=item.val();
+
+let notification={
+
+type:"bulletin",
+
+titre:"📄 Bulletin disponible",
+
+message:
+"Votre bulletin est maintenant disponible.",
+
+eleveId:item.key,
+
+lu:false,
+
+createdAt:Date.now()
+
+};
+
+// Notification élève
+if(eleve.phone){
+
+promesses.push(
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/notifications/"+eleve.phone
+)
+
+.push(notification)
+
+);
+
+}
+
+// Notification parent
+if(eleve.parentPhone){
+
+promesses.push(
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/notifications/"+eleve.parentPhone
+)
+
+.push(notification)
+
+);
+
+}
+
+});
+
+return Promise.all(promesses);
+
+})
+
+.then(()=>{
+
+return db.ref(
+"schools/"+window.currentSchoolId+
+"/bulletinsPublies"
+)
+
+.set({
+
+publie:true,
+
+datePublication:Date.now(),
+
+publiePar:window.currentPhone
+
+});
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert(
+"Les bulletins ont été publiés avec succès."
+);
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function configurerBulletins(){
+
+let html=`
+
+<button
+class="back-btn"
+onclick="ouvrirBulletins()">
+⬅ Retour
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+⚙️ Configuration des bulletins
+
+</h2>
+
+<label>Période</label>
+
+<select id="periodeBulletin">
+
+<option>1er Trimestre</option>
+
+<option>2ème Trimestre</option>
+
+<option>3ème Trimestre</option>
+
+<option>1er Semestre</option>
+
+<option>2ème Semestre</option>
+
+<option>Annuel</option>
+
+</select>
+
+<label>Année scolaire</label>
+
+<input
+id="anneeScolaire"
+placeholder="2026-2027">
+
+<label>Moyenne de réussite</label>
+
+<input
+id="moyenneReussite"
+type="number"
+value="10">
+
+<label>Signature du directeur</label>
+
+<input
+id="directeurNom"
+placeholder="Nom du directeur">
+
+<label>Signature du titulaire</label>
+
+<input
+id="titulaireNom"
+placeholder="Nom du titulaire">
+
+<button
+onclick="enregistrerConfigBulletin()">
+
+💾 Enregistrer
+
+</button>
+
+`;
+
+document.querySelector(".login-box").innerHTML=html;
+
+}
+
+function enregistrerConfigBulletin(){
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/configurationBulletins"
+)
+
+.set({
+
+periode:
+document.getElementById("periodeBulletin").value,
+
+annee:
+document.getElementById("anneeScolaire").value.trim(),
+
+moyenne:
+parseFloat(
+document.getElementById("moyenneReussite").value
+)||10,
+
+directeur:
+document.getElementById("directeurNom").value.trim(),
+
+titulaire:
+document.getElementById("titulaireNom").value.trim(),
+
+updatedAt:Date.now()
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("Configuration enregistrée.");
+
+ouvrirBulletins();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function palmaresClasse(){
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+"/bulletins"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+let liste=[];
+
+snapshot.forEach(item=>{
+
+let b=item.val();
+
+liste.push({
+
+nom:b.nom||"-",
+
+classe:b.classe||"-",
+
+moyenne:parseFloat(b.moyenne)||0,
+
+mention:b.mention||"-"
+
+});
+
+});
+
+liste.sort((a,b)=>b.moyenne-a.moyenne);
+
+let html=`
+
+<button
+class="back-btn"
+onclick="ouvrirBulletins()">
+⬅ Retour
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;">
+🏆 Palmarès
+</h2>
+
+`;
+
+if(liste.length==0){
+
+html+=`
+
+<div class="card">
+
+Aucun bulletin disponible.
+
+</div>
+
+`;
+
+}else{
+
+liste.forEach((e,index)=>{
+
+let medal="🎖";
+
+if(index==0) medal="🥇";
+else if(index==1) medal="🥈";
+else if(index==2) medal="🥉";
+
+html+=`
+
+<div class="card">
+
+<h3>
+
+${medal} ${index+1}. ${e.nom}
+
+</h3>
+
+🏫 ${e.classe}<br>
+
+📊 Moyenne : <b>${e.moyenne}/20</b><br>
+
+🏅 ${e.mention}
+
+</div>
+
+`;
+
+});
+
+}
+
+document.querySelector(".login-box").innerHTML=html;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function ouvrirTableauBordEnseignant(){
+
+showLoader();
+
+Promise.all([
+
+db.ref(
+"schools/"+window.currentSchoolId+"/students"
+).once("value"),
+
+db.ref(
+"schools/"+window.currentSchoolId+"/preparations"
+).once("value"),
+
+db.ref(
+"schools/"+window.currentSchoolId+"/cahierTexte"
+).once("value"),
+
+db.ref(
+"schools/"+window.currentSchoolId+"/notifications/"+window.currentPhone
+).once("value")
+
+])
+
+.then(([students,preparations,cahiers,notifications])=>{
+
+hideLoader();
+
+let nbEleves=students.numChildren();
+
+let nbPreparations=0;
+let nbValidees=0;
+let nbCorrection=0;
+
+preparations.forEach(item=>{
+
+let p=item.val();
+
+if(p.enseignant!=window.currentPhone)return;
+
+nbPreparations++;
+
+if(p.statut=="Validée"){
+nbValidees++;
+}
+
+if(p.statut=="À corriger"){
+nbCorrection++;
+}
+
+});
+
+let nbCahiers=0;
+
+cahiers.forEach(item=>{
+
+let c=item.val();
+
+if(c.enseignant==window.currentPhone){
+
+nbCahiers++;
+
+}
+
+});
+
+let nbNotifications=0;
+
+notifications.forEach(item=>{
+
+if(item.val().lu!==true){
+
+nbNotifications++;
+
+}
+
+});
+
+let html=`
+
+<button
+class="back-btn"
+onclick="openTeacher()">
+⬅ Retour
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;">
+📊 Tableau de bord
+</h2>
+
+<div style="
+display:grid;
+grid-template-columns:repeat(2,1fr);
+gap:12px;
+margin-top:15px;
+">
+
+<div class="card">
+<h3>👨‍🎓</h3>
+<b>${nbEleves}</b><br>
+Élèves
+</div>
+
+<div class="card">
+<h3>📑</h3>
+<b>${nbPreparations}</b><br>
+Préparations
+</div>
+
+<div class="card">
+<h3>✅</h3>
+<b>${nbValidees}</b><br>
+Validées
+</div>
+
+<div class="card">
+<h3>✏️</h3>
+<b>${nbCorrection}</b><br>
+À corriger
+</div>
+
+<div class="card">
+<h3>📚</h3>
+<b>${nbCahiers}</b><br>
+Cahiers de texte
+</div>
+
+<div class="card">
+<h3>🔔</h3>
+<b>${nbNotifications}</b><br>
+Notifications
+</div>
+
+</div>
+
+`;
+
+document.querySelector(".login-box").innerHTML=html;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+
+function ouvrirStatistiquesClasse(){
+
+showLoader();
+
+Promise.all([
+
+db.ref(
+"schools/"+window.currentSchoolId+"/students"
+).once("value"),
+
+db.ref(
+"schools/"+window.currentSchoolId+"/notes"
+).once("value"),
+
+db.ref(
+"schools/"+window.currentSchoolId+"/presences"
+).once("value")
+
+])
+
+.then(([students,notes,presences])=>{
+
+hideLoader();
+
+let nbEleves=students.numChildren();
+
+let nbNotes=0;
+
+notes.forEach(eleve=>{
+
+eleve.forEach(note=>{
+
+nbNotes++;
+
+});
+
+});
+
+let nbPresences=0;
+
+presences.forEach(date=>{
+
+date.forEach(classe=>{
+
+classe.forEach(eleve=>{
+
+nbPresences++;
+
+});
+
+});
+
+});
+
+let html=`
+
+<button
+class="back-btn"
+onclick="openTeacher()">
+⬅ Retour
+</button>
+
+<h2 style="
+text-align:center;
+color:#1f4cff;">
+📊 Statistiques de la classe
+</h2>
+
+<div class="card">
+<h3>👨‍🎓 Élèves</h3>
+<p>${nbEleves}</p>
+</div>
+
+<div class="card">
+<h3>📝 Notes enregistrées</h3>
+<p>${nbNotes}</p>
+</div>
+
+<div class="card">
+<h3>✅ Présences enregistrées</h3>
+<p>${nbPresences}</p>
+</div>
+
+`;
+
+document.querySelector(".login-box").innerHTML=html;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function chargerClassesModification(){
+
+let select=document.getElementById("classeModification");
+
+if(!select) return;
+
+select.innerHTML='<option value="">Choisir une classe</option>';
+
+db.ref("schools/"+schoolId+"/classes")
+.once("value")
+.then(snapshot=>{
+
+snapshot.forEach(child=>{
+
+let classe=child.val();
+
+let option=document.createElement("option");
+
+option.value=child.key;
+
+option.textContent=classe.nom || child.key;
+
+select.appendChild(option);
+
+});
+
+});
+
+}
+
+function chargerNotesModification(){
+
+let classe=document.getElementById("classeModification").value;
+
+let tbody=document.getElementById("listeNotesModification");
+
+if(!tbody) return;
+
+tbody.innerHTML="";
+
+if(!classe) return;
+
+db.ref("schools/"+schoolId+"/notes/"+classe)
+.once("value")
+.then(snapshot=>{
+
+snapshot.forEach(eleve=>{
+
+let note=eleve.val();
+
+tbody.innerHTML+=`
+<tr>
+<td>${note.matricule||""}</td>
+<td>${note.nom||""}</td>
+<td>${note.cours||""}</td>
+<td>${note.note||0}</td>
+<td>
+<button onclick="modifierNote('${classe}','${eleve.key}')">
+✏️
+</button>
+</td>
+</tr>
+`;
+
+});
+
+});
+
+}
+
+function historiquePaiementPersonnel(){
+
+showLoader();
+
+let zone=document.getElementById("historiquePaiementPersonnel");
+
+if(!zone){
+
+hideLoader();
+
+return;
+
+}
+
+zone.innerHTML="";
+
+db.ref("schools/"+schoolId+"/finance/paiementsPersonnel")
+.once("value")
+.then(snapshot=>{
+
+if(!snapshot.exists()){
+
+zone.innerHTML="<p>Aucun paiement enregistré.</p>";
+
+hideLoader();
+
+return;
+
+}
+
+snapshot.forEach(child=>{
+
+let p=child.val();
+
+zone.innerHTML+=`
+
+<div class="card">
+
+<b>${p.nom}</b><br>
+
+Montant :
+${formatMoney(p.montantPaye||0)}<br>
+
+Prime :
+${formatMoney(p.prime||0)}<br>
+
+Avance :
+${formatMoney(p.avance||0)}<br>
+
+Reste :
+${formatMoney(p.reste||0)}<br>
+
+Statut :
+${p.statut}<br>
+
+${p.date||""}
+
+</div>
+
+`;
+
+});
+
+hideLoader();
+
+});
+
+}
+
+function openNotes(){
+
+pageNotes();
+
+setTimeout(()=>{
+
+if(typeof chargerClassesNotes==="function"){
+
+chargerClassesNotes();
+
+}
+
+if(typeof chargerClassesConsultation==="function"){
+
+chargerClassesConsultation();
+
+}
+
+if(typeof chargerClassesModification==="function"){
+
+chargerClassesModification();
+
+}
+
+},300);
+
+}
+
+function enregistrerPresence(){
+
+let classe=document.getElementById("classePresence").value;
+
+let matricule=document.getElementById("matriculePresence").value;
+
+let statut=document.getElementById("statutPresence").value;
+
+if(!classe||!matricule){
+
+alert("Complète tous les champs.");
+
+return;
+
+}
+
+showLoader();
+
+let data={
+
+matricule:matricule,
+
+classe:classe,
+
+statut:statut,
+
+date:new Date().toLocaleDateString(),
+
+heure:new Date().toLocaleTimeString(),
+
+timestamp:Date.now()
+
+};
+
+db.ref("schools/"+schoolId+"/presences/"+classe+"/"+matricule+"/"+Date.now())
+
+.set(data)
+
+.then(()=>{
+
+hideLoader();
+
+alert("Présence enregistrée.");
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function supprimerTeacher(id){
+
+if(!confirm("Supprimer cet enseignant ?")){
+
+return;
+
+}
+
+showLoader();
+
+db.ref("schools/"+schoolId+"/teachers/"+id)
+
+.remove()
+
+.then(()=>{
+
+hideLoader();
+
+alert("Enseignant supprimé.");
+
+if(typeof loadTeachers==="function"){
+
+loadTeachers();
+
+}
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function telechargerExcelTeacher(){
+
+let table=document.getElementById("tableEns");
+
+if(!table){
+
+alert("Tableau des enseignants introuvable.");
+
+return;
+
+}
+
+let wb=XLSX.utils.table_to_book(table,{sheet:"Enseignants"});
+
+XLSX.writeFile(wb,"Enseignants.xlsx");
+
+}
+
+function telechargerPDFTeacher(){
+
+let table=document.getElementById("tableEns");
+
+if(!table){
+
+alert("Tableau des enseignants introuvable.");
+
+return;
+
+}
+
+html2canvas(table).then(canvas=>{
+
+const pdf=new jspdf.jsPDF("p","mm","a4");
+
+let img=canvas.toDataURL("image/png");
+
+let largeur=190;
+
+let hauteur=canvas.height*largeur/canvas.width;
+
+pdf.addImage(img,"PNG",10,10,largeur,hauteur);
+
+pdf.save("Enseignants.pdf");
+
+});
+
+}
+
+function telechargerWordTeacher(){
+
+let table=document.getElementById("tableEns");
+
+if(!table){
+
+alert("Tableau des enseignants introuvable.");
+
+return;
+
+}
+
+let html=`
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Enseignants</title>
+</head>
+<body>
+<h2>Liste des enseignants</h2>
+${table.outerHTML}
+</body>
+</html>
+`;
+
+let blob=new Blob(
+["\ufeff",html],
+{
+type:"application/msword"
+}
+);
+
+let lien=document.createElement("a");
+
+lien.href=URL.createObjectURL(blob);
+
+lien.download="Enseignants.doc";
+
+document.body.appendChild(lien);
+
+lien.click();
+
+document.body.removeChild(lien);
+
+}
+
+
+function ouvrirAbsences(){
+
+pageAbsences();
+
+setTimeout(()=>{
+
+if(typeof chargerClassesPresence==="function"){
+
+chargerClassesPresence();
+
+}
+
+if(typeof chargerAbsences==="function"){
+
+chargerAbsences();
+
+}
+
+},300);
+
+}
+
+function pageAbsences(){
+
+document.getElementById("content").innerHTML=`
+
+<div class="page">
+
+<h2>🚫 Gestion des absences</h2>
+
+<div class="card">
+
+<label>Classe</label>
+
+<select id="classePresence"
+onchange="chargerAbsences()">
+<option value="">Choisir une classe</option>
+</select>
+
+</div>
+
+<div class="card">
+
+<input
+type="text"
+id="rechercheAbsence"
+placeholder="🔍 Rechercher un élève..."
+onkeyup="rechercherAbsence()">
+
+</div>
+
+<div class="card">
+
+<table id="tableAbsences">
+
+<thead>
+
+<tr>
+
+<th>Matricule</th>
+
+<th>Nom</th>
+
+<th>Classe</th>
+
+<th>Date</th>
+
+<th>Heure</th>
+
+<th>Statut</th>
+
+</tr>
+
+</thead>
+
+<tbody id="listeAbsences">
+
+<tr>
+
+<td colspan="6"
+style="text-align:center">
+
+Aucune absence
+
+</td>
+
+</tr>
+
+</tbody>
+
+</table>
+
+</div>
+
+<div class="card">
+
+<button
+class="btn"
+onclick="telechargerExcelAbsences()">
+
+📗 Excel
+
+</button>
+
+<button
+class="btn"
+onclick="telechargerPDFAbsences()">
+
+📄 PDF
+
+</button>
+
+<button
+class="btn"
+onclick="window.print()">
+
+🖨 Imprimer
+
+</button>
+
+</div>
+
+</div>
+
+`;
+
+chargerClassesPresence();
+
+}
+
+function chargerAbsences(){
+
+let classe=document.getElementById("classePresence").value;
+
+let tbody=document.getElementById("listeAbsences");
+
+tbody.innerHTML="";
+
+if(!classe){
+
+tbody.innerHTML="<tr><td colspan='6'>Choisissez une classe.</td></tr>";
+
+return;
+
+}
+
+showLoader();
+
+db.ref("schools/"+schoolId+"/presences/"+classe)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+if(!snapshot.exists()){
+
+tbody.innerHTML="<tr><td colspan='6'>Aucune absence enregistrée.</td></tr>";
+
+return;
+
+}
+
+let vide=true;
+
+snapshot.forEach(eleve=>{
+
+eleve.forEach(jour=>{
+
+let p=jour.val();
+
+if(p.statut==="Absent"){
+
+vide=false;
+
+tbody.innerHTML+=`
+
+<tr>
+
+<td>${p.matricule||""}</td>
+
+<td>${p.nom||""}</td>
+
+<td>${p.classe||classe}</td>
+
+<td>${p.date||""}</td>
+
+<td>${p.heure||""}</td>
+
+<td style="color:red;font-weight:bold;">🚫 ${p.statut}</td>
+
+</tr>
+
+`;
+
+}
+
+});
+
+});
+
+if(vide){
+
+tbody.innerHTML="<tr><td colspan='6'>Aucun absent.</td></tr>";
+
+}
+
+});
+
+}
+
+function rechercherAbsence(){
+
+let filtre=document
+.getElementById("rechercheAbsence")
+.value
+.toUpperCase();
+
+let lignes=document
+.querySelectorAll("#listeAbsences tr");
+
+lignes.forEach(ligne=>{
+
+ligne.style.display=
+
+ligne.innerText.toUpperCase().includes(filtre)
+
+?
+
+""
+
+:
+
+"none";
+
+});
+
+}
+
+function telechargerExcelAbsences(){
+
+let table=document.getElementById("tableAbsences");
+
+if(!table){
+
+alert("Tableau introuvable.");
+
+return;
+
+}
+
+let wb=XLSX.utils.table_to_book(table,{sheet:"Absences"});
+
+XLSX.writeFile(wb,"Absences.xlsx");
+
+}
+
+function telechargerPDFAbsences(){
+
+let table=document.getElementById("tableAbsences");
+
+html2canvas(table).then(canvas=>{
+
+const pdf=new jspdf.jsPDF("p","mm","a4");
+
+let img=canvas.toDataURL("image/png");
+
+let largeur=190;
+
+let hauteur=canvas.height*largeur/canvas.width;
+
+pdf.addImage(img,"PNG",10,10,largeur,hauteur);
+
+pdf.save("Absences.pdf");
+
+});
+
+}
+
+function enregistrerAbsence(matricule,nom,classe){
+
+let data={
+
+matricule:matricule,
+
+nom:nom,
+
+classe:classe,
+
+statut:"Absent",
+
+date:new Date().toLocaleDateString(),
+
+heure:new Date().toLocaleTimeString(),
+
+timestamp:Date.now()
+
+};
+
+db.ref("schools/"+schoolId+"/presences/"+classe+"/"+matricule+"/"+Date.now())
+
+.set(data)
+
+.then(()=>{
+
+chargerAbsences();
+
+});
+
+}
+
+
+
+function ouvrirCalendrierExamens(){
+
+document.getElementById("content").innerHTML=`
+
+<div class="page">
+
+<h2>📅 Calendrier des examens</h2>
+
+<div class="card">
+
+<label>Classe</label>
+
+<select id="classeCalendrier">
+<option value="">Choisir une classe</option>
+</select>
+
+<label>Date</label>
+
+<input
+type="date"
+id="dateExamen">
+
+<label>Cours</label>
+
+<input
+type="text"
+id="coursExamen"
+placeholder="Nom du cours">
+
+<label>Heure</label>
+
+<input
+type="time"
+id="heureExamen">
+
+<label>Lieu</label>
+
+<input
+type="text"
+id="lieuExamen"
+placeholder="Salle ou lieu">
+
+<button
+class="btn"
+onclick="enregistrerCalendrierExamen()">
+
+💾 Enregistrer
+
+</button>
+
+</div>
+
+<div class="card">
+
+<h3>Examens programmés</h3>
+
+<table id="tableCalendrierExamens">
+
+<thead>
+
+<tr>
+
+<th>Classe</th>
+
+<th>Date</th>
+
+<th>Heure</th>
+
+<th>Cours</th>
+
+<th>Lieu</th>
+
+</tr>
+
+</thead>
+
+<tbody id="listeCalendrierExamens">
+
+<tr>
+
+<td colspan="5"
+style="text-align:center;">
+
+Aucun examen programmé.
+
+</td>
+
+</tr>
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+`;
+
+if(typeof chargerClassesCalendrier==="function"){
+
+chargerClassesCalendrier();
+
+}else if(typeof chargerClasses==="function"){
+
+chargerClasses("classeCalendrier");
+
+}
+
+if(typeof chargerCalendrierExamens==="function"){
+
+chargerCalendrierExamens();
+
+}
+
+}
+
+function chargerClassesCalendrier(){
+
+let select=document.getElementById("classeCalendrier");
+
+if(!select) return;
+
+select.innerHTML='<option value="">Choisir une classe</option>';
+
+db.ref("schools/"+schoolId+"/classes")
+
+.once("value")
+
+.then(snapshot=>{
+
+snapshot.forEach(child=>{
+
+let classe=child.val();
+
+let option=document.createElement("option");
+
+option.value=child.key;
+
+option.textContent=classe.nom||child.key;
+
+select.appendChild(option);
+
+});
+
+});
+
+}
+
+function enregistrerCalendrierExamen(){
+
+let classe=document.getElementById("classeCalendrier").value;
+
+let date=document.getElementById("dateExamen").value;
+
+let heure=document.getElementById("heureExamen").value;
+
+let cours=document.getElementById("coursExamen").value.trim();
+
+let lieu=document.getElementById("lieuExamen").value.trim();
+
+if(!classe||!date||!heure||!cours){
+
+alert("Complète tous les champs.");
+
+return;
+
+}
+
+showLoader();
+
+let id=db.ref("schools/"+schoolId+"/calendrierExamens").push().key;
+
+db.ref("schools/"+schoolId+"/calendrierExamens/"+id)
+
+.set({
+
+id:id,
+
+classe:classe,
+
+date:date,
+
+heure:heure,
+
+cours:cours,
+
+lieu:lieu,
+
+timestamp:Date.now()
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("Examen enregistré.");
+
+document.getElementById("coursExamen").value="";
+
+document.getElementById("lieuExamen").value="";
+
+chargerCalendrierExamens();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function chargerCalendrierExamens(){
+
+let tbody=document.getElementById("listeCalendrierExamens");
+
+if(!tbody) return;
+
+tbody.innerHTML="";
+
+db.ref("schools/"+schoolId+"/calendrierExamens")
+
+.once("value")
+
+.then(snapshot=>{
+
+if(!snapshot.exists()){
+
+tbody.innerHTML=`
+<tr>
+<td colspan="5" style="text-align:center;">
+Aucun examen programmé.
+</td>
+</tr>
+`;
+
+return;
+
+}
+
+snapshot.forEach(child=>{
+
+let e=child.val();
+
+tbody.innerHTML+=`
+
+<tr>
+
+<td>${e.classe||""}</td>
+
+<td>${e.date||""}</td>
+
+<td>${e.heure||""}</td>
+
+<td>${e.cours||""}</td>
+
+<td>${e.lieu||""}</td>
+
+</tr>
+
+`;
+
+});
+
+});
+
+}
+
+
+
+function ouvrirDocumentsPedagogiques(){
+
+document.getElementById("content").innerHTML=`
+
+<div class="page">
+
+<h2>📚 Documents pédagogiques</h2>
+
+<div class="card">
+
+<label>Classe</label>
+
+<select id="classeDocument">
+<option value="">Choisir une classe</option>
+</select>
+
+<label>Titre du document</label>
+
+<input
+type="text"
+id="titreDocument"
+placeholder="Ex : Cours de Mathématiques">
+
+<label>Description</label>
+
+<textarea
+id="descriptionDocument"
+placeholder="Description du document"></textarea>
+
+<label>Fichier</label>
+
+<input
+type="file"
+id="fichierDocument"
+accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png">
+
+<br><br>
+
+<button
+class="btn"
+onclick="enregistrerDocumentPedagogique()">
+
+💾 Enregistrer
+
+</button>
+
+</div>
+
+<div class="card">
+
+<h3>Documents enregistrés</h3>
+
+<table id="tableDocumentsPedagogiques">
+
+<thead>
+
+<tr>
+
+<th>Classe</th>
+
+<th>Titre</th>
+
+<th>Description</th>
+
+<th>Document</th>
+
+<th>Actions</th>
+
+</tr>
+
+</thead>
+
+<tbody id="listeDocumentsPedagogiques">
+
+<tr>
+
+<td colspan="5" style="text-align:center;">
+
+Aucun document disponible.
+
+</td>
+
+</tr>
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+`;
+
+if(typeof chargerClassesDocuments==="function"){
+
+chargerClassesDocuments();
+
+}
+
+if(typeof chargerDocumentsPedagogiques==="function"){
+
+chargerDocumentsPedagogiques();
+
+}
+
+}
+
+function chargerClassesDocuments(){
+
+let select=document.getElementById("classeDocument");
+
+if(!select) return;
+
+select.innerHTML='<option value="">Choisir une classe</option>';
+
+db.ref("schools/"+schoolId+"/classes")
+
+.once("value")
+
+.then(snapshot=>{
+
+snapshot.forEach(child=>{
+
+let classe=child.val();
+
+let option=document.createElement("option");
+
+option.value=child.key;
+
+option.textContent=classe.nom||child.key;
+
+select.appendChild(option);
+
+});
+
+});
+
+}
+
+
+function enregistrerDocumentPedagogique(){
+
+let classe=document.getElementById("classeDocument").value;
+
+let cours=document.getElementById("coursDocument").value.trim();
+
+let titre=document.getElementById("titreDocument").value.trim();
+
+let fichier=document.getElementById("fichierDocument").files[0];
+
+if(!classe||!cours||!titre){
+
+alert("Complète tous les champs.");
+
+return;
+
+}
+
+showLoader();
+
+let id=db.ref("schools/"+schoolId+"/documentsPedagogiques").push().key;
+
+db.ref("schools/"+schoolId+"/documentsPedagogiques/"+id)
+
+.set({
+
+id:id,
+
+classe:classe,
+
+cours:cours,
+
+titre:titre,
+
+nomFichier:fichier?fichier.name:"Aucun fichier",
+
+date:new Date().toLocaleDateString(),
+
+timestamp:Date.now()
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("Document enregistré.");
+
+document.getElementById("titreDocument").value="";
+
+document.getElementById("coursDocument").value="";
+
+document.getElementById("fichierDocument").value="";
+
+chargerDocumentsPedagogiques();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function chargerDocumentsPedagogiques(){
+
+let tbody=document.getElementById("listeDocuments");
+
+if(!tbody) return;
+
+tbody.innerHTML="";
+
+db.ref("schools/"+schoolId+"/documentsPedagogiques")
+
+.once("value")
+
+.then(snapshot=>{
+
+if(!snapshot.exists()){
+
+tbody.innerHTML=`
+<tr>
+<td colspan="5" style="text-align:center;">
+Aucun document disponible.
+</td>
+</tr>
+`;
+
+return;
+
+}
+
+snapshot.forEach(child=>{
+
+let d=child.val();
+
+tbody.innerHTML+=`
+
+<tr>
+
+<td>${d.classe}</td>
+
+<td>${d.cours}</td>
+
+<td>${d.titre}</td>
+
+<td>${d.date}</td>
+
+<td>
+
+<button onclick="telechargerDocument('${d.id}')">
+
+📄 Voir
+
+</button>
+
+</td>
+
+</tr>
+
+`;
+
+});
+
+});
+
+}
+
+function telechargerDocument(id){
+
+db.ref("schools/"+schoolId+"/documentsPedagogiques/"+id)
+
+.once("value")
+
+.then(snapshot=>{
+
+if(!snapshot.exists()){
+
+alert("Document introuvable.");
+
+return;
+
+}
+
+let doc=snapshot.val();
+
+alert(
+"Titre : "+doc.titre+
+"\nClasse : "+doc.classe+
+"\nCours : "+doc.cours+
+"\nFichier : "+doc.nomFichier+
+"\n\nLe téléchargement sera disponible après l'ajout de Firebase Storage."
+);
+
+});
+
+}
+
+
+
+function ouvrirMessagesParents(){}
+
+function ouvrirReunions(){}
+
+function ouvrirProfilEnseignant(){}
+
+
+
+
 
 
 
@@ -9196,6 +20847,8 @@ console.log("Notifications refusées");
 
 </script>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -9206,9 +20859,15 @@ console.log("Notifications refusées");
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="firebase-app-compat.js"></script>
 <script src="firebase-database-compat.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
 
 <!-- Ajouter celui-ci -->
 <script src="firebase-messaging-compat.js"></script>
