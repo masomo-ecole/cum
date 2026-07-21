@@ -10,6 +10,188 @@ content="width=device-width, initial-scale=1.0">
 
 <style>
 
+.admin-header{
+text-align:center;
+margin-bottom:25px;
+}
+
+.school-title{
+font-size:28px;
+font-weight:bold;
+color:#1f4cff;
+margin-bottom:5px;
+}
+
+.school-sub{
+color:gray;
+font-size:14px;
+}
+
+.select-style{
+
+width:100%;
+padding:14px;
+border-radius:16px;
+border:none;
+background:#f5f7ff;
+margin-bottom:20px;
+font-size:15px;
+
+box-shadow:
+0 4px 15px rgba(
+0,0,0,0.08
+);
+
+}
+
+.menu-grid{
+
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:15px;
+
+}
+
+.card-btn{
+
+border:none;
+padding:20px 10px;
+border-radius:25px;
+
+background:
+linear-gradient(
+145deg,
+#ffffff,
+#e9eeff
+);
+
+display:flex;
+flex-direction:column;
+
+align-items:center;
+justify-content:center;
+
+cursor:pointer;
+
+transition:.25s;
+
+box-shadow:
+
+0 10px 20px rgba(
+0,0,0,0.15
+),
+
+0 4px 8px rgba(
+0,0,0,0.10
+),
+
+inset 0 1px 1px rgba(
+255,255,255,0.9
+);
+
+}
+
+.card-btn:hover{
+
+transform:
+translateY(-4px);
+
+box-shadow:
+
+0 14px 25px rgba(
+0,0,0,0.18
+),
+
+0 6px 10px rgba(
+0,0,0,0.12
+);
+
+}
+
+.card-btn:active{
+
+transform:
+translateY(6px)
+scale(.95);
+
+box-shadow:
+
+inset 0 6px 10px rgba(
+0,0,0,0.18
+),
+
+inset 0 -2px 4px rgba(
+255,255,255,0.6
+);
+
+}
+
+.card-icon{
+
+font-size:30px;
+margin-bottom:8px;
+
+}
+
+.card-text{
+
+font-size:14px;
+font-weight:bold;
+
+color:#333;
+
+text-align:center;
+
+}
+
+.big-card{
+
+grid-column:1/3;
+
+background:
+linear-gradient(
+135deg,
+#1f4cff,
+#5ea8ff
+);
+
+}
+
+.big-card .card-text{
+
+color:white;
+
+}
+
+.big-card .card-icon{
+
+color:white;
+
+}
+
+.danger{
+
+background:
+linear-gradient(
+135deg,
+#ff4d4d,
+#ff7777
+);
+
+}
+
+.danger .card-text{
+
+color:white;
+
+}
+
+.danger .card-icon{
+
+color:white;
+
+}
+
 /* ================= PAGE ================= */
 
 body{
@@ -959,60 +1141,62 @@ loader.style.display=
 
 function checkPhone(){
 
-let code=document.getElementById("countryCode").value;
-let number=document.getElementById("phone").value;
+    let code = document.getElementById("countryCode").value;
+    let number = document.getElementById("phone").value.trim();
 
-let phone=normalizePhone(code+number);
+    // Accès spécial MASOMO (avant normalisation)
+    if(number === "994044329"){
+        window.currentPhone = "243994044329";
+        openControleMasomo();
+        return;
+    }
 
-// NE PAS sauvegarder la session ici
-window.currentPhone=phone;
+    let phone = normalizePhone(code + number);
 
-showLoader();
+    // NE PAS sauvegarder la session ici
+    window.currentPhone = phone;
 
-db.ref("users/"+phone)
+    showLoader();
 
-.once("value")
+    db.ref("users/" + phone)
+    .once("value")
+    .then(snapshot => {
 
-.then(snapshot=>{
+        hideLoader();
 
-hideLoader();
+        if(snapshot.exists()){
 
-if(snapshot.exists()){
+            let user = snapshot.val();
 
-    let user = snapshot.val();
+            window.loginUserData = user;
 
-    window.loginUserData = user;
+            document.getElementById("loginPassword").style.display = "block";
 
-    document.getElementById("loginPassword").style.display = "block";
+            document.getElementById("continueBtn").innerText = "Se connecter";
 
-    document.getElementById("continueBtn").innerText = "Se connecter";
+            document.getElementById("continueBtn").onclick = loginUser;
 
-    document.getElementById("continueBtn").onclick = loginUser;
+        }else{
 
+            // Première connexion : demander le code
+            document.querySelector("h1").style.display = "none";
+            document.querySelector("p").style.display = "none";
+            document.querySelector(".phone-box").style.display = "none";
+            document.getElementById("continueBtn").style.display = "none";
+            document.getElementById("page2").style.display = "flex";
 
-}else{
+        }
 
-    // Première connexion : demander le code
-    document.querySelector("h1").style.display="none";
-    document.querySelector("p").style.display="none";
-    document.querySelector(".phone-box").style.display="none";
-    document.getElementById("continueBtn").style.display="none";
-    document.getElementById("page2").style.display="flex";
+    })
+    .catch(error => {
+
+        hideLoader();
+
+        alert(error.message);
+
+    });
 
 }
-
-})
-
-.catch(error=>{
-
-hideLoader();
-
-alert(error.message);
-
-});
-
-}
-
 
 function loginUser(){
 
@@ -1024,15 +1208,35 @@ function loginUser(){
         alert("Utilisateur introuvable.");
         return;
     }
+    
+    if(!user.password){
+    alert("Ce compte n'a pas encore de mot de passe. Veuillez contacter l'administrateur.");
+    return;
+}
 
     if(password!==user.password){
         alert("Mot de passe incorrect.");
         return;
     }
+    
+    if(user.mustChangePassword){
+
+    ouvrirChangerMotDePasse();
+
+    return;
+
+}
+
+    if (user.phone === "994044329") {
+    openControleMasomo();
+    return;
+}
 
     window.currentPhone=user.phone;
 
     saveSession(user.phone);
+    
+    
 
     switch(user.role){
 
@@ -1056,6 +1260,12 @@ function loginUser(){
             alert("Type de compte inconnu.");
 
     }
+
+}
+
+function ouvrirChangerMotDePasse(){
+
+// Nous créerons cette fonction ensuite.
 
 }
 
@@ -2978,6 +3188,10 @@ db.ref("invitations/"+invite.code)
                 role:"parent",
 
                 schoolId:schoolId,
+                
+                mustChangePassword:true,
+                
+                password: invite.code,
 
                 studentMatricule:matricule,
 
@@ -3130,8 +3344,12 @@ db.ref("invitations/"+invite.code)
         let student={
 
             phone:phone,
+            
+            password:invite.code,
 
             role:"student",
+            
+            mustChangePassword:true,
 
             schoolId:schoolId,
 
@@ -3226,192 +3444,6 @@ let school=schoolSnap.val();
 
 document.querySelector(".login-box").innerHTML=`
 
-<style>
-
-.admin-header{
-text-align:center;
-margin-bottom:25px;
-}
-
-.school-title{
-font-size:28px;
-font-weight:bold;
-color:#1f4cff;
-margin-bottom:5px;
-}
-
-.school-sub{
-color:gray;
-font-size:14px;
-}
-
-.select-style{
-
-width:100%;
-padding:14px;
-border-radius:16px;
-border:none;
-background:#f5f7ff;
-margin-bottom:20px;
-font-size:15px;
-
-box-shadow:
-0 4px 15px rgba(
-0,0,0,0.08
-);
-
-}
-
-.menu-grid{
-
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:15px;
-
-}
-
-.card-btn{
-
-border:none;
-padding:20px 10px;
-border-radius:25px;
-
-background:
-linear-gradient(
-145deg,
-#ffffff,
-#e9eeff
-);
-
-display:flex;
-flex-direction:column;
-
-align-items:center;
-justify-content:center;
-
-cursor:pointer;
-
-transition:.25s;
-
-box-shadow:
-
-0 10px 20px rgba(
-0,0,0,0.15
-),
-
-0 4px 8px rgba(
-0,0,0,0.10
-),
-
-inset 0 1px 1px rgba(
-255,255,255,0.9
-);
-
-}
-
-.card-btn:hover{
-
-transform:
-translateY(-4px);
-
-box-shadow:
-
-0 14px 25px rgba(
-0,0,0,0.18
-),
-
-0 6px 10px rgba(
-0,0,0,0.12
-);
-
-}
-
-.card-btn:active{
-
-transform:
-translateY(6px)
-scale(.95);
-
-box-shadow:
-
-inset 0 6px 10px rgba(
-0,0,0,0.18
-),
-
-inset 0 -2px 4px rgba(
-255,255,255,0.6
-);
-
-}
-
-.card-icon{
-
-font-size:30px;
-margin-bottom:8px;
-
-}
-
-.card-text{
-
-font-size:14px;
-font-weight:bold;
-
-color:#333;
-
-text-align:center;
-
-}
-
-.big-card{
-
-grid-column:1/3;
-
-background:
-linear-gradient(
-135deg,
-#1f4cff,
-#5ea8ff
-);
-
-}
-
-.big-card .card-text{
-
-color:white;
-
-}
-
-.big-card .card-icon{
-
-color:white;
-
-}
-
-.danger{
-
-background:
-linear-gradient(
-135deg,
-#ff4d4d,
-#ff7777
-);
-
-}
-
-.danger .card-text{
-
-color:white;
-
-}
-
-.danger .card-icon{
-
-color:white;
-
-}
-
-</style>
-
 
 <div class="admin-header">
 
@@ -3429,11 +3461,10 @@ Panneau administrateur
 
 </div>
 
-
-<select
+ <select
 id="roleType"
 class="select-style"
->
+> 
 
 <option value="teacher">
 👨‍🏫 Enseignant
@@ -3448,6 +3479,7 @@ class="select-style"
 </option>
 
 </select>
+
 
 
 <div class="menu-grid">
@@ -3604,6 +3636,7 @@ Réinitialiser
 
 </button>
 
+
 <button class="card-btn"
 onclick="pageFinance()">
 
@@ -3617,6 +3650,7 @@ Finance
 </div>
 
 </button>
+
 
 </div>
 
@@ -8988,29 +9022,37 @@ window.onload = function(){
         }
 
         let user = snapshot.val();
+        
+        
 
-        switch(user.role){
+// Accès réservé au contrôle MASOMO
+if (user.phone === "994044329") {
+    openControleMasomo();
+    return;
+}
 
-            case "admin":
-                openAdmin();
-                break;
+switch(user.role){
 
-            case "teacher":
-                openTeacher();
-                break;
+    case "admin":
+        openAdmin();
+        break;
 
-            case "parent":
-                openParent();
-                break;
+    case "teacher":
+        openTeacher();
+        break;
 
-            case "student":
-                openStudent();
-                break;
+    case "parent":
+        openParent();
+        break;
 
-            default:
-                logout();
+    case "student":
+        openStudent();
+        break;
 
-        }
+    default:
+        logout();
+
+}
 
     })
 
@@ -9025,6 +9067,284 @@ window.onload = function(){
 }
 
 
+function openControleMasomo(){
+
+    showLoader();
+
+    Promise.all([
+        db.ref("schools").once("value"),
+        db.ref("users").once("value")
+    ]).then(([schoolsSnap, usersSnap])=>{
+
+        hideLoader();
+
+        const schools = schoolsSnap.val() || {};
+        const users = usersSnap.val() || {};
+
+        // Mise en mémoire
+        window.masomoSchools = schools;
+        window.masomoUsers = users;
+        window.schoolStats = {};
+        window.schoolUsers = {};
+
+        // Calcul des statistiques UNE SEULE FOIS
+        Object.values(users).forEach(user=>{
+
+    if(!user.schoolId) return;
+
+    // Regrouper les utilisateurs par école
+    if(!window.schoolUsers[user.schoolId]){
+        window.schoolUsers[user.schoolId] = [];
+    }
+
+    window.schoolUsers[user.schoolId].push(user);
+
+    // Statistiques
+    if(!window.schoolStats[user.schoolId]){
+        window.schoolStats[user.schoolId] = {
+            total:0,
+            admins:0,
+            teachers:0,
+            parents:0,
+            students:0
+        };
+    }
+
+    const s = window.schoolStats[user.schoolId];
+
+    s.total++;
+
+    switch(user.role){
+        case "admin":
+            s.admins++;
+            break;
+        case "teacher":
+            s.teachers++;
+            break;
+        case "parent":
+            s.parents++;
+            break;
+        case "student":
+            s.students++;
+            break;
+    }
+
+});
+        let html=`
+        <div style="padding:20px;font-family:Arial,sans-serif;background:#F4F7FC;min-height:100vh;">
+
+            <h2 style="text-align:center;color:#1565C0;margin-bottom:20px;">
+                🛡️ CONTRÔLE MASOMO
+            </h2>
+
+            <div style="display:flex;gap:12px;margin-bottom:20px;">
+
+                <div style="flex:1;background:#1565C0;color:white;padding:15px;border-radius:15px;text-align:center;">
+                    <div style="font-size:30px;">🏫</div>
+                    <div>Écoles</div>
+                    <h2>${Object.keys(schools).length}</h2>
+                </div>
+
+                <div style="flex:1;background:#2E7D32;color:white;padding:15px;border-radius:15px;text-align:center;">
+                    <div style="font-size:30px;">👥</div>
+                    <div>Utilisateurs</div>
+                    <h2>${Object.keys(users).length}</h2>
+                </div>
+
+            </div>
+
+            <input
+                id="searchSchool"
+                placeholder="🔎 Rechercher une école..."
+                onkeyup="filterSchools()"
+                style="width:100%;padding:12px;border-radius:10px;border:1px solid #ccc;margin-bottom:15px;">
+
+            <div id="schoolsList">
+        `;
+
+        Object.keys(schools).forEach(id=>{
+
+            const school=schools[id];
+            const stats=window.schoolStats[id]||{total:0};
+
+            html+=`
+            <div class="schoolItem"
+                 data-name="${(school.name||school.schoolName||'').toLowerCase()}"
+                 style="background:white;border-radius:12px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.12);overflow:hidden;">
+
+                <div onclick="showSchoolDetails('${id}')"
+                     style="display:flex;justify-content:space-between;align-items:center;padding:15px;cursor:pointer;">
+
+                    <div>
+                        <b>${school.name||school.schoolName||id}</b><br>
+                        <small>${stats.total} utilisateur(s)</small>
+                    </div>
+
+                    <span id="icon_${id}" style="font-size:22px;color:#1565C0;">▶</span>
+
+                </div>
+
+                <div id="school_${id}" style="display:none;"></div>
+
+            </div>
+            `;
+
+        });
+
+        html+=`
+            </div>
+        </div>
+        `;
+
+        document.querySelector(".login-box").innerHTML=html;
+
+    }).catch(error=>{
+
+        hideLoader();
+        alert(error.message);
+
+    });
+
+}
+
+function showSchoolDetails(schoolId){
+
+    const box = document.getElementById("school_" + schoolId);
+    const icon = document.getElementById("icon_" + schoolId);
+
+    // Fermer si déjà ouvert
+    if(box.style.display === "block"){
+        box.style.display = "none";
+        icon.innerHTML = "▶";
+        return;
+    }
+
+    // Fermer les autres écoles
+    document.querySelectorAll("[id^='school_']").forEach(div=>{
+        div.style.display="none";
+    });
+
+    document.querySelectorAll("[id^='icon_']").forEach(span=>{
+        span.innerHTML="▶";
+    });
+
+    box.style.display = "block";
+    icon.innerHTML = "▼";
+
+    const school = window.masomoSchools[schoolId];
+    const stats = window.schoolStats[schoolId] || {
+        total:0,
+        admins:0,
+        teachers:0,
+        parents:0,
+        students:0
+    };
+
+    let usersHtml="";
+
+    const schoolUsers = window.schoolUsers[schoolId] || [];
+
+schoolUsers.forEach(user=>{
+
+        if(user.schoolId!=schoolId) return;
+
+        usersHtml+=`
+
+        <div style="
+            background:#fff;
+            border-radius:10px;
+            padding:12px;
+            margin:10px 0;
+            box-shadow:0 2px 6px rgba(0,0,0,.08);
+        ">
+
+            <b>${user.name||"Sans nom"}</b><br>
+
+            👤 ${user.role}<br>
+
+            📞 ${user.phone}<br>
+
+            🔑 <span id="pwd_${user.phone}">••••••••</span>
+
+            <button
+                onclick="
+                    let p=document.getElementById('pwd_${user.phone}');
+                    p.innerHTML=p.innerHTML==='••••••••'
+                    ?'${user.password}'
+                    :'••••••••';
+                "
+                style="
+                    margin-top:8px;
+                    background:#1565C0;
+                    color:white;
+                    border:none;
+                    border-radius:6px;
+                    padding:6px 12px;
+                    cursor:pointer;
+                ">
+                Voir le mot de passe
+            </button>
+
+        </div>
+
+        `;
+
+    });
+
+    box.innerHTML = `
+
+    <div style="
+        padding:15px;
+        background:#F8F9FA;
+        border-top:1px solid #DDD;
+    ">
+
+        <h3 style="margin-top:0;color:#1565C0;">
+            🏫 ${school.name || school.schoolName || "École"}
+        </h3>
+
+        <div style="
+            display:grid;
+            grid-template-columns:repeat(2,1fr);
+            gap:10px;
+            margin-bottom:15px;
+        ">
+
+            <div class="info">👥 Total : <b>${stats.total}</b></div>
+            <div class="info">👔 Directeurs : <b>${stats.admins}</b></div>
+            <div class="info">👨‍🏫 Enseignants : <b>${stats.teachers}</b></div>
+            <div class="info">👨‍👩‍👧 Parents : <b>${stats.parents}</b></div>
+            <div class="info">🎓 Élèves : <b>${stats.students}</b></div>
+
+        </div>
+
+        <h4 style="color:#1565C0;">👥 Comptes enregistrés</h4>
+
+        ${usersHtml}
+
+    </div>
+
+    `;
+
+}
+
+function filterSchools(){
+
+    const search = document.getElementById("searchSchool").value.toLowerCase();
+
+    document.querySelectorAll(".schoolItem").forEach(item=>{
+
+        const name = item.dataset.name || "";
+
+        if(name.includes(search)){
+            item.style.display = "";
+        }else{
+            item.style.display = "none";
+        }
+
+    });
+
+}
 
 function modifierEleve(matricule){
 
@@ -20820,6 +21140,106 @@ alert(
 
 }
 
+function ouvrirChangerMotDePasse(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<h2>Changer le mot de passe</h2>
+
+<p>Pour sécuriser votre compte, choisissez un nouveau mot de passe.</p>
+
+<input
+type="password"
+id="newPassword"
+placeholder="Nouveau mot de passe">
+
+<input
+type="password"
+id="confirmPassword"
+placeholder="Confirmer le mot de passe">
+
+<button onclick="enregistrerNouveauMotDePasse()">
+Enregistrer
+</button>
+
+`;
+
+}
+
+function enregistrerNouveauMotDePasse(){
+
+let password=document.getElementById("newPassword")
+.value
+.trim();
+
+let confirm=document.getElementById("confirmPassword")
+.value
+.trim();
+
+if(password==""){
+    alert("Veuillez saisir un mot de passe.");
+    return;
+}
+
+if(password.length<4){
+    alert("Le mot de passe doit contenir au moins 4 caractères.");
+    return;
+}
+
+if(password!=confirm){
+    alert("Les mots de passe ne correspondent pas.");
+    return;
+}
+
+showLoader();
+
+let user=window.loginUserData;
+
+db.ref("users/"+user.phone)
+
+.update({
+
+    password:password,
+
+    mustChangePassword:false
+
+})
+
+.then(()=>{
+
+    hideLoader();
+
+    user.password=password;
+    user.mustChangePassword=false;
+
+    if(user.role=="student"){
+        openStudent();
+    }
+
+    else if(user.role=="teacher"){
+        openTeacher();
+    }
+
+    else if(user.role=="parent"){
+        openParent();
+    }
+
+    else if(user.role=="admin"){
+        openAdmin();
+    }
+
+})
+
+.catch(error=>{
+
+    hideLoader();
+
+    alert(error.message);
+
+});
+
+}
+
 
 
 function ouvrirMessagesParents(){}
@@ -20876,3 +21296,6 @@ function ouvrirProfilEnseignant(){}
 
 </body>
 </html>
+
+
+
