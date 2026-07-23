@@ -9,6 +9,26 @@ content="width=device-width, initial-scale=1.0">
 <title>MASOMO</title>
 
 <style>
+    
+    .floating-refresh{
+position:fixed;
+bottom:20px;
+right:20px;
+width:60px;
+height:60px;
+border:none;
+border-radius:50%;
+background:#0d6efd;
+color:white;
+font-size:28px;
+cursor:pointer;
+box-shadow:0 4px 10px rgba(0,0,0,.3);
+z-index:9999;
+}
+
+.floating-refresh:hover{
+transform:scale(1.08);
+}
 
 .admin-header{
 text-align:center;
@@ -313,23 +333,31 @@ margin-bottom:10px;
 
 /* ================= INPUT ================= */
 
-input{
+input,
+textarea{
 
-padding:15px;
-
-border-radius:12px;
-
-border:1px solid #ccc;
-
-font-size:16px;
-
-outline:none;
+    width:100%;
+    padding:15px;
+    border-radius:12px;
+    border:1px solid #ccc;
+    font-size:16px;
+    outline:none;
+    box-sizing:border-box;
+    margin-top:10px;
 
 }
 
-input:focus{
+input:focus,
+textarea:focus{
 
-border-color:#1f4cff;
+    border-color:#1f4cff;
+
+}
+
+textarea{
+
+    resize:vertical;
+    min-height:80px;
 
 }
 
@@ -924,11 +952,43 @@ function logout(){
 
     localStorage.removeItem("masomoUser");
 
+    if(window.currentSchoolId){
+
+        localStorage.removeItem(
+            "adminData_"+window.currentSchoolId
+        );
+
+    }
+
     window.currentPhone = null;
     window.loginUserData = null;
     window.currentInvite = null;
 
     location.reload();
+
+}
+
+function demarrerCompteurEssai(){
+
+if(window.compteurEssai){
+
+    clearInterval(window.compteurEssai);
+
+}
+
+window.compteurEssai = setInterval(()=>{
+
+    if(!window.adminCache) return;
+
+    let zone = document.getElementById("tempsEssai");
+
+    if(zone){
+
+        zone.innerHTML = afficherTempsRestant(window.adminCache);
+
+    }
+
+},1000);
 
 }
 
@@ -1227,12 +1287,41 @@ function loginUser(){
 
 }
 
-    if (user.phone === "994044329") {
+    
+   if(normalizePhone(user.phone)===normalizePhone("243994044329")){
+
     openControleMasomo();
+
     return;
+
 }
 
-    window.currentPhone=user.phone;
+   window.currentPhone=user.phone;
+    window.currentRole = user.role;
+window.currentTeacherClass = user.classe || "";
+if(user.role === "teacher"){
+
+    db.ref(
+        "schools/"+window.currentSchoolId+"/teachers"
+    )
+    .once("value")
+    .then(snapshot=>{
+
+        snapshot.forEach(item=>{
+
+            let t = item.val();
+
+            if(normalizePhone(t.telephone) === normalizePhone(user.phone)){
+
+                window.currentTeacherClass = t.classe || "";
+
+            }
+
+        });
+
+    });
+
+}
 
     saveSession(user.phone);
     
@@ -1241,8 +1330,45 @@ function loginUser(){
     switch(user.role){
 
         case "admin":
-            openAdmin();
-            break;
+
+    db.ref("schools/"+user.schoolId)
+    .once("value")
+    .then(snapshot=>{
+
+        if(!snapshot.exists()){
+
+            alert("École introuvable.");
+
+            return;
+
+        }
+
+        let school = snapshot.val();
+
+        window.currentSchoolId = user.schoolId;
+
+        // École validée
+       if(
+    school.status === "active" &&
+    school.paymentStatus === "paid"
+){
+
+    openAdmin();
+
+}else{
+
+    afficherEcoleEnAttente(school);
+
+}
+
+    })
+    .catch(error=>{
+
+        alert(error.message);
+
+    });
+
+    break;
 
         case "teacher":
             openTeacher();
@@ -1638,6 +1764,7 @@ border:2px solid white;
 📅 Emploi du temps
 </button>
 
+
 <button onclick="ouvrirPresence()">
 ✅ Présence
 </button>
@@ -1682,13 +1809,6 @@ border:2px solid white;
 📂 Documents
 </button>
 
-<button onclick="ouvrirMessagesParents()">
-👨‍👩‍👧 Parents
-</button>
-
-<button onclick="ouvrirReunions()">
-🤝 Réunions
-</button>
 
 <button onclick="ouvrirTableauBordEnseignant()">
 📊 Tableau de bord
@@ -3418,53 +3538,146 @@ db.ref("invitations/"+invite.code)
 
 function openAdmin(){
 
-window.currentRole="admin";
+    window.currentRole = "admin";
 
-let phone=window.currentPhone;
+    let phone = window.currentPhone;
 
-db.ref("users/"+phone)
+    showLoader();
 
-.once("value")
+    db.ref("users/"+phone)
+    .once("value")
+    .then(userSnap=>{
 
-.then(userSnap=>{
+        let user = userSnap.val();
 
-let user=userSnap.val();
+        if(!user){
 
-window.currentSchoolId=user.schoolId;
+            hideLoader();
 
-return db.ref(
-"schools/"+user.schoolId
-).once("value");
+            alert("Utilisateur introuvable.");
 
-})
+            return;
 
-.then(schoolSnap=>{
+        }
 
-let school=schoolSnap.val();
+        window.currentSchoolId = user.schoolId;
+
+        // Cache propre à cette école
+        let cacheKey = "adminData_" + user.schoolId;
+
+        let cache = localStorage.getItem(cacheKey);
+
+        if(cache){
+
+            let data = JSON.parse(cache);
+
+            window.adminCache = data.school;
+
+            hideLoader();
+
+            afficherAdmin(data.school);
+
+            // Vérification silencieuse en arrière-plan
+            actualiserAdmin(true);
+
+            return Promise.reject("CACHE");
+
+        }
+
+        // Aucun cache : télécharger depuis Firebase
+        return db.ref(
+            "schools/"+user.schoolId
+        ).once("value");
+
+    })
+    .then(snapshot=>{
+
+        if(!snapshot.exists()){
+
+            hideLoader();
+
+            alert("École introuvable.");
+
+            return;
+
+        }
+
+        let school = snapshot.val();
+
+        window.adminCache = school;
+
+        let data = {
+
+            school:school,
+
+            schoolId:window.currentSchoolId,
+
+            phone:phone
+
+        };
+
+        // Sauvegarde du cache de cette école
+        localStorage.setItem(
+
+            "adminData_"+window.currentSchoolId,
+
+            JSON.stringify(data)
+
+        );
+
+        hideLoader();
+
+        afficherAdmin(school);
+        
+        surveillerEssai();
+
+    })
+    .catch(error=>{
+
+        if(error==="CACHE") return;
+
+        hideLoader();
+
+        alert(error.message || error);
+
+    });
+
+}
+
+function afficherAdmin(school){
 
 document.querySelector(".login-box").innerHTML=`
 
+<button class="floating-refresh"
+onclick="actualiserAdmin()"
+title="Actualiser">
+🔄
+</button>
 
 <div class="admin-header">
 
 <div class="school-title">
-
 🏫 ${school.schoolName}
 
 </div>
 
+<br><br>
+
+<div id="tempsEssai">
+
+${afficherTempsRestant(window.adminCache)}
+
+</div>
+
 <div class="school-sub">
-
 Panneau administrateur
-
 </div>
 
 </div>
 
- <select
+<select
 id="roleType"
-class="select-style"
-> 
+class="select-style">
 
 <option value="teacher">
 👨‍🏫 Enseignant
@@ -3480,180 +3693,213 @@ class="select-style"
 
 </select>
 
-
-
 <div class="menu-grid">
 
-<button class="card-btn big-card"
-onclick="generateInvite()">
+<!-- Continue ici avec TOUS les autres boutons exactement comme dans ton ancien openAdmin() -->
 
-<div class="card-icon">
-🔗
+<button class="card-btn big-card"  
+onclick="generateInvite()">  
+  
+<div class="card-icon">  
+🔗  
+</div>  
+  
+<div class="card-text">  
+Générer invitation  
+</div>  
+  
+</button>  
+  
+  
+<button class="card-btn"  
+onclick="openMembers()">  
+  
+<div class="card-icon">  
+👥  
+</div>  
+  
+<div class="card-text">  
+Membres  
+</div>  
+  
+</button>  
+  
+  
+<button class="card-btn"  
+onclick="showActivities()">  
+  
+<div class="card-icon">  
+📊  
+</div>  
+  
+<div class="card-text">  
+Activités  
+</div>  
+  
+</button>  
+  
+  
+<button class="card-btn"  
+onclick="studentRecords()">  
+  
+<div class="card-icon">  
+🎓  
+</div>  
+  
+<div class="card-text">  
+Inscription Elèves  
+</div>  
+  
+</button>  
+  
+  
+<button class="card-btn"  
+onclick="teacherRecords()">  
+  
+<div class="card-icon">  
+👨‍🏫  
+</div>  
+  
+<div class="card-text">  
+Fiches enseignants  
+</div>  
+  
+</button>  
+  
+  
+<button class="card-btn"  
+onclick="ouvrirListeEleves()">  
+  
+<div class="card-icon">  
+📋  
+</div>  
+  
+<div class="card-text">  
+Liste élèves  
+</div>  
+  
+</button>  
+  
+  
+<button class="card-btn"  
+onclick="ouvrirListeEnseignants()">  
+  
+<div class="card-icon">  
+📚  
+</div>  
+  
+<div class="card-text">  
+Liste enseignants  
+</div>  
+  
+</button>  
+  
+<button class="card-btn"  
+onclick="ouvrirPreparationsAdmin()">  
+  
+<div class="card-icon">  
+📑   
+</div>  
+  
+<div class="card-text">  
+Fiches de préparation  
+</div>  
+  
+</button>  
+  
+<button class="card-btn"  
+onclick="ouvrirAjouterEmploiTemps()">  
+  
+<div class="card-icon">  
+➕  
+</div>  
+  
+<div class="card-text">  
+Ajouter un emploi du temps  
+</div>  
+  
+   
+</button>  
+  
+<button class="card-btn"  
+onclick="ouvrirEmploiTemps()">  
+  
+<div class="card-icon">  
+📅  
+</div>  
+  
+<div class="card-text">  
+Horaire  
+</div>  
+  
+</button>  
+  
+  
+<button class="card-btn" onclick="ouvrirMessagesParents()">  
+<div class="card-icon">  
+👨‍👩‍👧  
+</div>  
+<div class="card-text">  
+Parents  
+</div>  
+   
+</button>  
+  
+<button class="card-btn" onclick="ouvrirReunions()">  
+<div class="card-icon">  
+🤝   
+</div>  
+  
+<div class="card-text">  
+Réunions  
+</div>  
+  
+</button>  
+  
+  
+<button class="card-btn"  
+onclick="modifierProfil()">  
+  
+<div class="card-icon">  
+👤  
+</div>  
+  
+<div class="card-text">  
+Mon profil  
+</div>  
+  
+</button>  
+  
+  
+<button class="card-btn danger"  
+onclick="resetDatabase()">  
+  
+<div class="card-icon">  
+🗑  
+</div>  
+  
+<div class="card-text">  
+Réinitialiser  
+</div>  
+  
+</button>  
+  
+  
+<button class="card-btn"  
+onclick="pageFinance()">  
+  
+  
+<div class="card-icon">  
+💰  
+</div>  
+  
+<div class="card-text">  
+Finance  
+</div>  
+  
+</button>  
+
 </div>
-
-<div class="card-text">
-Générer invitation
-</div>
-
-</button>
-
-
-<button class="card-btn"
-onclick="openMembers()">
-
-<div class="card-icon">
-👥
-</div>
-
-<div class="card-text">
-Membres
-</div>
-
-</button>
-
-
-<button class="card-btn"
-onclick="showActivities()">
-
-<div class="card-icon">
-📊
-</div>
-
-<div class="card-text">
-Activités
-</div>
-
-</button>
-
-
-<button class="card-btn"
-onclick="studentRecords()">
-
-<div class="card-icon">
-🎓
-</div>
-
-<div class="card-text">
-Inscription Elèves
-</div>
-
-</button>
-
-
-<button class="card-btn"
-onclick="teacherRecords()">
-
-<div class="card-icon">
-👨‍🏫
-</div>
-
-<div class="card-text">
-Fiches enseignants
-</div>
-
-</button>
-
-
-<button class="card-btn"
-onclick="ouvrirListeEleves()">
-
-<div class="card-icon">
-📋
-</div>
-
-<div class="card-text">
-Liste élèves
-</div>
-
-</button>
-
-
-<button class="card-btn"
-onclick="ouvrirListeEnseignants()">
-
-<div class="card-icon">
-📚
-</div>
-
-<div class="card-text">
-Liste enseignants
-</div>
-
-</button>
-
-<button class="card-btn"
-onclick="ouvrirPreparationsAdmin()">
-
-<div class="card-icon">
-📑 
-</div>
-
-<div class="card-text">
-Fiches de préparation
-</div>
-
-</button>
-
-
-<button class="card-btn"
-onclick="ouvrirEmploiTemps()">
-
-<div class="card-icon">
-📅
-</div>
-
-<div class="card-text">
-Horaire
-</div>
-
-</button>
-
-
-<button class="card-btn"
-onclick="modifierProfil()">
-
-<div class="card-icon">
-👤
-</div>
-
-<div class="card-text">
-Mon profil
-</div>
-
-</button>
-
-
-<button class="card-btn danger"
-onclick="resetDatabase()">
-
-<div class="card-icon">
-🗑
-</div>
-
-<div class="card-text">
-Réinitialiser
-</div>
-
-</button>
-
-
-<button class="card-btn"
-onclick="pageFinance()">
-
-
-<div class="card-icon">
-💰
-</div>
-
-<div class="card-text">
-Finance
-</div>
-
-</button>
-
-
-</div>
-
 
 <div id="generatedInvite"
 style="
@@ -3667,6 +3913,263 @@ text-align:center;
 </div>
 
 `;
+
+}
+
+
+function actualiserAdmin(silencieux=false){
+
+    if(!window.currentSchoolId){
+        return;
+    }
+
+    if(!silencieux){
+        showLoader();
+    }
+
+    db.ref("schools/"+window.currentSchoolId)
+    .once("value")
+    .then(snapshot=>{
+
+        if(!snapshot.exists()){
+
+            if(!silencieux){
+                hideLoader();
+            }
+
+            return;
+        }
+
+        let school = snapshot.val();
+
+        // Mise à jour du cache mémoire
+        window.adminCache = school;
+
+        // Mise à jour du cache local
+        
+       localStorage.setItem(
+
+"adminData_"+window.currentSchoolId,
+
+JSON.stringify({
+
+school:school,
+
+schoolId:window.currentSchoolId,
+
+phone:window.currentPhone
+
+})
+
+);
+
+        // Si l'utilisateur est sur l'espace admin
+        if(document.querySelector(".admin-header")){
+
+            afficherAdmin(school);
+
+        }
+
+        if(!silencieux){
+            hideLoader();
+        }
+
+    })
+    .catch(error=>{
+
+        if(!silencieux){
+            hideLoader();
+            alert(error.message);
+        }
+
+    });
+
+}
+
+
+function ouvrirAjouterEmploiTemps(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+📅 Nouvel emploi du temps
+
+</h2>
+
+<select id="enseignant">
+
+<option value="">
+Choisir un enseignant
+</option>
+
+</select>
+
+<select id="classe">
+
+<option value="">
+Choisir une classe
+</option>
+
+</select>
+
+<input
+id="matiere"
+placeholder="Matière">
+
+<select id="jour">
+
+<option>Lundi</option>
+<option>Mardi</option>
+<option>Mercredi</option>
+<option>Jeudi</option>
+<option>Vendredi</option>
+<option>Samedi</option>
+
+</select>
+
+<label>Heure début</label>
+
+<input
+type="time"
+id="heureDebut">
+
+<label>Heure fin</label>
+
+<input
+type="time"
+id="heureFin">
+
+<input
+id="salle"
+placeholder="Salle">
+
+<button
+onclick="enregistrerEmploiTemps()">
+
+💾 Enregistrer
+
+</button>
+
+<button
+onclick="ouvrirGestionEmploiTemps()">
+
+⬅ Retour
+
+</button>
+
+`;
+
+chargerListeEnseignants();
+
+chargerListeClasses();
+
+}
+
+function afficherTempsRestant(school){
+
+if(!school.trialEnd) return "";
+
+let restant = school.trialEnd - Date.now();
+
+if(restant <= 0){
+
+    return `
+    <div style="
+    background:#D32F2F;
+    color:white;
+    padding:10px;
+    border-radius:10px;
+    margin-top:10px;
+    ">
+    ⛔ Essai expiré
+    </div>
+    `;
+}
+
+let jours = Math.ceil(restant/(1000*60*60*24));
+
+let couleur = jours<=10 ? "#D32F2F" : "#2E7D32";
+
+return `
+<div style="
+background:${couleur};
+color:white;
+padding:10px;
+border-radius:10px;
+margin-top:10px;
+">
+
+⏳ Il reste ${jours} jour(s) d'essai.
+
+</div>
+`;
+
+}
+
+
+function chargerListeEnseignants(){
+
+let select=document.getElementById("enseignant");
+
+select.innerHTML="<option value=''>Choisir un enseignant</option>";
+
+db.ref(
+"schools/"+window.currentSchoolId+"/teachers"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+snapshot.forEach(item=>{
+
+let t=item.val();
+
+select.innerHTML+=`
+
+<option value="${t.telephone}">
+
+${t.nom} ${t.postnom} ${t.prenom}
+
+</option>
+
+`;
+
+});
+
+});
+
+}
+
+
+
+function chargerListeClasses(){
+
+let select=document.getElementById("classe");
+
+select.innerHTML="";
+
+db.ref("schools/"+window.currentSchoolId)
+
+.once("value")
+
+.then(snapshot=>{
+
+let school=snapshot.val();
+
+(school.classes||[]).forEach(classe=>{
+
+select.innerHTML+=`
+<option value="${classe}">
+${classe}
+</option>
+`;
+
+});
 
 });
 
@@ -4022,6 +4525,8 @@ db.ref(
     name:data.name,
 
     phone:telephone,
+    
+    classe:data.classe,
 
     role:"teacher",
 
@@ -4375,36 +4880,61 @@ style="margin-top:15px;">
 
 function openAddStudent(){
 
-let adminPhone=window.currentPhone;
+    // Utiliser les données déjà chargées
+    if(window.adminCache){
 
-db.ref(
-"users/"+adminPhone
-)
+        window.currentSchool = window.adminCache;
 
-.once("value")
+        afficherFormulaireAjoutEleve(window.adminCache);
 
-.then(snapshot=>{
+        actualiserAdmin(true);
 
-let admin=snapshot.val();
+        return;
 
-window.currentSchoolId=
-admin.schoolId;
+    }
 
-return db.ref(
-"schools/"+admin.schoolId
-)
+    let adminPhone = window.currentPhone;
 
-.once("value");
+    showLoader();
 
-})
+    db.ref("users/"+adminPhone)
+    .once("value")
+    .then(snapshot=>{
 
-.then(snapshot=>{
+        let admin = snapshot.val();
 
-let school=snapshot.val();
+        window.currentSchoolId = admin.schoolId;
 
-window.currentSchool=school;
+        return db.ref("schools/"+admin.schoolId).once("value");
 
-let classHtml="";
+    })
+    .then(snapshot=>{
+
+        hideLoader();
+
+        let school = snapshot.val();
+
+        window.adminCache = school;
+        window.currentSchool = school;
+
+        localStorage.setItem("adminData", JSON.stringify({
+
+            school: school,
+            schoolId: window.currentSchoolId,
+            phone: window.currentPhone
+
+        }));
+
+        afficherFormulaireAjoutEleve(school);
+
+    });
+
+}
+
+
+
+function afficherFormulaireAjoutEleve(school){
+    let classHtml="";
 
 school.classes.forEach(c=>{
 
@@ -4545,9 +5075,6 @@ Enregistrer
 </button>
 
 `;
-
-});
-
 }
 
 
@@ -4648,18 +5175,41 @@ style="margin-top:15px;">
 // ================= OUVRIR MEMBRES AVEC VRAI CHARGEMENT =================
 
 function openMembers(){
+    
+    let cache=localStorage.getItem("membersCache");
 
-// afficher chargement
+if(cache){
 
-showLoader();
+    window.schoolUsersCache=JSON.parse(cache);
 
+    schoolUsersCache=window.schoolUsersCache;
 
-// ouvrir membres
+    drawMembers();
 
-showMembers();
+    showMembers(false);
+
+    return;
 
 }
 
+    // Si les membres sont déjà en mémoire
+    if(window.schoolUsersCache){
+
+        schoolUsersCache = window.schoolUsersCache;
+
+        drawMembers();
+
+        showMembers(false);
+
+        return;
+
+    }
+
+    showLoader();
+
+    showMembers();
+
+}
 // ================= GENERER INVITATION =================
 
 function generateInvite(){
@@ -5628,7 +6178,7 @@ hideLoader();
 let html=`
 
 <button class="back-btn"
-onclick="openNotes()">
+onclick="openTeacher()">
 ⬅ Retour
 </button>
 
@@ -5725,7 +6275,7 @@ moyenne=(somme/total).toFixed(2);
 let html=`
 
 <button class="back-btn"
-onclick="openNotes()">
+onclick="ouvrirNotes()">
 ⬅ Retour
 </button>
 
@@ -6172,8 +6722,19 @@ logo:
 enregistrerPhoto(),
 
 
-verificationStatus:
-"pending",
+status: "pending",
+
+paymentStatus: "unpaid",
+
+paymentMethod: "",
+
+verifiedBy: "",
+
+verifiedAt: 0,
+
+trialStart: 0,
+
+trialEnd: 0,
 
 motto:
 schoolMotto,
@@ -6266,14 +6827,15 @@ hideLoader();
 
 alert(
 
-"École créée avec succès\n\n"+
+"Votre école a été créée.\n\n"
 
-"Code : "+schoolCode
++
+
+"Effectuez maintenant le paiement afin que MASOMO puisse valider votre école."
 
 );
 
-openAdmin();
-
+ouvrirPaiementEcole(schoolRef.key);
 }
 
 catch(error){
@@ -6283,6 +6845,152 @@ hideLoader();
 alert(
 error.message
 );
+
+}
+
+}
+
+function ouvrirPaiementEcole(schoolId){
+
+window.currentSchoolId = schoolId;
+
+document.getElementById("page2").innerHTML = `
+
+<h2 style="text-align:center;color:#1f4cff;">
+Paiement MASOMO
+</h2>
+
+<p style="text-align:center;">
+Votre école a été créée avec succès.<br><br>
+Pour activer votre école, effectuez le paiement puis attendez la validation de MASOMO.
+</p>
+
+<h3 style="text-align:center;">
+Choisissez une méthode de paiement
+</h3>
+
+<button onclick="choisirPaiement('Airtel Money')">
+📱 Airtel Money
+</button>
+
+<button onclick="choisirPaiement('Orange Money')">
+🍊 Orange Money
+</button>
+
+<button onclick="choisirPaiement('M-Pesa')">
+🔵 M-Pesa
+</button>
+
+<button onclick="choisirPaiement('Paiement direct')">
+💵 Paiement direct
+</button>
+
+<div id="paymentInfo" style="margin-top:20px;"></div>
+
+`;
+
+}
+
+async function choisirPaiement(methode){
+
+let numero="";
+
+let beneficiaire="MASOMO";
+
+let montant="À définir";
+
+switch(methode){
+
+case "Airtel Money":
+numero="0994044329";
+break;
+
+case "Orange Money":
+numero="0894044329";
+break;
+
+case "M-Pesa":
+numero="0824044329";
+break;
+
+case "Paiement direct":
+numero="Contactez MASOMO";
+break;
+
+}
+
+document.getElementById("paymentInfo").innerHTML=`
+
+<div style="
+padding:20px;
+background:#f5f7ff;
+border-radius:15px;
+margin-top:20px;
+">
+
+<h3>${methode}</h3>
+
+<p><b>Bénéficiaire :</b> ${beneficiaire}</p>
+
+<p><b>Numéro :</b> ${numero}</p>
+
+<p><b>Montant :</b> ${montant}</p>
+
+<button onclick="confirmerPaiement('${methode}')">
+
+J'ai effectué le paiement
+
+</button>
+
+</div>
+
+`;
+
+}
+
+async function confirmerPaiement(methode){
+
+try{
+
+showLoader();
+
+await db.ref(
+"schools/"+window.currentSchoolId
+).update({
+
+paymentStatus:"waiting",
+
+paymentMethod:methode,
+
+paymentDate:Date.now()
+
+});
+
+hideLoader();
+
+alert(
+
+"Merci !\n\n"
+
++
+
+"Votre paiement a été enregistré.\n\n"
+
++
+
+"Votre école sera activée après vérification par MASOMO."
+
+);
+
+location.reload();
+
+}
+
+catch(error){
+
+hideLoader();
+
+alert(error.message);
 
 }
 
@@ -6298,19 +7006,12 @@ try{
 
 showLoader();
 
-const adminSnap=
+const admin={
 
-await db.ref(
-"users/"+window.currentPhone
-)
+phone:window.currentPhone,
+schoolId:window.currentSchoolId
 
-.once("value");
-
-const admin=
-adminSnap.val();
-
-window.currentSchoolId=
-admin.schoolId;
+};
 
 
 // vérifier si directeur existe
@@ -6385,6 +7086,7 @@ admin.schoolId+
 
 
 schoolUsersCache=[];
+window.schoolUsersCache=[];
 
 
 if(
@@ -6393,13 +7095,20 @@ membersSnap.exists()
 
 membersSnap.forEach(item=>{
 
-schoolUsersCache.push(
-item.val()
-);
+let membre=item.val();
+
+schoolUsersCache.push(membre);
+
+window.schoolUsersCache.push(membre);
 
 });
 
 }
+
+localStorage.setItem(
+    "membersCache",
+    JSON.stringify(window.schoolUsersCache)
+);
 
 
 drawMembers();
@@ -6819,88 +7528,61 @@ function ouvrirDevoirs(){
 
 showLoader();
 
-let phone=window.currentPhone;
-
-db.ref(
-"users/"+phone
-)
-
+db.ref("users/"+window.currentPhone)
 .once("value")
-
 .then(snapshot=>{
 
 let user=snapshot.val();
 
 if(!user){
-
-throw new Error(
-"Utilisateur introuvable"
-);
-
+throw new Error("Utilisateur introuvable");
 }
 
-return db.ref(
-"schools/"+user.schoolId
-)
-
-.once("value");
+return Promise.all([
+Promise.resolve(user),
+db.ref("schools/"+user.schoolId+"/teachers").once("value")
+]);
 
 })
+.then(result=>{
 
-.then(snapshot=>{
+let user=result[0];
+let teachers=result[1].val() || {};
 
-let school=snapshot.val();
+let maClasse="";
 
-if(!school){
+Object.keys(teachers).forEach(id=>{
 
-throw new Error(
-"École introuvable"
-);
+let t=teachers[id];
 
+if (
+    normalizePhone(t.telephone || t.phone || "") ===
+    normalizePhone(user.phone || user.telephone || "")
+) {
+    maClasse = t.classe || t.className || "";
 }
-
-
-// sécurité si classes absentes
-
-let classes=
-school.classes || [];
-
-let classesHtml="";
-
-
-// construire liste
-
-classes.forEach(c=>{
-
-classesHtml+=`
-<option value="${c}">
-${c}
-</option>
-`;
 
 });
 
+let classesHtml="";
 
-// aucune classe
+if(maClasse){
 
-if(classes.length===0){
+classesHtml=
+`<option value="${maClasse}">
+${maClasse}
+</option>`;
 
-classesHtml=`
+}else{
 
-<option disabled selected>
-
-Aucune classe disponible
-
-</option>
-
-`;
+classesHtml=
+`<option disabled selected>
+Aucune classe attribuée
+</option>`;
 
 }
 
-
-document.querySelector(
-".login-box"
-).innerHTML=`
+document.querySelector(".login-box").innerHTML=`
 
 <h2 style="
 text-align:center;
@@ -6936,8 +7618,7 @@ border-radius:12px;
 border:1px solid #ccc;
 height:100px;
 resize:none;
-"
-></textarea>
+"></textarea>
 
 <input
 id="dateLimite"
@@ -6945,15 +7626,11 @@ type="date"
 >
 
 <button onclick="enregistrerDevoir()">
-
 Enregistrer devoir
-
 </button>
 
 <button onclick="openTeacher()">
-
 ⬅ Retour
-
 </button>
 
 `;
@@ -6961,142 +7638,185 @@ Enregistrer devoir
 hideLoader();
 
 })
-
 .catch(error=>{
 
 hideLoader();
-
-alert(
-error.message
-);
+alert(error.message);
 
 });
 
 }
 
-// enregistrer devoir
+
 
 function enregistrerDevoir(){
 
 showLoader();
 
-let matiere=
-document.getElementById(
-"matiere"
-).value.trim();
-
-let classe=
-document.getElementById(
-"classe"
-).value;
-
-let titre=
-document.getElementById(
-"titre"
-).value.trim();
-
-let description=
-document.getElementById(
-"description"
-).value.trim();
-
-let dateLimite=
-document.getElementById(
-"dateLimite"
-).value;
-
+let matiere=document.getElementById("matiere").value.trim();
+let titre=document.getElementById("titre").value.trim();
+let description=document.getElementById("description").value.trim();
+let dateLimite=document.getElementById("dateLimite").value;
 
 if(
-
-matiere==="" ||
-titre==="" ||
-description==="" ||
-dateLimite===""
-
-){
-
+matiere===""||
+titre===""||
+description===""||
+dateLimite===""){
 hideLoader();
-
-alert(
-"Complétez tous les champs"
-);
-
+alert("Complétez tous les champs");
 return;
-
 }
 
-
-db.ref(
-"users/"+window.currentPhone
-)
-
+db.ref("users/"+window.currentPhone)
 .once("value")
-
 .then(snapshot=>{
 
 let user=snapshot.val();
 
-let devoirRef=
+if(!user){
+throw new Error("Utilisateur introuvable");
+}
 
-db.ref(
-"devoirs"
-).push();
+return Promise.all([
+Promise.resolve(user),
+db.ref("schools/"+user.schoolId+"/teachers").once("value")
+]);
 
+})
+.then(result=>{
+
+let user=result[0];
+let teachers=result[1].val()||{};
+
+let maClasse="";
+
+Object.keys(teachers).forEach(id=>{
+
+let t=teachers[id];
+
+if (
+    normalizePhone(t.telephone || t.phone || "") ===
+    normalizePhone(user.phone || user.telephone || "")
+) {
+    maClasse = t.classe || t.className || "";
+}
+
+});
+
+if(!maClasse){
+throw new Error("Aucune classe ne vous est attribuée.");
+}
+
+let devoirRef=db.ref("devoirs").push();
 
 return devoirRef.set({
 
-idEcole:
-user.schoolId,
+idEcole:user.schoolId,
 
-telephoneEnseignant:
-user.phone,
+telephoneEnseignant:user.phone,
 
-classe:
-classe,
+classe:maClasse,
 
-matiere:
-matiere,
+matiere:matiere,
 
-titre:
-titre,
+titre:titre,
 
-description:
-description,
+description:description,
 
-dateLimite:
-dateLimite,
+dateLimite:dateLimite,
 
-dateCreation:
-new Date()
-.toISOString()
+dateCreation:new Date().toISOString()
 
 });
 
 })
-
 .then(()=>{
 
 hideLoader();
 
-alert(
-"Devoir enregistré"
-);
+alert("Devoir enregistré avec succès.");
 
 ouvrirDevoirs();
 
 })
-
 .catch(error=>{
 
 hideLoader();
 
-alert(
-error.message
-);
+alert(error.message);
 
 });
 
 }
+
+async function modifierEmploiTemps(id) {
+    try {
+        const snap = await db.ref("emploisTemps/" + id).once("value");
+
+        if (!snap.exists()) {
+            alert("Emploi du temps introuvable.");
+            return;
+        }
+
+        const e = snap.val();
+
+        const jour = prompt("Jour :", e.jour);
+        if (jour === null) return;
+
+        const heure = prompt("Heure :", e.heure);
+        if (heure === null) return;
+
+        const matiere = prompt("Matière :", e.matiere);
+        if (matiere === null) return;
+
+        const enseignant = prompt("Enseignant :", e.enseignant);
+        if (enseignant === null) return;
+
+        const salle = prompt("Salle :", e.salle || "");
+        if (salle === null) return;
+
+        await db.ref("emploisTemps/" + id).update({
+            jour,
+            heure,
+            matiere,
+            enseignant,
+            salle
+        });
+
+        alert("Emploi du temps modifié avec succès.");
+
+        if (typeof chargerEmploiTemps === "function") {
+            chargerEmploiTemps();
+        }
+
+    } catch (err) {
+        console.error(err);
+        alert("Erreur lors de la modification.");
+    }
+}
+
+
+async function supprimerEmploiTemps(id) {
+
+    if (!confirm("Supprimer cet emploi du temps ?")) return;
+
+    try {
+
+        await db.ref("emploisTemps/" + id).remove();
+
+        alert("Emploi du temps supprimé.");
+
+        if (typeof chargerEmploiTemps === "function") {
+            chargerEmploiTemps();
+        }
+
+    } catch (err) {
+        console.error(err);
+        alert("Erreur lors de la suppression.");
+    }
+}
+
 
 // ================= DEVOIRS ELEVE =================
 
@@ -7364,261 +8084,466 @@ function ouvrirEmploiTemps(){
 
 showLoader();
 
+let phone=normalizePhone(window.currentPhone);
+
+db.ref("schools/"+window.currentSchoolId+"/emploisTemps")
+.once("value")
+.then(snapshot=>{
+
+hideLoader();
+
+const ordreJours={
+"Lundi":1,
+"Mardi":2,
+"Mercredi":3,
+"Jeudi":4,
+"Vendredi":5,
+"Samedi":6,
+"Dimanche":7
+};
+
+let cours=[];
+
+snapshot.forEach(s=>{
+
+let e = s.val();
+e.id = s.key;
+
+if (e.enseignantPhone == phone) {
+    cours.push(e);
+}
+
+});
+
+cours.sort((a,b)=>{
+
+if(ordreJours[a.jour]!=ordreJours[b.jour]){
+
+return ordreJours[a.jour]-ordreJours[b.jour];
+
+}
+
+return a.heureDebut.localeCompare(b.heureDebut);
+
+});
+
+let html=`
+
+<button class="back-btn" onclick="openTeacher()">
+⬅ Retour
+</button>
+
+<h2 style="text-align:center;color:#1f4cff;">
+📅 Mon emploi du temps
+</h2>
+
+`;
+
+if(cours.length==0){
+
+html+=`
+<div class="empty-box">
+Aucun cours programmé.
+</div>
+`;
+
+}
+
+cours.forEach(c=>{
+
+html+=`
+
+<div class="card">
+
+<h3>${c.matiere}</h3>
+
+<p>📅 <b>${c.jour}</b></p>
+
+<p>🕒 ${c.heureDebut} - ${c.heureFin}</p>
+
+<p>🏫 ${c.classe}</p>
+
+<p>🚪 ${c.salle||"-"}</p>
+
+<div class="menu-grid">
+
+<button onclick="ouvrirPresenceClasse('${c.classe}')">
+👥 Présence
+</button>
+
+<button onclick="ouvrirNotesClasse('${c.classe}')">
+📝 Notes
+</button>
+
+<button onclick="commencerCours('${c.id}')">
+▶ Commencer
+</button>
+
+</div>
+
+</div>
+
+`;
+
+});
+
+document.querySelector(".login-box").innerHTML = html;
+
+});
+
+}
+
+
+function enregistrerEmploiTemps(){
+
+let telephone=document.getElementById("enseignant").value;
+
+if(telephone==""){
+
+alert("Choisissez un enseignant.");
+
+return;
+
+}
+
 db.ref(
-"users/"+window.currentPhone
+"schools/"+window.currentSchoolId+
+"/teachers"
 )
 
 .once("value")
 
 .then(snapshot=>{
 
-let user=snapshot.val();
+let enseignant=null;
 
-return db.ref(
-"schools/"+user.schoolId
-)
+snapshot.forEach(item=>{
 
-.once("value");
+let t=item.val();
 
-})
+if(t.telephone==telephone){
 
-.then(snapshot=>{
-
-let school=snapshot.val();
-
-let classes=
-school.classes || [];
-
-let classesHtml="";
-
-classes.forEach(c=>{
-
-classesHtml+=`
-
-<option value="${c}">
-${c}
-</option>
-
-`;
-
-});
-
-if(classes.length===0){
-
-classesHtml=`
-
-<option disabled selected>
-Aucune classe disponible
-</option>
-
-`;
+enseignant=t;
 
 }
 
-document.querySelector(
-".login-box"
-).innerHTML=`
+});
+
+if(!enseignant){
+
+alert("Enseignant introuvable.");
+
+return;
+
+}
+
+let id="EMP"+Date.now();
+
+let data={
+
+id:id,
+
+enseignantPhone:enseignant.telephone,
+
+enseignantNom:
+enseignant.nom+" "+
+enseignant.postnom+" "+
+enseignant.prenom,
+
+classe:
+document.getElementById("classe").value,
+
+matiere:
+document.getElementById("matiere").value,
+
+jour:
+document.getElementById("jour").value,
+
+heureDebut:
+document.getElementById("heureDebut").value,
+
+heureFin:
+document.getElementById("heureFin").value,
+
+salle:
+document.getElementById("salle").value,
+
+dateCreation:Date.now()
+
+};
+
+db.ref(
+"schools/"+window.currentSchoolId+
+"/emploisTemps/"+id
+)
+
+.set(data)
+
+.then(()=>{
+
+alert("✅ Emploi du temps enregistré.");
+
+ouvrirGestionEmploiTemps();
+
+});
+
+});
+
+}
+
+
+function ouvrirGestionEmploiTemps(){
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+"/emploisTemps"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+let html=`
+
+<button class="back-btn"
+onclick="openAdmin()">
+
+⬅ Retour
+
+</button>
 
 <h2 style="
 text-align:center;
 color:#1f4cff;
 ">
 
-📅 Gestion emploi du temps
+📅 Gestion des emplois du temps
 
 </h2>
 
-<select id="classe">
-
-${classesHtml}
-
-</select>
-
-<select id="jour">
-
-<option>Lundi</option>
-<option>Mardi</option>
-<option>Mercredi</option>
-<option>Jeudi</option>
-<option>Vendredi</option>
-<option>Samedi</option>
-
-</select>
-
-<input
-type="time"
-id="heureDebut"
->
-
-<input
-type="time"
-id="heureFin"
->
-
-<input
-id="matiere"
-placeholder="Matière"
->
-
-<input
-id="enseignant"
-placeholder="Nom enseignant"
->
-
-<input
-id="salle"
-placeholder="Salle"
->
-
 <button
-onclick="enregistrerEmploiTemps()"
->
+class="save-btn"
+onclick="ouvrirAjouterEmploiTemps()">
 
-Enregistrer
-
-</button>
-
-<button
-onclick="openTeacher()"
->
-
-⬅ Retour
+➕ Ajouter un emploi du temps
 
 </button>
 
 `;
 
-hideLoader();
+if(!snapshot.exists()){
 
-})
+html+=`
 
-.catch(error=>{
+<div class="empty-box">
 
-hideLoader();
+Aucun emploi du temps enregistré.
 
-alert(error.message);
+</div>
+
+`;
+
+}else{
+
+snapshot.forEach(item=>{
+
+let e=item.val();
+
+html+=`
+
+<div class="card">
+
+<h3>
+
+${e.matiere}
+
+</h3>
+
+<p>
+
+👨‍🏫 ${e.enseignantNom}
+
+</p>
+
+<p>
+
+🏫 ${e.classe}
+
+</p>
+
+<p>
+
+📅 ${e.jour}
+
+</p>
+
+<p>
+
+🕒 ${e.heureDebut} - ${e.heureFin}
+
+</p>
+
+<p>
+
+🚪 ${e.salle||"-"}
+
+</p>
+
+<div style="
+display:flex;
+gap:10px;
+margin-top:10px;
+">
+
+<button
+onclick="modifierEmploiTemps('${e.id}')">
+
+✏ Modifier
+
+</button>
+
+<button
+style="background:#e53935;color:#fff;"
+onclick="supprimerEmploiTemps('${e.id}')">
+
+🗑 Supprimer
+
+</button>
+
+</div>
+
+</div>
+
+`;
 
 });
 
 }
 
-function enregistrerEmploiTemps(){
+document.querySelector(".login-box").innerHTML=html;
 
-showLoader();
-
-let classe=
-document.getElementById(
-"classe"
-).value;
-
-let jour=
-document.getElementById(
-"jour"
-).value;
-
-let heureDebut=
-document.getElementById(
-"heureDebut"
-).value;
-
-let heureFin=
-document.getElementById(
-"heureFin"
-).value;
-
-let matiere=
-document.getElementById(
-"matiere"
-).value.trim();
-
-let enseignant=
-document.getElementById(
-"enseignant"
-).value.trim();
-
-let salle=
-document.getElementById(
-"salle"
-).value.trim();
-
-
-if(
-
-!classe ||
-!jour ||
-!heureDebut ||
-!heureFin ||
-!matiere
-
-){
-
-hideLoader();
-
-alert(
-"Complétez tous les champs"
-);
-
-return;
+});
 
 }
 
+function verifierConflit(jour,heureDebut,heureFin,enseignantPhone){
 
-db.ref(
-"users/"+window.currentPhone
+return db.ref(
+"schools/"+window.currentSchoolId+"/emploisTemps"
 )
 
 .once("value")
 
 .then(snapshot=>{
 
-let user=snapshot.val();
+let conflit=false;
 
-return db.ref(
-"emploisTemps"
-)
+snapshot.forEach(s=>{
 
-.push({
+let e=s.val();
 
-idEcole:user.schoolId,
+if(
 
-classe:classe,
+e.jour==jour &&
 
-jour:jour,
+e.enseignantPhone==enseignantPhone &&
 
-heureDebut:heureDebut,
+heureDebut<e.heureFin &&
 
-heureFin:heureFin,
+heureFin>e.heureDebut
 
-matiere:matiere,
+){
 
-enseignant:enseignant,
+conflit=true;
 
-salle:salle,
-
-dateCreation:
-new Date().toISOString()
+}
 
 });
 
-})
+return conflit;
 
-.then(()=>{
+});
 
-hideLoader();
+}
+
+function verifierCoursDuJour(){
+
+let phone=normalizePhone(window.currentPhone);
+
+let maintenant=new Date();
+
+let jours=[
+
+"Dimanche",
+
+"Lundi",
+
+"Mardi",
+
+"Mercredi",
+
+"Jeudi",
+
+"Vendredi",
+
+"Samedi"
+
+];
+
+let jour=jours[maintenant.getDay()];
+
+let heure=
+
+String(maintenant.getHours()).padStart(2,"0")
+
++":"+
+
+String(maintenant.getMinutes()).padStart(2,"0");
+
+db.ref(
+
+"schools/"+window.currentSchoolId+"/emploisTemps"
+
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+snapshot.forEach(s=>{
+
+let e=s.val();
+
+if(
+
+e.enseignantPhone==phone &&
+
+e.jour==jour &&
+
+heure>=e.heureDebut &&
+
+heure<=e.heureFin
+
+){
 
 alert(
-"Emploi du temps enregistré"
+
+"📚 Cours en cours : "+
+
+e.matiere+
+
+"\nClasse : "+
+
+e.classe
+
 );
 
-ouvrirEmploiTemps();
+}
 
-})
-
-.catch(error=>{
-
-hideLoader();
-
-alert(error.message);
+});
 
 });
 
@@ -8023,12 +8948,21 @@ if(snapshot.exists()){
 
 snapshot.forEach(item=>{
 
-eleves.push(
-item.val()
-);
+    let eleve = item.val();
+
+    if(window.currentRole === "teacher"){
+
+        if(eleve.classe === window.currentTeacherClass){
+            eleves.push(eleve);
+        }
+
+    }else{
+
+        eleves.push(eleve);
+
+    }
 
 });
-
 }
 
 window.elevesCache=
@@ -9026,16 +9960,49 @@ window.onload = function(){
         
 
 // Accès réservé au contrôle MASOMO
-if (user.phone === "994044329") {
+if(normalizePhone(user.phone)===normalizePhone("243994044329")){
+
     openControleMasomo();
+
     return;
+
 }
 
 switch(user.role){
 
     case "admin":
-        openAdmin();
-        break;
+
+    window.currentSchoolId = user.schoolId;
+
+    db.ref("schools/"+user.schoolId)
+    .once("value")
+    .then(schoolSnap=>{
+
+        if(!schoolSnap.exists()){
+
+            logout();
+
+            return;
+
+        }
+
+        let school = schoolSnap.val();
+
+        if(
+    school.status === "active" &&
+    school.paymentStatus === "paid"
+){
+
+    openAdmin();
+
+}else{
+
+    afficherEcoleEnAttente(school);
+
+}
+    });
+
+    break;
 
     case "teacher":
         openTeacher();
@@ -9302,6 +10269,28 @@ schoolUsers.forEach(user=>{
         <h3 style="margin-top:0;color:#1565C0;">
             🏫 ${school.name || school.schoolName || "École"}
         </h3>
+        
+        <div style="
+background:#FFF8E1;
+padding:12px;
+border-radius:10px;
+margin-bottom:15px;
+">
+
+<b>Statut :</b>
+${school.status=="active" ? "🟢 Active" : "🟡 En attente"}
+
+<br><br>
+
+<b>Paiement :</b>
+${school.paymentStatus || "unpaid"}
+
+<br><br>
+
+<b>Méthode :</b>
+${school.paymentMethod || "-"}
+
+</div>
 
         <div style="
             display:grid;
@@ -9318,6 +10307,70 @@ schoolUsers.forEach(user=>{
 
         </div>
 
+        ${
+school.status!="active"
+
+?
+
+`
+
+<button
+onclick="validerEcole('${schoolId}')"
+style="
+width:100%;
+padding:14px;
+background:#2E7D32;
+color:white;
+border:none;
+border-radius:10px;
+font-size:16px;
+margin-bottom:10px;
+">
+
+✅ Valider l'école
+
+</button>
+
+<button
+onclick="refuserEcole('${schoolId}')"
+style="
+width:100%;
+padding:14px;
+background:#C62828;
+color:white;
+border:none;
+border-radius:10px;
+font-size:16px;
+margin-bottom:20px;
+">
+
+❌ Refuser
+
+</button>
+
+`
+
+:
+
+`
+
+<div style="
+background:#E8F5E9;
+padding:15px;
+border-radius:10px;
+color:#2E7D32;
+font-weight:bold;
+margin-bottom:20px;
+">
+
+✅ École déjà validée
+
+</div>
+
+`
+
+}
+
         <h4 style="color:#1565C0;">👥 Comptes enregistrés</h4>
 
         ${usersHtml}
@@ -9327,6 +10380,385 @@ schoolUsers.forEach(user=>{
     `;
 
 }
+
+
+async function validerEcole(schoolId){
+
+if(!confirm("Valider cette école ?")) return;
+
+showLoader();
+
+try{
+
+await db.ref("schools/"+schoolId).update({
+
+status:"active",
+
+paymentStatus:"paid",
+
+verifiedBy:"MASOMO",
+
+verifiedAt:Date.now(),
+
+trialStart: Date.now(),
+
+trialEnd: Date.now() + (3 * 60 * 1000) // 3 minutes
+
+
+// trialEnd: Date.now() + (90 * 24 * 60 * 60 * 1000)
+
+});
+
+hideLoader();
+
+alert("École validée avec succès.");
+
+openControleMasomo();
+
+}
+catch(error){
+
+hideLoader();
+
+alert(error.message);
+
+}
+
+}
+
+
+function afficherEssaiExpire(school){
+
+document.querySelector(".login-box").innerHTML=`
+
+<div style="padding:25px;text-align:center;">
+
+<h1 style="color:#D32F2F;">
+
+⛔ Essai expiré
+
+</h1>
+
+<p>
+
+Votre période d'essai est terminée.
+
+</p>
+
+<p>
+
+Veuillez renouveler votre abonnement afin de continuer à utiliser MASOMO.
+
+</p>
+
+<button onclick="ouvrirPaiementRenouvellement()">
+
+💳 Renouveler
+
+</button>
+
+</div>
+
+`;
+
+}
+
+
+function verifierEssai(school){
+
+if(!school.trialEnd) return true;
+
+let restant = school.trialEnd - Date.now();
+
+if(restant <= 0){
+
+    afficherEssaiExpire(school);
+
+    return false;
+
+}
+
+return true;
+
+}
+
+async function refuserEcole(schoolId){
+
+let raison=prompt("Pourquoi refusez-vous cette école ?");
+
+if(raison===null) return;
+
+showLoader();
+
+try{
+
+await db.ref("schools/"+schoolId).update({
+
+status:"refused",
+
+refuseReason:raison,
+
+paymentStatus:"refused"
+
+});
+
+hideLoader();
+
+alert("École refusée.");
+
+openControleMasomo();
+
+}
+catch(error){
+
+hideLoader();
+
+alert(error.message);
+
+}
+
+}
+
+function afficherEcoleEnAttente(school){
+
+let statut="🟡 En attente de validation";
+let message="Nous vérifions actuellement votre paiement. Dès qu'il sera confirmé, votre école sera automatiquement activée.";
+let couleur="#F9A825";
+
+if(school.status==="refused"){
+
+    statut="🔴 Paiement refusé";
+    couleur="#D32F2F";
+
+    message=school.refuseReason
+    ?
+    "Motif :<br><b>"+school.refuseReason+"</b>"
+    :
+    "Votre demande a été refusée. Veuillez contacter le service client.";
+
+}
+
+document.querySelector(".login-box").innerHTML=`
+
+<div style="
+padding:25px;
+max-width:500px;
+margin:auto;
+text-align:center;
+font-family:Arial,sans-serif;
+">
+
+<h1 style="color:#1565C0;">
+🏫 MASOMO
+</h1>
+
+<div style="
+background:#fff;
+border-radius:20px;
+padding:25px;
+box-shadow:0 4px 15px rgba(0,0,0,.12);
+">
+
+<h2 style="color:${couleur};">
+${statut}
+</h2>
+
+<p style="
+font-size:16px;
+line-height:1.6;
+">
+
+${message}
+
+</p>
+
+<hr style="margin:20px 0;">
+
+<h3 style="color:#1565C0;">
+📞 Service client
+</h3>
+
+<p>
+
+WhatsApp : <b>+243994044329</b><br>
+
+Téléphone : <b>+243994044329</b><br>
+
+E-mail : <b>support@masomo.cd</b>
+
+</p>
+
+<button
+onclick="contacterWhatsapp()"
+style="
+width:100%;
+padding:14px;
+margin-top:10px;
+background:#25D366;
+color:white;
+border:none;
+border-radius:12px;
+font-size:16px;
+">
+
+💬 Contacter sur WhatsApp
+
+</button>
+
+<button
+onclick="appelerServiceClient()"
+style="
+width:100%;
+padding:14px;
+margin-top:10px;
+background:#1565C0;
+color:white;
+border:none;
+border-radius:12px;
+font-size:16px;
+">
+
+📞 Appeler le service client
+
+</button>
+
+<p style="
+font-size:14px;
+color:#666;
+">
+
+En cas de problème, contactez notre service client.
+
+</p>
+
+<button
+onclick="verifierValidationEcole()"
+style="
+width:100%;
+padding:14px;
+margin-top:15px;
+background:#1565C0;
+color:white;
+border:none;
+border-radius:12px;
+font-size:16px;
+cursor:pointer;
+">
+
+🔄 Actualiser
+
+</button>
+
+</div>
+
+<p style="
+margin-top:20px;
+font-size:14px;
+color:#888;
+">
+
+Merci d'avoir choisi <b>MASOMO</b> ❤️
+
+</p>
+
+</div>
+
+`;
+
+}
+
+function contacterWhatsapp(){
+
+let numero="243994044329";
+
+let message="Bonjour MASOMO, mon école est en attente de validation.";
+
+window.open(
+"https://wa.me/"+numero+
+"?text="+encodeURIComponent(message),
+"_blank"
+);
+
+}
+
+function appelerServiceClient(){
+
+window.location.href="tel:+243994044329";
+
+}
+
+
+
+async function verifierValidationEcole(){
+
+try{
+
+showLoader();
+
+const snapshot = await db.ref(
+"schools/"+window.currentSchoolId
+).once("value");
+
+hideLoader();
+
+if(!snapshot.exists()){
+
+alert("École introuvable.");
+
+return;
+
+}
+
+const school = snapshot.val();
+
+// École validée
+if(
+    school.status === "active" &&
+    school.paymentStatus === "paid"
+){
+
+window.adminCache = school;
+
+localStorage.setItem(
+
+"adminData_"+window.currentSchoolId,
+
+JSON.stringify({
+
+school:school,
+
+schoolId:window.currentSchoolId,
+
+phone:window.currentPhone
+
+})
+
+);
+
+alert(
+"🎉 Félicitations !\n\nVotre école a été validée par MASOMO.\n\nBienvenue !"
+);
+
+openAdmin();
+
+return;
+
+}
+
+// Toujours en attente ou refusée
+afficherEcoleEnAttente(school);
+
+}
+catch(error){
+
+hideLoader();
+
+alert(error.message);
+
+}
+
+}
+
 
 function filterSchools(){
 
@@ -12598,18 +14030,10 @@ return;
 }
 
 let updates={};
-let trouve=false;
 
 snapshot.forEach(item=>{
 
 let n=item.val();
-
-// Afficher uniquement les notifications de salaire
-if(n.type!=="salaire"){
-return;
-}
-
-trouve=true;
 
 html+=`
 
@@ -12622,22 +14046,24 @@ box-shadow:0 4px 10px rgba(0,0,0,.08);
 ">
 
 <h3 style="margin:0;">
-${n.title}
+${n.title||"Notification"}
 </h3>
 
 <br>
 
-${n.message}
+${n.message||""}
 
 <br><br>
 
 <small>
 
-📅 ${n.date}
+📅 ${n.date||""}
 
 </small>
 
 `;
+
+if(n.type==="salaire"){
 
 if(n.status==="confirmé"){
 
@@ -12686,7 +14112,7 @@ onclick="confirmerPaiementPersonnel('${item.key}')">
 
 </button>
 
-<br> <br>
+<br><br>
 
 <button
 style="background:#e53935;"
@@ -12700,6 +14126,8 @@ onclick="refuserPaiementPersonnel('${item.key}')">
 
 }
 
+}
+
 html+=`
 
 </div>
@@ -12710,29 +14138,18 @@ updates[item.key+"/read"]=true;
 
 });
 
-if(!trouve){
-
-html+=`
-
-<p style="
-text-align:center;
-color:gray;
-">
-
-Aucune notification de salaire.
-
-</p>
-
-`;
-
-}
-
 document.querySelector(".login-box").innerHTML=html;
 
 db.ref(
 "schools/"+window.currentSchoolId+
 "/notifications/"+phone
 ).update(updates);
+
+let badge=document.getElementById("teacherNotifBadge");
+
+if(badge){
+    badge.style.display="none";
+}
 
 })
 
@@ -12745,6 +14162,7 @@ alert(error.message);
 });
 
 }
+
 
 function confirmerPaiementPersonnel(idNotif){
 
@@ -19894,6 +21312,8 @@ alert(error.message);
 
 function chargerClassesModification(){
 
+let schoolId = window.currentSchoolId;
+
 let select=document.getElementById("classeModification");
 
 if(!select) return;
@@ -19904,17 +21324,17 @@ db.ref("schools/"+schoolId+"/classes")
 .once("value")
 .then(snapshot=>{
 
-snapshot.forEach(child=>{
+snapshot.forEach(child => {
 
-let classe=child.val();
+    let classe = child.val();
 
-let option=document.createElement("option");
+    let option = document.createElement("option");
 
-option.value=child.key;
+    option.value = typeof classe === "string" ? classe : (classe.nom || child.key);
 
-option.textContent=classe.nom || child.key;
+    option.textContent = typeof classe === "string" ? classe : (classe.nom || child.key);
 
-select.appendChild(option);
+    select.appendChild(option);
 
 });
 
@@ -19923,6 +21343,9 @@ select.appendChild(option);
 }
 
 function chargerNotesModification(){
+    
+    let schoolId = window.currentSchoolId;
+    
 
 let classe=document.getElementById("classeModification").value;
 
@@ -20272,8 +21695,9 @@ chargerAbsences();
 
 function pageAbsences(){
 
-document.getElementById("content").innerHTML=`
-
+document.querySelector(
+".login-box"
+).innerHTML=`
 <div class="page">
 
 <h2>🚫 Gestion des absences</h2>
@@ -20352,6 +21776,8 @@ onclick="telechargerExcelAbsences()">
 
 </button>
 
+<br> <br> 
+
 <button
 class="btn"
 onclick="telechargerPDFAbsences()">
@@ -20359,6 +21785,8 @@ onclick="telechargerPDFAbsences()">
 📄 PDF
 
 </button>
+
+<br> <br> 
 
 <button
 class="btn"
@@ -20375,6 +21803,43 @@ onclick="window.print()">
 `;
 
 chargerClassesPresence();
+
+}
+
+function chargerClassesPresence(){
+
+    let schoolId = window.currentSchoolId;
+
+    let select = document.getElementById("classePresence");
+
+    if(!select) return;
+
+    select.innerHTML = '<option value="">Choisir une classe</option>';
+
+    db.ref("schools/"+schoolId+"/classes")
+    .once("value")
+    .then(snapshot=>{
+
+        snapshot.forEach(item=>{
+
+            let classe = item.val();
+
+            let option = document.createElement("option");
+
+            option.value = classe;
+            option.textContent = classe;
+
+            select.appendChild(option);
+
+        });
+
+    })
+    .catch(err=>{
+
+        console.error(err);
+        alert("Impossible de charger les classes.");
+
+    });
 
 }
 
@@ -20396,8 +21861,7 @@ return;
 
 showLoader();
 
-db.ref("schools/"+schoolId+"/presences/"+classe)
-
+db.ref("schools/"+window.currentSchoolId+"/presences/"+classe)
 .once("value")
 
 .then(snapshot=>{
@@ -21242,11 +22706,610 @@ db.ref("users/"+user.phone)
 
 
 
-function ouvrirMessagesParents(){}
+function ouvrirMessagesParents(){
 
-function ouvrirReunions(){}
+db.ref("schools/"+window.currentSchoolId+"/students").once("value").then(snap=>{
 
-function ouvrirProfilEnseignant(){}
+let html=`
+
+<button
+onclick="openAdmin()"
+style="
+width:100%;
+padding:14px;
+border:none;
+border-radius:15px;
+background:#1f4cff;
+color:white;
+font-weight:bold;
+margin-bottom:20px;
+">
+⬅ Retour
+</button>
+
+<h2 style="text-align:center;color:#1f4cff;">
+📢 Signaler aux parents
+</h2>
+
+<div id="listeEleves"
+style="
+max-height:250px;
+overflow:auto;
+margin-bottom:15px;
+">
+`;
+
+if(!snap.exists()){
+
+html+=`
+<p style="text-align:center;color:gray;">
+Aucun élève.
+</p>
+`;
+
+}else{
+
+snap.forEach(e=>{
+
+let s=e.val();
+
+html+=`
+
+<label style="
+display:block;
+padding:10px;
+background:white;
+margin-bottom:8px;
+border-radius:10px;
+box-shadow:0 2px 6px rgba(0,0,0,.08);
+">
+
+<input
+type="checkbox"
+class="eleveNotif"
+value="${e.key}"
+data-phone="${normalizePhone(s.fatherPhone || s.motherPhone || "")}"
+data-name="${s.name||""}"
+>
+
+${s.name||""}
+
+</label>
+
+`;
+
+});
+
+}
+
+html+=`
+
+<select
+id="typeSignalement"
+style="
+width:100%;
+padding:12px;
+border-radius:10px;
+margin-bottom:12px;
+">
+
+<option value="Présence">✅ Présence</option>
+<option value="Absence">❌ Absence</option>
+<option value="Retard">⏰ Retard</option>
+<option value="Maladie">🏥 Maladie</option>
+<option value="Bon comportement">⭐ Bon comportement</option>
+<option value="Mauvais comportement">⚠ Mauvais comportement</option>
+<option value="Devoir non fait">📚 Devoir non fait</option>
+<option value="Convocation">📢 Convocation</option>
+<option value="Autre">✍ Autre</option>
+
+</select>
+
+<textarea
+id="messageNotif"
+placeholder="Message complémentaire..."
+style="
+width:100%;
+height:100px;
+padding:10px;
+border-radius:10px;
+margin-bottom:15px;
+"></textarea>
+
+<button
+onclick="envoyerSignalementParents()"
+style="
+width:100%;
+padding:15px;
+background:#1f4cff;
+color:white;
+border:none;
+border-radius:12px;
+font-weight:bold;
+">
+📤 Envoyer
+</button>
+
+`;
+
+document.querySelector(".login-box").innerHTML=html;
+
+});
+
+}
+
+
+
+function envoyerSignalementParents(){
+
+let type=document.getElementById("typeSignalement").value;
+
+let message=document.getElementById("messageNotif").value.trim();
+
+let checks=document.querySelectorAll(".eleveNotif:checked");
+
+if(checks.length===0){
+
+alert("Sélectionnez au moins un élève.");
+
+return;
+
+}
+
+let date=new Date().toLocaleString("fr-FR");
+
+let promesses=[];
+
+checks.forEach(c=>{
+
+let phone=c.dataset.phone;
+
+if(!phone)return;
+
+let ref=db.ref(
+"schools/"
++window.currentSchoolId+
+"/notifications/"
++phone
+).push();
+
+promesses.push(
+
+ref.set({
+
+title:type,
+
+message:
+"Élève : "
++c.dataset.name+
+(message ? "<br><br>"+message : ""),
+
+date:date,
+
+read:false
+
+})
+
+);
+
+});
+
+Promise.all(promesses).then(()=>{
+
+alert("Notifications envoyées.");
+
+ouvrirMessagesParents();
+
+});
+
+}
+
+
+
+function ouvrirReunions(){
+
+db.ref("schools/"+currentSchoolId+"/classes")
+.once("value")
+.then(classesSnap=>{
+
+let html=`
+<div style="padding:15px;">
+
+<h2 style="text-align:center;color:#1f4cff;">
+📅 Réunions des parents
+</h2>
+
+<label>Classe</label>
+
+<select id="classeReunion"
+style="
+width:100%;
+padding:12px;
+margin-bottom:12px;
+border-radius:10px;
+">
+`;
+
+classesSnap.forEach(c=>{
+
+let classe=c.val();
+
+html+=`
+<option value="${classe}">
+${classe}
+</option>
+`;
+
+});
+
+
+html+=`
+
+</select>
+
+
+<label>Date</label>
+
+<input
+type="date"
+id="dateReunion"
+style="
+width:100%;
+padding:12px;
+margin-bottom:12px;
+border-radius:10px;
+">
+
+
+<label>Heure</label>
+
+<input
+type="time"
+id="heureReunion"
+style="
+width:100%;
+padding:12px;
+margin-bottom:12px;
+border-radius:10px;
+">
+
+
+<label>Lieu</label>
+
+<input
+type="text"
+id="lieuReunion"
+placeholder="Ex : Salle polyvalente"
+style="
+width:100%;
+padding:12px;
+margin-bottom:12px;
+border-radius:10px;
+">
+
+
+<label>Objet</label>
+
+<textarea
+id="objetReunion"
+placeholder="Motif de la réunion..."
+style="
+width:100%;
+height:120px;
+padding:12px;
+margin-bottom:15px;
+border-radius:10px;
+"></textarea>
+
+
+<button
+onclick="envoyerReunionParents()"
+style="
+width:100%;
+padding:15px;
+background:#1f4cff;
+color:white;
+border:none;
+border-radius:12px;
+font-weight:bold;
+">
+📢 Informer tous les parents
+</button>
+
+<br> 
+<br>
+
+<button
+onclick="openAdmin()"
+style="
+width:50%;
+padding:15px;
+background: #e53935;
+color: white;
+border:none;
+border-radius:12px;
+font-weight:bold;
+">
+Retour
+</button>
+
+
+</div>
+`;
+
+
+document.querySelector(".login-box").innerHTML=html;
+
+
+});
+
+
+}
+
+
+
+
+
+function envoyerReunionParents(){
+
+const classe=document.getElementById("classeReunion").value;
+const date=document.getElementById("dateReunion").value;
+const heure=document.getElementById("heureReunion").value;
+const lieu=document.getElementById("lieuReunion").value;
+const objet=document.getElementById("objetReunion").value;
+
+if(!classe){
+    alert("Veuillez choisir une classe.");
+    return;
+}
+
+showLoader();
+
+db.ref("schools/"+currentSchoolId+"/students")
+.orderByChild("className")
+.equalTo(classe)
+.once("value")
+.then(snap=>{
+
+    let taches=[];
+    let compteur=0;
+
+    snap.forEach(e=>{
+
+        let eleve=e.val();
+
+        let telephones=[
+            eleve.parentPhone,
+            eleve.fatherPhone,
+            eleve.motherPhone
+        ];
+
+        let uniques=[...new Set(
+            telephones
+            .map(p=>normalizePhone(p||""))
+            .filter(p=>p)
+        )];
+
+        uniques.forEach(phone=>{
+
+            compteur++;
+
+            taches.push(
+
+                db.ref(
+                    "schools/"+currentSchoolId+
+                    "/notifications/"+phone
+                ).push({
+
+                    type:"meeting",
+                    title:"📅 Réunion des parents",
+
+                    message:
+                    "Votre présence est demandée pour une réunion.\n\n"+
+                    "Classe : "+classe+
+                    "\nDate : "+date+
+                    "\nHeure : "+heure+
+                    "\nLieu : "+lieu+
+                    "\n\n"+
+                    objet,
+
+                    date:new Date().toLocaleString("fr-FR"),
+                    read:false
+
+                })
+
+            );
+
+        });
+
+    });
+
+    return Promise.all(taches).then(()=>{
+
+        hideLoader();
+
+        alert("Réunion envoyée à "+compteur+" parent(s).");
+
+        ouvrirReunions();
+
+    });
+
+})
+.catch(err=>{
+
+    hideLoader();
+    console.error(err);
+    alert(err.message);
+
+});
+
+}
+
+function ouvrirProfilEnseignant(){
+
+let nom=currentUser?.name||currentUser?.nom||"";
+let matricule=currentUser?.matricule||"Non défini";
+let telephone=currentUser?.phone||currentUser?.telephone||"";
+let email=currentUser?.email||"";
+let sexe=currentUser?.sexe||"";
+let adresse=currentUser?.adresse||"";
+let fonction=currentUser?.fonction||"Enseignant";
+
+document.querySelector(".login-box").innerHTML=`
+
+<div style="padding:15px;">
+
+<button
+onclick="openTeacher()"
+style="
+width:100%;
+padding:14px;
+margin-bottom:20px;
+background:#1f4cff;
+color:white;
+border:none;
+border-radius:12px;
+font-weight:bold;
+">
+⬅ Retour
+</button>
+
+<div style="text-align:center;">
+
+<div style="
+width:100px;
+height:100px;
+margin:auto;
+border-radius:50%;
+background:#1f4cff;
+color:white;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:40px;
+font-weight:bold;
+">
+${nom?nom.charAt(0).toUpperCase():"E"}
+</div>
+
+<h2 style="margin-top:15px;">
+${nom}
+</h2>
+
+<p style="color:gray;">
+${fonction}
+</p>
+
+</div>
+
+<hr>
+
+<p><b>🆔 Matricule :</b> ${matricule}</p>
+
+<p><b>📞 Téléphone :</b> ${telephone}</p>
+
+<p><b>📧 Email :</b> ${email}</p>
+
+<p><b>👤 Sexe :</b> ${sexe}</p>
+
+<p><b>🏠 Adresse :</b> ${adresse}</p>
+
+<button
+onclick="modifierProfilEnseignant()"
+style="
+width:100%;
+padding:15px;
+margin-top:20px;
+background:#1f4cff;
+color:white;
+border:none;
+border-radius:12px;
+font-weight:bold;
+">
+✏ Modifier le profil
+</button>
+
+</div>
+
+`;
+
+}
+
+
+function ouvrirNotesClasse(classe){
+
+    saisirNotes();
+
+    setTimeout(function(){
+
+        let select = document.getElementById("classeNotes");
+
+        if(!select) return;
+
+        select.value = classe;
+
+        if(typeof chargerCoursNotes==="function"){
+            chargerCoursNotes();
+        }
+
+        if(typeof chargerElevesNotes==="function"){
+            chargerElevesNotes();
+        }
+
+    },300);
+
+}
+
+function commencerCours(id){
+
+    db.ref(
+        "schools/"+window.currentSchoolId+"/emploisTemps/"+id
+    )
+    .update({
+        statut:"En cours",
+        heureDebutReelle:new Date().toISOString()
+    })
+    .then(()=>{
+
+        alert("Cours démarré.");
+        ouvrirEmploiTemps();
+
+    })
+    .catch(err => {
+
+    console.error(err);
+    alert("Erreur lors du démarrage du cours.");
+
+});
+
+}
+
+function surveillerEssai(){
+
+setInterval(()=>{
+
+    if(!window.adminCache) return;
+
+    if(!verifierEssai(window.adminCache)){
+
+        localStorage.removeItem(
+            "adminData_"+window.currentSchoolId
+        );
+
+        return;
+
+    }
+
+},30000);
+
+}
+
+
+function modifierProfilEnseignant(){
+
+alert("La modification du profil sera disponible dans une prochaine mise à jour.");
+
+}
 
 
 
