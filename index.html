@@ -988,6 +988,19 @@ window.compteurEssai = setInterval(()=>{
 
     }
 
+    // Vérifier si l'essai est terminé
+    if(!verifierEssai(window.adminCache)){
+
+        clearInterval(window.compteurEssai);
+
+        localStorage.removeItem(
+            "adminData_"+window.currentSchoolId
+        );
+
+        return;
+
+    }
+
 },1000);
 
 }
@@ -1823,6 +1836,7 @@ border:2px solid white;
 `;
 
 verifierNotificationsEnseignant(phone);
+surveillerEmploiTemps();
 
 });
 
@@ -3573,16 +3587,20 @@ function openAdmin(){
 
             window.adminCache = data.school;
 
-            hideLoader();
+hideLoader();
 
-            afficherAdmin(data.school);
+if(verifierEssai(data.school)){
 
-            // Vérification silencieuse en arrière-plan
-            actualiserAdmin(true);
+    afficherAdmin(data.school);
 
-            return Promise.reject("CACHE");
+    surveillerEssai();
 
-        }
+    actualiserAdmin(true);
+
+}
+
+return Promise.reject("CACHE");
+}
 
         // Aucun cache : télécharger depuis Firebase
         return db.ref(
@@ -3603,6 +3621,14 @@ function openAdmin(){
         }
 
         let school = snapshot.val();
+        
+        if(!verifierEssai(school)){
+
+    hideLoader();
+
+    return;
+
+}
 
         window.adminCache = school;
 
@@ -3665,7 +3691,9 @@ title="Actualiser">
 
 <div id="tempsEssai">
 
-${afficherTempsRestant(window.adminCache)}
+<div id="tempsExpiration">
+    ${afficherTempsRestant(window.adminCache)}
+</div>
 
 </div>
 
@@ -3913,6 +3941,14 @@ text-align:center;
 </div>
 
 `;
+// Démarrer le compteur automatique
+clearInterval(window.compteurExpiration);
+
+setTimeout(function(){
+
+    lancerCompteurExpiration();
+
+},100);
 
 }
 
@@ -3966,9 +4002,17 @@ phone:window.currentPhone
         // Si l'utilisateur est sur l'espace admin
         if(document.querySelector(".admin-header")){
 
-            afficherAdmin(school);
+    if(verifierEssai(school)){
 
-        }
+        afficherAdmin(school);
+
+    }else{
+
+        return;
+
+    }
+
+}
 
         if(!silencieux){
             hideLoader();
@@ -3983,6 +4027,91 @@ phone:window.currentPhone
         }
 
     });
+
+}
+
+function ouvrirPaiementRenouvellement(){
+
+document.querySelector(".login-box").innerHTML = `
+
+<h2 style="text-align:center;color:#1565C0;">
+💳 Renouveler l'abonnement
+</h2>
+
+<p style="text-align:center;">
+Choisissez votre méthode de paiement.
+Après paiement, MASOMO vérifiera votre transaction avant d'activer votre abonnement.
+</p>
+
+<button class="card-btn"
+onclick="confirmerRenouvellement('Airtel Money')">
+📱 Airtel Money
+</button>
+
+<button class="card-btn"
+onclick="confirmerRenouvellement('Orange Money')">
+🟠 Orange Money
+</button>
+
+<button class="card-btn"
+onclick="confirmerRenouvellement('M-Pesa')">
+🔵 M-Pesa
+</button>
+
+<button class="card-btn"
+onclick="confirmerRenouvellement('Paiement direct')">
+🏦 Paiement direct
+</button>
+
+<br><br>
+
+<button class="card-btn danger"
+onclick="logout()">
+Retour
+</button>
+
+`;
+
+}
+
+async function confirmerRenouvellement(methode){
+
+try{
+
+showLoader();
+
+await db.ref(
+"schools/"+window.currentSchoolId
+).update({
+
+status:"pending",
+
+paymentStatus:"pending",
+
+paymentMethod:methode,
+
+renewalRequest:true,
+
+renewalRequestedAt:Date.now()
+
+});
+
+hideLoader();
+
+alert(
+"Votre demande de renouvellement a été envoyée.\n\nAprès vérification du paiement, MASOMO activera votre abonnement."
+);
+
+verifierValidationEcole();
+
+}
+catch(error){
+
+hideLoader();
+
+alert(error.message);
+
+}
 
 }
 
@@ -4069,44 +4198,182 @@ chargerListeClasses();
 
 }
 
+
 function afficherTempsRestant(school){
 
-if(!school.trialEnd) return "";
+let abonnementActif=
+school.subscriptionEnd &&
+school.subscriptionEnd>Date.now();
 
-let restant = school.trialEnd - Date.now();
+let fin=abonnementActif
+?school.subscriptionEnd
+:school.trialEnd;
 
-if(restant <= 0){
+if(!fin) return "";
 
-    return `
-    <div style="
-    background:#D32F2F;
-    color:white;
-    padding:10px;
-    border-radius:10px;
-    margin-top:10px;
-    ">
-    ⛔ Essai expiré
-    </div>
-    `;
-}
+let restant=fin-Date.now();
 
-let jours = Math.ceil(restant/(1000*60*60*24));
-
-let couleur = jours<=10 ? "#D32F2F" : "#2E7D32";
+if(restant<=0){
 
 return `
+
+<div style="
+background:#D32F2F;
+color:white;
+padding:10px;
+border-radius:12px;
+margin-top:8px;
+text-align:center;
+">
+
+<b>
+
+${abonnementActif
+?"⛔ Abonnement expiré"
+:"⛔ Essai expiré"}
+
+</b>
+
+</div>
+
+`;
+
+}
+
+let jours=Math.floor(restant/86400000);
+
+let heures=Math.floor((restant%86400000)/3600000);
+
+let minutes=Math.floor((restant%3600000)/60000);
+
+let secondes=Math.floor((restant%60000)/1000);
+
+let couleur=restant<=10*60*1000
+?"#D32F2F"
+:"#2E7D32";
+
+return `
+
 <div style="
 background:${couleur};
 color:white;
 padding:10px;
-border-radius:10px;
-margin-top:10px;
+border-radius:12px;
+margin-top:8px;
+text-align:center;
 ">
 
-⏳ Il reste ${jours} jour(s) d'essai.
+<div style="
+font-size:16px;
+font-weight:bold;
+margin-bottom:8px;
+">
+
+${abonnementActif
+?"💳 Abonnement restant"
+:"🎁 Essai restant"}
 
 </div>
+
+<div id="compteurAbonnement"
+data-fin="${fin}"
+style="
+font-size:22px;
+font-family:monospace;
+font-weight:bold;
+letter-spacing:2px;
+">
+
+${String(jours).padStart(2,"0")} :
+${String(heures).padStart(2,"0")} :
+${String(minutes).padStart(2,"0")} :
+${String(secondes).padStart(2,"0")}
+
+</div>
+
+<div style="
+font-size:11px;
+margin-top:5px;
+opacity:.8;
+">
+
+J H M S
+
+</div>
+
+</div>
+
 `;
+
+}
+
+function lancerCompteurExpiration(){
+
+clearInterval(window.compteurExpiration);
+
+window.compteurExpiration=setInterval(function(){
+
+if(!window.adminCache) return;
+
+let abonnementActif =
+window.adminCache.subscriptionEnd &&
+window.adminCache.subscriptionEnd > Date.now();
+
+let fin = abonnementActif
+? window.adminCache.subscriptionEnd
+: window.adminCache.trialEnd;
+
+if(!fin) return;
+
+let restant=fin-Date.now();
+
+if(restant<0){
+
+clearInterval(window.compteurExpiration);
+
+actualiserAdmin(true);
+
+return;
+
+}
+
+let jours=Math.floor(restant/86400000);
+
+restant%=86400000;
+
+let heures=Math.floor(restant/3600000);
+
+restant%=3600000;
+
+let minutes=Math.floor(restant/60000);
+
+restant%=60000;
+
+let secondes=Math.floor(restant/1000);
+
+let el=document.getElementById("compteurAbonnement");
+
+if(el){
+
+el.innerHTML=
+
+jours.toString().padStart(2,"0")+
+
+" : "+
+
+heures.toString().padStart(2,"0")+
+
+" : "+
+
+minutes.toString().padStart(2,"0")+
+
+" : "+
+
+secondes.toString().padStart(2,"0");
+
+}
+
+},1000);
 
 }
 
@@ -5073,6 +5340,15 @@ onclick="saveStudent()"
 Enregistrer
 
 </button>
+
+<button
+onclick="openAdmin()"
+>
+
+Retour
+
+</button>
+
 
 `;
 }
@@ -6736,6 +7012,12 @@ trialStart: 0,
 
 trialEnd: 0,
 
+subscriptionStart: 0,
+
+subscriptionEnd: 0,
+
+subscriptionNumber: 0,
+
 motto:
 schoolMotto,
 
@@ -8206,13 +8488,29 @@ return;
 
 }
 
+// Correspondance des jours
+const jours={
+
+"Dimanche":0,
+
+"Lundi":1,
+
+"Mardi":2,
+
+"Mercredi":3,
+
+"Jeudi":4,
+
+"Vendredi":5,
+
+"Samedi":6
+
+};
+
 db.ref(
-"schools/"+window.currentSchoolId+
-"/teachers"
+"schools/"+window.currentSchoolId+"/teachers"
 )
-
 .once("value")
-
 .then(snapshot=>{
 
 let enseignant=null;
@@ -8237,6 +8535,85 @@ return;
 
 }
 
+let jourChoisi=document.getElementById("jour").value;
+
+let debut=document.getElementById("heureDebut").value;
+
+let fin=document.getElementById("heureFin").value;
+
+let classe=document.getElementById("classe").value;
+
+let salle=document.getElementById("salle").value;
+
+let matiere=document.getElementById("matiere").value;
+
+return db.ref(
+"schools/"+window.currentSchoolId+"/emploisTemps"
+)
+.once("value")
+.then(snap=>{
+
+let conflit=false;
+
+snap.forEach(item=>{
+
+let c=item.val();
+
+if(c.jourNumero!=null){
+
+if(c.jourNumero!=jours[jourChoisi]) return;
+
+}else{
+
+if(c.jour!=jourChoisi) return;
+
+}
+
+// Vérifier le chevauchement des heures
+if(
+
+debut<c.heureFin &&
+
+fin>c.heureDebut
+
+){
+
+if(c.enseignantPhone==enseignant.telephone){
+
+alert("❌ Cet enseignant a déjà un cours à cette heure.");
+
+conflit=true;
+
+return;
+
+}
+
+if(c.classe==classe){
+
+alert("❌ Cette classe a déjà un cours à cette heure.");
+
+conflit=true;
+
+return;
+
+}
+
+if(c.salle==salle){
+
+alert("❌ Cette salle est déjà occupée à cette heure.");
+
+conflit=true;
+
+return;
+
+}
+
+}
+
+});
+
+if(conflit) return;
+
 let id="EMP"+Date.now();
 
 let data={
@@ -8250,42 +8627,45 @@ enseignant.nom+" "+
 enseignant.postnom+" "+
 enseignant.prenom,
 
-classe:
-document.getElementById("classe").value,
+classe:classe,
 
-matiere:
-document.getElementById("matiere").value,
+matiere:matiere,
 
-jour:
-document.getElementById("jour").value,
+jour:jourChoisi,
 
-heureDebut:
-document.getElementById("heureDebut").value,
+jourNumero:jours[jourChoisi],
 
-heureFin:
-document.getElementById("heureFin").value,
+heureDebut:debut,
 
-salle:
-document.getElementById("salle").value,
+heureFin:fin,
+
+salle:salle,
+
+statut:"Programmé",
 
 dateCreation:Date.now()
 
 };
 
-db.ref(
+return db.ref(
 "schools/"+window.currentSchoolId+
 "/emploisTemps/"+id
 )
+.set(data);
 
-.set(data)
+});
 
+})
 .then(()=>{
 
 alert("✅ Emploi du temps enregistré.");
 
 ouvrirGestionEmploiTemps();
 
-});
+})
+.catch(error=>{
+
+alert(error.message);
 
 });
 
@@ -10390,7 +10770,11 @@ showLoader();
 
 try{
 
-await db.ref("schools/"+schoolId).update({
+const schoolSnap = await db.ref("schools/"+schoolId).once("value");
+
+const school = schoolSnap.val();
+
+let data = {
 
 status:"active",
 
@@ -10398,16 +10782,34 @@ paymentStatus:"paid",
 
 verifiedBy:"MASOMO",
 
-verifiedAt:Date.now(),
+verifiedAt:Date.now()
 
-trialStart: Date.now(),
+};
 
-trialEnd: Date.now() + (3 * 60 * 1000) // 3 minutes
+// Première activation : pas encore d'essai
+// Première activation → Essai de 30 minutes
+if(!school.trialStart){
 
+data.trialStart = Date.now();
 
-// trialEnd: Date.now() + (90 * 24 * 60 * 60 * 1000)
+data.trialEnd = Date.now() + (30*60*1000);
 
-});
+// 30 minutes
+
+}else{
+
+// Renouvellement → Abonnement de 10 minutes
+data.subscriptionStart = Date.now();
+
+data.subscriptionEnd = Date.now() + (10*60*1000);
+
+// 10 minutes
+
+data.subscriptionNumber = (school.subscriptionNumber || 0) + 1;
+
+}
+
+await db.ref("schools/"+schoolId).update(data);
 
 hideLoader();
 
@@ -10433,21 +10835,23 @@ document.querySelector(".login-box").innerHTML=`
 
 <div style="padding:25px;text-align:center;">
 
-<h1 style="color:#D32F2F;">
+<h2 style="color:#D32F2F;">
+${school.subscriptionStart
+? "⛔ Abonnement expiré"
+: "⛔ Essai expiré"}
+</h2>
 
-⛔ Essai expiré
+<p style="
+font-size:16px;
+line-height:1.6;
+">
 
-</h1>
-
-<p>
-
-Votre période d'essai est terminée.
-
-</p>
-
-<p>
-
-Veuillez renouveler votre abonnement afin de continuer à utiliser MASOMO.
+${school.subscriptionStart
+?
+"Votre abonnement est arrivé à expiration.<br><br>Veuillez effectuer un nouveau paiement afin de réactiver votre école."
+:
+"Votre période d'essai est terminée.<br><br>Veuillez souscrire un abonnement afin de continuer à utiliser MASOMO."
+}
 
 </p>
 
@@ -10466,16 +10870,21 @@ Veuillez renouveler votre abonnement afin de continuer à utiliser MASOMO.
 
 function verifierEssai(school){
 
-if(!school.trialEnd) return true;
+let abonnementActif =
+    school.subscriptionEnd &&
+    school.subscriptionEnd > Date.now();
 
-let restant = school.trialEnd - Date.now();
+let fin = abonnementActif
+    ? school.subscriptionEnd
+    : school.trialEnd;
 
-if(restant <= 0){
+if(!fin){
+    return true;
+}
 
+if(Date.now() >= fin){
     afficherEssaiExpire(school);
-
     return false;
-
 }
 
 return true;
@@ -17423,7 +17832,13 @@ showLoader();
 
 let schoolId=window.currentSchoolId;
 
-let aujourdhui=new Date().toLocaleDateString();
+let maintenant=new Date();
+
+let jour=maintenant.getDate();
+
+let mois=maintenant.getMonth();
+
+let annee=maintenant.getFullYear();
 
 Promise.all([
 
@@ -17451,7 +17866,17 @@ recettesSnap.forEach(item=>{
 
 let data=item.val();
 
-if(data.date===aujourdhui){
+let d=new Date(data.createdAt||0);
+
+if(
+
+d.getDate()==jour &&
+
+d.getMonth()==mois &&
+
+d.getFullYear()==annee
+
+){
 
 recettes+=Number(data.montant)||0;
 
@@ -17482,7 +17907,17 @@ depensesSnap.forEach(item=>{
 
 let data=item.val();
 
-if(data.date===aujourdhui){
+let d=new Date(data.createdAt||0);
+
+if(
+
+d.getDate()==jour &&
+
+d.getMonth()==mois &&
+
+d.getFullYear()==annee
+
+){
 
 depenses+=Number(data.montant)||0;
 
@@ -17537,7 +17972,7 @@ margin-bottom:15px;
 
 <b>Date :</b>
 
-${aujourdhui}
+${maintenant.toLocaleDateString()}
 
 <br><br>
 
@@ -23262,45 +23697,413 @@ function ouvrirNotesClasse(classe){
 
 function commencerCours(id){
 
-    db.ref(
-        "schools/"+window.currentSchoolId+"/emploisTemps/"+id
-    )
-    .update({
-        statut:"En cours",
-        heureDebutReelle:new Date().toISOString()
-    })
-    .then(()=>{
+db.ref(
+"schools/"+window.currentSchoolId+"/emploisTemps/"+id
+)
+.update({
 
-        alert("Cours démarré.");
-        ouvrirEmploiTemps();
+statut:"En cours",
 
-    })
-    .catch(err => {
+heureDebutReelle:Date.now()
 
-    console.error(err);
-    alert("Erreur lors du démarrage du cours.");
+})
+.then(()=>{
+
+alert("Cours démarré.");
+
+ouvrirEmploiTemps();
+
+})
+.catch(err=>{
+
+console.error(err);
+
+alert("Erreur lors du démarrage du cours.");
 
 });
 
 }
 
+function surveillerEmploiTemps(){
+
+if(window.emploiTimer){
+
+clearInterval(window.emploiTimer);
+
+}
+
+verifierCours();
+
+// Vérifie toutes les 30 secondes
+window.emploiTimer=setInterval(
+
+verifierCours,
+
+30000
+
+);
+
+}
+
+
+async function verifierCours(){
+
+try{
+
+if(window.currentRole!="teacher") return;
+
+const snap=await db.ref(
+
+"schools/"+window.currentSchoolId+
+
+"/emploisTemps"
+
+).once("value");
+
+if(!snap.exists()) return;
+
+let maintenant=new Date();
+
+let jourActuel=maintenant.getDay();
+
+let aujourdhui=[
+
+"Dimanche",
+
+"Lundi",
+
+"Mardi",
+
+"Mercredi",
+
+"Jeudi",
+
+"Vendredi",
+
+"Samedi"
+
+][jourActuel];
+
+let minutesActuelles=
+
+maintenant.getHours()*60+
+
+maintenant.getMinutes();
+
+snap.forEach(item=>{
+
+let cours=item.val();
+
+// Vérification du jour
+if(cours.jourNumero!=null){
+
+if(cours.jourNumero!=jourActuel) return;
+
+}else{
+
+if((cours.jour||"").trim()!=aujourdhui) return;
+
+}
+
+// Vérification de l'enseignant
+if(
+
+normalizePhone(cours.enseignantPhone)!=
+
+normalizePhone(window.currentPhone)
+
+){
+
+return;
+
+}
+
+if(!cours.heureDebut || !cours.matiere) return;
+
+let h=cours.heureDebut.split(":");
+
+let debut=
+
+parseInt(h[0])*60+
+
+parseInt(h[1]);
+
+let difference=
+
+debut-minutesActuelles;
+
+// ===== 10 minutes avant =====
+
+if(
+
+difference<=10 &&
+
+difference>0 &&
+
+localStorage.getItem(
+
+"rappel10_"+item.key
+
+)!="1"
+
+){
+
+afficherAlerteCours(
+
+"⏰ Cours bientôt",
+
+"Bonjour 👋<br><br>Dans <b>"+difference+
+
+" minute(s)</b> vous aurez cours de <b>"+
+
+cours.matiere+
+
+"</b><br><br>🏫 Classe : <b>"+
+
+cours.classe+
+
+"</b><br>🚪 Salle : <b>"+
+
+(cours.salle || "Salle non définie")+
+
+"</b>"
+
+);
+
+localStorage.setItem(
+
+"rappel10_"+item.key,
+
+"1"
+
+);
+
+}
+
+// ===== Heure exacte =====
+
+if(
+
+difference===0 &&
+
+localStorage.getItem(
+
+"rappel0_"+item.key
+
+)!="1"
+
+){
+
+afficherAlerteCours(
+
+"📚 Cours à commencer",
+
+"Il est l'heure de commencer le cours de <b>"+
+
+cours.matiere+
+
+"</b><br><br>🏫 Classe : <b>"+
+
+cours.classe+
+
+"</b><br>🚪 Salle : <b>"+
+
+(cours.salle || "Salle non définie")+
+
+"</b>"
+
+);
+
+localStorage.setItem(
+
+"rappel0_"+item.key,
+
+"1"
+
+);
+
+}
+
+// ===== Retard jusqu'à 10 minutes =====
+
+if(
+
+difference<0 &&
+
+difference>=-10 &&
+
+cours.statut!="En cours" &&
+
+localStorage.getItem(
+
+"retard_"+item.key
+
+)!="1"
+
+){
+
+afficherAlerteCours(
+
+"⚠️ Cours en retard",
+
+"Votre cours de <b>"+
+
+cours.matiere+
+
+"</b> devait commencer il y a <b>"+
+
+Math.abs(difference)+
+
+" minute(s)</b>.<br><br>Pensez à démarrer le cours."
+
+);
+
+localStorage.setItem(
+
+"retard_"+item.key,
+
+"1"
+
+);
+
+}
+
+});
+
+}catch(err){
+
+console.log(err);
+
+}
+
+}
+
+
 function surveillerEssai(){
 
-setInterval(()=>{
+if(window.surveillanceEssai){
 
-    if(!window.adminCache) return;
+    clearInterval(window.surveillanceEssai);
 
-    if(!verifierEssai(window.adminCache)){
+}
 
-        localStorage.removeItem(
-            "adminData_"+window.currentSchoolId
-        );
+window.surveillanceEssai = setInterval(()=>{
 
-        return;
+    if(!window.currentSchoolId) return;
 
-    }
+    db.ref("schools/"+window.currentSchoolId)
+    .once("value")
+    .then(snapshot=>{
 
-},30000);
+        if(!snapshot.exists()) return;
+
+        let school = snapshot.val();
+
+        window.adminCache = school;
+
+        if(!verifierEssai(school)){
+
+    clearInterval(window.surveillanceEssai);
+
+    localStorage.removeItem(
+        "adminData_"+window.currentSchoolId
+    );
+
+    return;
+
+}
+
+    });
+
+},5000); // toutes les 30 secondes
+
+}
+
+function afficherAlerteCours(titre,message){
+
+let ancienne=document.getElementById("alerteCoursMasomo");
+
+if(ancienne){
+    ancienne.remove();
+}
+
+let div=document.createElement("div");
+
+div.id="alerteCoursMasomo";
+
+div.style=`
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,.75);
+display:flex;
+justify-content:center;
+align-items:center;
+z-index:999999;
+`;
+
+div.innerHTML=`
+
+<div style="
+background:white;
+width:90%;
+max-width:420px;
+padding:25px;
+border-radius:20px;
+text-align:center;
+animation:zoomIn .3s;
+">
+
+<h2 style="color:#1565C0;">
+🔔 ${titre}
+</h2>
+
+<p style="
+font-size:18px;
+line-height:1.6;
+margin:20px 0;
+">
+${message}
+</p>
+
+<p style="
+color:#777;
+font-size:14px;
+">
+Cette fenêtre se fermera automatiquement...
+</p>
+
+</div>
+
+`;
+
+document.body.appendChild(div);
+
+// Jouer le son
+let son=document.getElementById("masomoNotification");
+
+if(son){
+
+son.currentTime=0;
+
+son.play().catch(()=>{});
+
+}
+
+// Fermer après 10 secondes
+setTimeout(()=>{
+
+let a=document.getElementById("alerteCoursMasomo");
+
+if(a){
+
+a.remove();
+
+}
+
+},10000);
 
 }
 
@@ -23355,7 +24158,9 @@ alert("La modification du profil sera disponible dans une prochaine mise à jour
 <!-- Ajouter celui-ci -->
 <script src="firebase-messaging-compat.js"></script>
 
-
+<audio id="masomoNotification" preload="auto">
+    <source src="notification.mp3" type="audio/mpeg">
+</audio>.
 
 </body>
 </html>
