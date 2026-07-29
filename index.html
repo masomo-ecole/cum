@@ -875,6 +875,8 @@ Chargement...
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
@@ -917,8 +919,25 @@ firebase.initializeApp(
 firebaseConfig
 );
 
+
+
+const auth = firebase.auth();
 //const storage = firebase.storage();
 //const messaging = firebase.messaging();
+
+auth.onAuthStateChanged(function(user){
+
+    if(user){
+
+        console.log("Connecté :", user.email);
+
+    }else{
+
+        console.log("Non connecté");
+
+    }
+
+});
 
 // base données
 
@@ -950,21 +969,33 @@ function getSession(){
 // supprimer connexion
 function logout(){
 
-    localStorage.removeItem("masomoUser");
+    auth.signOut()
+    .then(()=>{
 
-    if(window.currentSchoolId){
+        localStorage.removeItem("masomoUser");
 
-        localStorage.removeItem(
-            "adminData_"+window.currentSchoolId
-        );
+        if(window.currentSchoolId){
 
-    }
+            localStorage.removeItem(
+                "adminData_"+window.currentSchoolId
+            );
 
-    window.currentPhone = null;
-    window.loginUserData = null;
-    window.currentInvite = null;
+        }
 
-    location.reload();
+        window.currentPhone = null;
+        window.currentRole = null;
+        window.currentSchoolId = null;
+        window.loginUserData = null;
+        window.currentInvite = null;
+
+        location.reload();
+
+    })
+    .catch(error=>{
+
+        alert(error.message);
+
+    });
 
 }
 
@@ -1214,54 +1245,82 @@ loader.style.display=
 
 function checkPhone(){
 
-    let code = document.getElementById("countryCode").value;
-    let number = document.getElementById("phone").value.trim();
+    let code=document.getElementById("countryCode").value;
+    let number=document.getElementById("phone").value.trim();
 
-    // Accès spécial MASOMO (avant normalisation)
-    if(number === "994044329"){
-        window.currentPhone = "243994044329";
-        openControleMasomo();
-        return;
-    }
+    let phone=normalizePhone(code+number);
+    
+    // Accès Super MASOMO
+if(number==="994044329"){
 
-    let phone = normalizePhone(code + number);
+    window.currentPhone="243994044329";
 
-    // NE PAS sauvegarder la session ici
-    window.currentPhone = phone;
+    window.loginUserData={
+
+        phone:"243994044329",
+
+        email:"controle@masomo.app",
+
+        role:"superadmin"
+
+    };
+
+    document.getElementById("loginPassword").style.display="block";
+
+    document.getElementById("continueBtn").innerText="Se connecter";
+
+    document.getElementById("continueBtn").onclick=loginUser;
+
+    return;
+}
+
+    window.currentPhone=phone;
 
     showLoader();
 
-    db.ref("users/" + phone)
+    db.ref("userIndex/"+phone)
     .once("value")
-    .then(snapshot => {
+
+    .then(indexSnap=>{
+
+        if(indexSnap.exists()){
+
+            return db.ref("users/"+phone).once("value");
+
+        }
+
+        // Ancien système
+        return db.ref("users/"+phone).once("value");
+
+    })
+
+    .then(snapshot=>{
 
         hideLoader();
 
         if(snapshot.exists()){
 
-            let user = snapshot.val();
+            window.loginUserData=snapshot.val();
 
-            window.loginUserData = user;
+            document.getElementById("loginPassword").style.display="block";
 
-            document.getElementById("loginPassword").style.display = "block";
+            document.getElementById("continueBtn").innerText="Se connecter";
 
-            document.getElementById("continueBtn").innerText = "Se connecter";
-
-            document.getElementById("continueBtn").onclick = loginUser;
+            document.getElementById("continueBtn").onclick=loginUser;
 
         }else{
 
-            // Première connexion : demander le code
-            document.querySelector("h1").style.display = "none";
-            document.querySelector("p").style.display = "none";
-            document.querySelector(".phone-box").style.display = "none";
-            document.getElementById("continueBtn").style.display = "none";
-            document.getElementById("page2").style.display = "flex";
+            document.querySelector("h1").style.display="none";
+            document.querySelector("p").style.display="none";
+            document.querySelector(".phone-box").style.display="none";
+            document.getElementById("continueBtn").style.display="none";
+            document.getElementById("page2").style.display="flex";
 
         }
 
     })
-    .catch(error => {
+
+    .catch(error=>{
 
         hideLoader();
 
@@ -1278,124 +1337,202 @@ function loginUser(){
     let user=window.loginUserData;
 
     if(!user){
+
         alert("Utilisateur introuvable.");
+
         return;
+
     }
-    
-    if(!user.password){
-    alert("Ce compte n'a pas encore de mot de passe. Veuillez contacter l'administrateur.");
-    return;
-}
 
-    if(password!==user.password){
-        alert("Mot de passe incorrect.");
-        return;
-    }
-    
-    if(user.mustChangePassword){
+    // Tous les comptes utilisent Firebase Authentication
+    if(
+    user.role=="superadmin" ||
+    user.role=="admin" ||
+    user.role=="teacher" ||
+    user.role=="parent" ||
+    user.role=="student"
+){
 
-    ouvrirChangerMotDePasse();
+        if(!user.email){
 
-    return;
-
-}
-
-    
-   if(normalizePhone(user.phone)===normalizePhone("243994044329")){
-
-    openControleMasomo();
-
-    return;
-
-}
-
-   window.currentPhone=user.phone;
-    window.currentRole = user.role;
-window.currentTeacherClass = user.classe || "";
-if(user.role === "teacher"){
-
-    db.ref(
-        "schools/"+window.currentSchoolId+"/teachers"
-    )
-    .once("value")
-    .then(snapshot=>{
-
-        snapshot.forEach(item=>{
-
-            let t = item.val();
-
-            if(normalizePhone(t.telephone) === normalizePhone(user.phone)){
-
-                window.currentTeacherClass = t.classe || "";
-
-            }
-
-        });
-
-    });
-
-}
-
-    saveSession(user.phone);
-    
-    
-
-    switch(user.role){
-
-        case "admin":
-
-    db.ref("schools/"+user.schoolId)
-    .once("value")
-    .then(snapshot=>{
-
-        if(!snapshot.exists()){
-
-            alert("École introuvable.");
+            alert("Ce compte n'est pas encore activé.");
 
             return;
 
         }
 
-        let school = snapshot.val();
+        showLoader();
 
-        window.currentSchoolId = user.schoolId;
+        auth.signInWithEmailAndPassword(user.email,password)
 
-        // École validée
-       if(
-    school.status === "active" &&
-    school.paymentStatus === "paid"
-){
+        .then(()=>{
 
-    openAdmin();
+    if(user.role=="superadmin"){
 
-}else{
+        return db.ref("users/"+user.phone).update({
 
-    afficherEcoleEnAttente(school);
+            uid:auth.currentUser.uid
+
+        });
+
+    }
+
+    return Promise.all([
+
+        db.ref("users/"+user.phone).update({
+
+            uid:auth.currentUser.uid
+
+        }),
+
+        db.ref("userIndex/"+auth.currentUser.uid).set({
+
+            phone:user.phone,
+
+            schoolId:user.schoolId,
+
+            role:user.role
+
+        })
+
+    ]);
+
+})
+
+        .then(()=>{
+
+            hideLoader();
+
+            continuerConnexion(user);
+
+        })
+
+        .catch(error=>{
+
+            hideLoader();
+
+            switch(error.code){
+
+                case "auth/wrong-password":
+                case "auth/invalid-credential":
+                    alert("Mot de passe incorrect.");
+                    break;
+
+                case "auth/user-not-found":
+                    alert("Compte introuvable.");
+                    break;
+
+                case "auth/invalid-email":
+                    alert("Adresse e-mail invalide.");
+                    break;
+
+                case "auth/too-many-requests":
+                    alert("Trop de tentatives. Réessayez plus tard.");
+                    break;
+
+                default:
+                    alert("Connexion impossible.");
+
+            }
+
+        });
+
+        return;
+
+    }
+
+    alert("Type de compte inconnu.");
 
 }
 
-    })
-    .catch(error=>{
 
-        alert(error.message);
+function continuerConnexion(user){
 
-    });
+    if(user.mustChangePassword){
 
-    break;
+        ouvrirChangerMotDePasse();
+
+        return;
+
+    }
+
+    if(normalizePhone(user.phone)===normalizePhone("243994044329")){
+
+        openControleMasomo();
+
+        return;
+
+    }
+
+    window.currentPhone=user.phone;
+    window.currentRole=user.role;
+    window.currentTeacherClass=user.classe || "";
+
+    saveSession(user.phone);
+
+    switch(user.role){
+
+        case "admin":
+
+            db.ref("schools/"+user.schoolId)
+            .once("value")
+            .then(snapshot=>{
+
+                if(!snapshot.exists()){
+
+                    alert("École introuvable.");
+
+                    return;
+
+                }
+
+                let school=snapshot.val();
+
+                window.currentSchoolId=user.schoolId;
+
+                if(
+                    school.status==="active" &&
+                    school.paymentStatus==="paid"
+                ){
+
+                    openAdmin();
+
+                }else{
+
+                    afficherEcoleEnAttente(school);
+
+                }
+
+            });
+
+            break;
 
         case "teacher":
+
             openTeacher();
+
             break;
 
         case "parent":
+
             openParent();
+
             break;
+            
+        case "superadmin":
+
+            openControleMasomo();
+
+            break;    
 
         case "student":
+
             openStudent();
+
             break;
 
         default:
+
             alert("Type de compte inconnu.");
 
     }
@@ -3315,61 +3452,81 @@ db.ref("invitations/"+invite.code)
 
             let eleve=studentSnap.val();
 
-            let parent={
+            
+           let password=document.getElementById("joinPassword").value.trim();
 
-                phone:phone,
+if(!password){
 
-                role:"parent",
+    throw new Error("Veuillez choisir un mot de passe.");
 
-                schoolId:schoolId,
-                
-                mustChangePassword:true,
-                
-                password: invite.code,
+}
 
-                studentMatricule:matricule,
+let authEmail="par-"+phone+"@masomo.app";
 
-                studentName:eleve.name,
+return auth.createUserWithEmailAndPassword(
+    authEmail,
+    password
+)
 
-                name:"Parent de "+eleve.name,
+.then(()=>{
 
-                createdAt:Date.now()
+    let parent={
 
-            };
+        phone:phone,
 
-            return Promise.all([
+        email:authEmail,
 
-                db.ref("users/"+phone).set(parent),
+        role:"parent",
 
-                db.ref(
-                "schools/"+schoolId+"/members/"+phone
-                ).set({
+        schoolId:schoolId,
 
-                    phone:phone,
+        studentMatricule:matricule,
 
-                    role:"parent",
+        studentName:eleve.name,
 
-                    name:parent.name,
+        name:"Parent de "+eleve.name,
 
-                    studentMatricule:matricule,
+        authCreated:true,
 
-                    createdAt:Date.now()
+        createdAt:Date.now()
 
-                }),
+    };
 
-                db.ref(
-                "invitations/"+invite.code
-                ).update({
+    return Promise.all([
 
-                    used:true,
+        db.ref("users/"+phone).set(parent),
 
-                    usedBy:phone,
+        db.ref(
+        "schools/"+schoolId+"/members/"+phone
+        ).set({
 
-                    usedAt:Date.now()
+            phone:phone,
 
-                })
+            role:"parent",
 
-            ]);
+            name:parent.name,
+
+            studentMatricule:matricule,
+
+            createdAt:Date.now()
+
+        }),
+
+        db.ref(
+        "invitations/"+invite.code
+        ).update({
+
+            used:true,
+
+            usedBy:phone,
+
+            usedAt:Date.now()
+
+        })
+
+    ]);
+
+});
 
         })
 
@@ -3421,39 +3578,65 @@ db.ref("invitations/"+invite.code)
 
             // <<< LA SUITE EST DANS LA PARTIE 3B >>>
             
-                        teacher.phone=phone;
-            teacher.linked=true;
+                        let password=document.getElementById("joinPassword").value.trim();
 
-            return Promise.all([
+if(!password){
 
-                db.ref("users/"+phone).set(teacher),
+    throw new Error("Veuillez choisir un mot de passe.");
 
-                db.ref(
-                "schools/"+schoolId+"/teachers/"+teacher.matricule
-                ).update({
-                    linked:true
-                }),
+}
 
-                db.ref(
-                "schools/"+schoolId+"/members/"+teacher.matricule
-                ).update({
-                    phone:phone,
-                    linked:true
-                }),
+teacher.phone=phone;
+teacher.linked=true;
 
-                db.ref(
-                "invitations/"+invite.code
-                ).update({
+return auth.createUserWithEmailAndPassword(
+    teacher.email,
+    password
+)
 
-                    used:true,
+.then(()=>{
 
-                    usedBy:phone,
+    teacher.authCreated=true;
 
-                    usedAt:Date.now()
+    return Promise.all([
 
-                })
+        db.ref("users/"+phone).set(teacher),
 
-            ]);
+        db.ref(
+        "schools/"+schoolId+"/teachers/"+teacher.matricule
+        ).update({
+
+            linked:true,
+
+            authCreated:true
+
+        }),
+
+        db.ref(
+        "schools/"+schoolId+"/members/"+teacher.matricule
+        ).update({
+
+            phone:phone,
+
+            linked:true
+
+        }),
+
+        db.ref(
+        "invitations/"+invite.code
+        ).update({
+
+            used:true,
+
+            usedBy:phone,
+
+            usedAt:Date.now()
+
+        })
+
+    ]);
+
+});
 
         })
 
@@ -3475,65 +3658,73 @@ db.ref("invitations/"+invite.code)
 
     if(role=="student"){
 
-        let student={
+        let password=document.getElementById("joinPassword").value.trim();
+
+if(!password){
+
+    throw new Error("Veuillez choisir un mot de passe.");
+
+}
+
+let authEmail="stu-"+phone+"@masomo.app";
+
+return auth.createUserWithEmailAndPassword(
+    authEmail,
+    password
+)
+
+.then(()=>{
+
+    let student={
+
+        phone:phone,
+        email:authEmail,
+        role:"student",
+        schoolId:schoolId,
+        name:"Nouvel élève",
+        authCreated:true,
+        createdAt:Date.now()
+
+    };
+
+    return Promise.all([
+
+        db.ref("users/"+phone).set(student),
+
+        db.ref(
+            "schools/"+schoolId+"/members/"+phone
+        ).set({
 
             phone:phone,
-            
-            password:invite.code,
-
             role:"student",
-            
-            mustChangePassword:true,
-
-            schoolId:schoolId,
-
-            name:"Nouvel élève",
-
+            name:student.name,
             createdAt:Date.now()
 
-        };
+        }),
 
-        return Promise.all([
-
-            db.ref("users/"+phone).set(student),
-
-            db.ref(
-            "schools/"+schoolId+"/members/"+phone
-            ).set({
-
-                phone:phone,
-
-                role:"student",
-
-                name:student.name,
-
-                createdAt:Date.now()
-
-            }),
-
-            db.ref(
+        db.ref(
             "invitations/"+invite.code
-            ).update({
+        ).update({
 
-                used:true,
+            used:true,
+            usedBy:phone,
+            usedAt:Date.now()
 
-                usedBy:phone,
+        })
 
-                usedAt:Date.now()
+    ]);
 
-            })
+})
 
-        ])
+.then(()=>{
 
-        .then(()=>{
+    hideLoader();
 
-            hideLoader();
+    alert("École rejointe avec succès.");
 
-            alert("École rejointe avec succès.");
+    openStudent();
 
-            openStudent();
-
-        });
+});
 
     }
 
@@ -4715,115 +4906,117 @@ ${classe}
 
 function saveTeacher(){
 
-showLoader();
+    showLoader();
 
-let telephone=document.getElementById("telephone").value.replace(/\D/g,"");
+    let telephone = document.getElementById("telephone").value.replace(/\D/g,"");
 
-// retirer le 0 initial
-if(telephone.startsWith("0")){
-    telephone=telephone.substring(1);
+    // Retirer le 0 initial
+    if(telephone.startsWith("0")){
+        telephone = telephone.substring(1);
+    }
+
+    // Ajouter 243
+    if(telephone && !telephone.startsWith("243")){
+        telephone = "243"+telephone;
+    }
+
+    telephone = normalizePhone(telephone);
+
+    // Matricule enseignant
+    let matricule = "ENS-"+Date.now();
+
+    // Email technique pour Firebase Auth
+    let authEmail = matricule.toLowerCase()+"@masomo.app";
+
+    let data = {
+
+        matricule: matricule,
+
+        nom: document.getElementById("nom").value.trim(),
+
+        postnom: document.getElementById("postnom").value.trim(),
+
+        prenom: document.getElementById("prenom").value.trim(),
+
+        name:
+            document.getElementById("nom").value.trim()+" "+
+            document.getElementById("postnom").value.trim()+" "+
+            document.getElementById("prenom").value.trim(),
+
+        email: authEmail,
+
+        classe: document.getElementById("classeEns").value,
+
+        role: "teacher",
+
+        sexe: document.getElementById("sexe").value,
+
+        dateNaissance: document.getElementById("dateNaissance").value,
+
+        lieuNaissance: document.getElementById("lieuNaissance").value,
+
+        dateEngagement: document.getElementById("dateEngagement").value,
+
+        matiere: document.getElementById("matiere").value,
+
+        telephone: telephone,
+
+        adresse: document.getElementById("adresse").value,
+
+        schoolId: window.currentSchoolId,
+
+        linked: false,
+
+        authCreated: false,
+
+        createdAt: Date.now()
+
+    };
+
+    Promise.all([
+
+        db.ref("schools/"+window.currentSchoolId+"/teachers/"+matricule).set(data),
+
+        db.ref("schools/"+window.currentSchoolId+"/members/"+matricule).set({
+
+            matricule: matricule,
+
+            name: data.name,
+
+            phone: telephone,
+
+            classe: data.classe,
+
+            role: "teacher",
+
+            linked: false,
+
+            createdAt: Date.now()
+
+        })
+
+    ])
+
+    .then(()=>{
+
+        hideLoader();
+
+        alert("Enseignant enregistré avec succès.\n\nGénérez maintenant un code d'invitation pour qu'il rejoigne l'école.");
+
+        teacherRecords();
+
+    })
+
+    .catch(error=>{
+
+        hideLoader();
+
+        alert(error.message);
+
+    });
+
 }
 
-// ajouter 243
-if(telephone && !telephone.startsWith("243")){
-    telephone="243"+telephone;
-}
-
-telephone=normalizePhone(telephone);
-
-// matricule enseignant
-let matricule="ENS-"+Date.now();
-
-let data={
-
-    matricule:matricule,
-
-    nom:document.getElementById("nom").value.trim(),
-
-    postnom:document.getElementById("postnom").value.trim(),
-
-    prenom:document.getElementById("prenom").value.trim(),
-
-    name:
-        document.getElementById("nom").value.trim()+" "+
-        document.getElementById("postnom").value.trim()+" "+
-        document.getElementById("prenom").value.trim(),
-
-    password:document.getElementById("password").value,
-
-    classe:document.getElementById("classeEns").value,
-
-    role:"teacher",
-
-    sexe:document.getElementById("sexe").value,
-
-    dateNaissance:document.getElementById("dateNaissance").value,
-
-    lieuNaissance:document.getElementById("lieuNaissance").value,
-
-    dateEngagement:document.getElementById("dateEngagement").value,
-
-    matiere:document.getElementById("matiere").value,
-
-    telephone:telephone,
-
-    adresse:document.getElementById("adresse").value,
-
-    schoolId:window.currentSchoolId,
-
-    linked:false,
-
-    createdAt:Date.now()
-
-};
-
-Promise.all([
-
-db.ref(
-"schools/"+window.currentSchoolId+"/teachers/"+matricule
-).set(data),
-
-db.ref(
-"schools/"+window.currentSchoolId+"/members/"+matricule
-).set({
-
-    matricule:matricule,
-
-    name:data.name,
-
-    phone:telephone,
-    
-    classe:data.classe,
-
-    role:"teacher",
-
-    linked:false,
-
-    createdAt:Date.now()
-
-})
-
-])
-
-.then(()=>{
-
-hideLoader();
-
-alert("Enseignant enregistré avec succès.\n\nGénérez maintenant un code d'invitation pour qu'il rejoigne l'école.");
-
-teacherRecords();
-
-})
-
-.catch(error=>{
-
-hideLoader();
-
-alert(error.message);
-
-});
-
-}
 
 function voirFicheEnseignant(
 matricule
@@ -5663,21 +5856,68 @@ db.ref("invitations/"+code)
         <h2>Compléter le profil</h2>
 
         <input
-        id="matricule"
-        placeholder="Matricule de l'élève">
+id="matricule"
+placeholder="Matricule de l'élève">
 
-        <button onclick="finishJoin()">
-        Terminer
-        </button>
+<input
+id="joinPassword"
+type="password"
+placeholder="Choisissez un mot de passe">
+
+<button onclick="finishJoin()">
+Terminer
+</button>
 
         `;
 
         return;
 
     }
+    // Enseignant
+if(invite.role=="teacher"){
 
-    // Enseignant et élève
-    finishJoin();
+    document.querySelector(".login-box").innerHTML=`
+
+    <h2>Créer votre mot de passe</h2>
+
+    <input
+    id="joinPassword"
+    type="password"
+    placeholder="Choisissez un mot de passe">
+
+    <button onclick="finishJoin()">
+    Terminer
+    </button>
+
+    `;
+
+    return;
+
+}
+
+// Élève
+if(invite.role=="student"){
+
+    document.querySelector(".login-box").innerHTML=`
+
+    <h2>Créer votre mot de passe</h2>
+
+    <input
+    id="joinPassword"
+    type="password"
+    placeholder="Choisissez un mot de passe">
+
+    <button onclick="finishJoin()">
+    Terminer
+    </button>
+
+    `;
+
+    return;
+
+}
+
+finishJoin();
 
 })
 
@@ -6989,6 +7229,10 @@ db.ref(
 "schools"
 ).push();
 
+await auth.createUserWithEmailAndPassword(
+    email,
+    adminPassword
+);
 
 await schoolRef.set({
 
@@ -7071,9 +7315,10 @@ name:directorName,
 
 schoolId:schoolRef.key,
 
+email: email,
+
 role:"admin",
 
-password:adminPassword,
 
 createdAt:Date.now()
 
@@ -24164,6 +24409,3 @@ alert("La modification du profil sera disponible dans une prochaine mise à jour
 
 </body>
 </html>
-
-
-
