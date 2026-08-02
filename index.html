@@ -731,7 +731,7 @@ Connectez-vous avec votre numéro
 <select id="countryCode">
 
 <option value="+243">🇨🇩 +243</option>
-<option value="+244">🇦🇴 +244</option>
+<!-- <option value="+244">🇦🇴 +244</option>
 <option value="+257">🇧🇮 +257</option>
 <option value="+250">🇷🇼 +250</option>
 <option value="+254">🇰🇪 +254</option>
@@ -754,7 +754,7 @@ Connectez-vous avec votre numéro
 <option value="+91">🇮🇳 +91</option>
 <option value="+86">🇨🇳 +86</option>
 <option value="+81">🇯🇵 +81</option>
-<option value="+55">🇧🇷 +55</option>
+<option value="+55">🇧🇷 +55</option>. -->
 
 </select>
 
@@ -1248,51 +1248,40 @@ function checkPhone(){
     let code=document.getElementById("countryCode").value;
     let number=document.getElementById("phone").value.trim();
 
-    let phone=normalizePhone(code+number);
-    
     // Accès Super MASOMO
-if(number==="994044329"){
+    if(number==="994044329"){
 
-    window.currentPhone="243994044329";
+        window.currentPhone="243994044329";
 
-    window.loginUserData={
+        window.loginUserData={
 
-        phone:"243994044329",
+            phone:"243994044329",
 
-        email:"controle@masomo.app",
+            email:"controle@masomo.app",
 
-        role:"superadmin"
+            role:"superadmin"
 
-    };
+        };
 
-    document.getElementById("loginPassword").style.display="block";
+        document.getElementById("loginPassword").style.display="block";
 
-    document.getElementById("continueBtn").innerText="Se connecter";
+        document.getElementById("continueBtn").innerText="Se connecter";
 
-    document.getElementById("continueBtn").onclick=loginUser;
+        document.getElementById("continueBtn").onclick=loginUser;
 
-    return;
-}
+        return;
+
+    }
+
+    let phone=normalizePhone(code+number);
 
     window.currentPhone=phone;
 
     showLoader();
 
-    db.ref("userIndex/"+phone)
+    db.ref("loginIndex/"+phone)
+
     .once("value")
-
-    .then(indexSnap=>{
-
-        if(indexSnap.exists()){
-
-            return db.ref("users/"+phone).once("value");
-
-        }
-
-        // Ancien système
-        return db.ref("users/"+phone).once("value");
-
-    })
 
     .then(snapshot=>{
 
@@ -1300,7 +1289,15 @@ if(number==="994044329"){
 
         if(snapshot.exists()){
 
-            window.loginUserData=snapshot.val();
+            let login=snapshot.val();
+
+            window.loginUserData={
+
+                phone:phone,
+
+                email:login.email
+
+            };
 
             document.getElementById("loginPassword").style.display="block";
 
@@ -1319,8 +1316,8 @@ if(number==="994044329"){
         }
 
     })
-
-    .catch(error=>{
+    
+        .catch(error=>{
 
         hideLoader();
 
@@ -1332,9 +1329,142 @@ if(number==="994044329"){
 
 function loginUser(){
 
-    let password=document.getElementById("loginPassword").value.trim();
+    let password = document.getElementById("loginPassword").value.trim();
 
-    let user=window.loginUserData;
+    let login = window.loginUserData;
+
+    if(!login){
+
+        alert("Utilisateur introuvable.");
+
+        return;
+
+    }
+
+    if(!login.email){
+
+        alert("Ce compte n'est pas encore activé.");
+
+        return;
+
+    }
+
+    showLoader();
+
+    auth.signInWithEmailAndPassword(login.email,password)
+
+    .then(()=>{
+
+        let uid = auth.currentUser.uid;
+
+        return db.ref("users/"+login.phone)
+
+        .once("value")
+
+        .then(snapshot=>{
+
+            if(!snapshot.exists()){
+
+                throw new Error("Compte introuvable.");
+
+            }
+
+            let user = snapshot.val();
+
+            user.uid = uid;
+
+            let updates = [];
+
+            // Sauvegarder le uid dans le compte
+            updates.push(
+
+                db.ref("users/"+login.phone).update({
+
+                    uid: uid
+
+                })
+
+            );
+
+            // Tous sauf le superadmin utilisent userIndex
+            if(user.role != "superadmin"){
+
+                let indexData = {
+
+                    phone: user.phone || login.phone,
+                    schoolId: user.schoolId || "",
+                    role: user.role || ""
+
+                };
+
+                updates.push(
+
+                    db.ref("userIndex/"+uid).set(indexData)
+
+                );
+
+            }
+
+            return Promise.all(updates)
+
+            .then(()=>user);
+
+        });
+
+    })
+
+    .then(user=>{
+
+        hideLoader();
+
+        continuerConnexion(user);
+
+    })
+
+    .catch(error=>{
+
+        hideLoader();
+
+        console.error(error);
+
+        switch(error.code){
+
+            case "auth/wrong-password":
+            case "auth/invalid-credential":
+
+                alert("Mot de passe incorrect.");
+
+                break;
+
+            case "auth/user-not-found":
+
+                alert("Compte introuvable.");
+
+                break;
+
+            case "auth/invalid-email":
+
+                alert("Adresse e-mail invalide.");
+
+                break;
+
+            case "auth/too-many-requests":
+
+                alert("Trop de tentatives. Réessayez plus tard.");
+
+                break;
+
+            default:
+
+                alert(error.message || "Connexion impossible.");
+
+        }
+
+    });
+
+}
+
+function continuerConnexion(user){
 
     if(!user){
 
@@ -1344,110 +1474,7 @@ function loginUser(){
 
     }
 
-    // Tous les comptes utilisent Firebase Authentication
-    if(
-    user.role=="superadmin" ||
-    user.role=="admin" ||
-    user.role=="teacher" ||
-    user.role=="parent" ||
-    user.role=="student"
-){
-
-        if(!user.email){
-
-            alert("Ce compte n'est pas encore activé.");
-
-            return;
-
-        }
-
-        showLoader();
-
-        auth.signInWithEmailAndPassword(user.email,password)
-
-        .then(()=>{
-
-    if(user.role=="superadmin"){
-
-        return db.ref("users/"+user.phone).update({
-
-            uid:auth.currentUser.uid
-
-        });
-
-    }
-
-    return Promise.all([
-
-        db.ref("users/"+user.phone).update({
-
-            uid:auth.currentUser.uid
-
-        }),
-
-        db.ref("userIndex/"+auth.currentUser.uid).set({
-
-            phone:user.phone,
-
-            schoolId:user.schoolId,
-
-            role:user.role
-
-        })
-
-    ]);
-
-})
-
-        .then(()=>{
-
-            hideLoader();
-
-            continuerConnexion(user);
-
-        })
-
-        .catch(error=>{
-
-            hideLoader();
-
-            switch(error.code){
-
-                case "auth/wrong-password":
-                case "auth/invalid-credential":
-                    alert("Mot de passe incorrect.");
-                    break;
-
-                case "auth/user-not-found":
-                    alert("Compte introuvable.");
-                    break;
-
-                case "auth/invalid-email":
-                    alert("Adresse e-mail invalide.");
-                    break;
-
-                case "auth/too-many-requests":
-                    alert("Trop de tentatives. Réessayez plus tard.");
-                    break;
-
-                default:
-                    alert("Connexion impossible.");
-
-            }
-
-        });
-
-        return;
-
-    }
-
-    alert("Type de compte inconnu.");
-
-}
-
-
-function continuerConnexion(user){
-
+    // Changement obligatoire du mot de passe
     if(user.mustChangePassword){
 
         ouvrirChangerMotDePasse();
@@ -1456,7 +1483,36 @@ function continuerConnexion(user){
 
     }
 
-    if(normalizePhone(user.phone)===normalizePhone("243994044329")){
+    // Vérifier les informations essentielles
+    if(!user.role){
+
+        alert("Type de compte inconnu.");
+
+        return;
+
+    }
+
+    if(!user.phone){
+
+        alert("Numéro de téléphone introuvable.");
+
+        return;
+
+    }
+
+    // Variables globales
+    window.currentPhone = normalizePhone(user.phone);
+    window.currentRole = user.role;
+    window.currentTeacherClass = user.classe || "";
+    window.currentSchoolId = user.schoolId || "";
+
+    saveSession(window.currentPhone);
+
+    // Super Administrateur
+    if(
+        user.role=="superadmin" ||
+        normalizePhone(user.phone)==normalizePhone("243994044329")
+    ){
 
         openControleMasomo();
 
@@ -1464,19 +1520,27 @@ function continuerConnexion(user){
 
     }
 
-    window.currentPhone=user.phone;
-    window.currentRole=user.role;
-    window.currentTeacherClass=user.classe || "";
-
-    saveSession(user.phone);
-
     switch(user.role){
 
         case "admin":
 
+            if(!user.schoolId){
+
+                alert("Aucune école associée à ce compte.");
+
+                return;
+
+            }
+
+            showLoader();
+
             db.ref("schools/"+user.schoolId)
+
             .once("value")
+
             .then(snapshot=>{
+
+                hideLoader();
 
                 if(!snapshot.exists()){
 
@@ -1487,8 +1551,6 @@ function continuerConnexion(user){
                 }
 
                 let school=snapshot.val();
-
-                window.currentSchoolId=user.schoolId;
 
                 if(
                     school.status==="active" &&
@@ -1502,6 +1564,14 @@ function continuerConnexion(user){
                     afficherEcoleEnAttente(school);
 
                 }
+
+            })
+
+            .catch(error=>{
+
+                hideLoader();
+
+                alert(error.message);
 
             });
 
@@ -1518,12 +1588,6 @@ function continuerConnexion(user){
             openParent();
 
             break;
-            
-        case "superadmin":
-
-            openControleMasomo();
-
-            break;    
 
         case "student":
 
@@ -1964,9 +2028,14 @@ border:2px solid white;
 📊 Tableau de bord
 </button>
 
-<button onclick="ouvrirProfilEnseignant()">
-👤 Mon profil
+<button onclick="proposerExamen()">
+📝 Proposer un examen
 </button>
+
+<button onclick="mesExamens()">
+📋 Mes examens
+</button>
+
 
 </div>
 
@@ -3374,16 +3443,18 @@ Créer école
 
 // ================= FINALISER INSCRIPTION =================
 
-function finishJoin(){
+async function finishJoin(){
 
 showLoader();
+
+try{
 
 let invite=window.currentInvite;
 
 if(!invite){
-    hideLoader();
-    alert("Invitation introuvable.");
-    return;
+hideLoader();
+alert("Invitation introuvable.");
+return;
 }
 
 let phone=normalizePhone(window.currentPhone);
@@ -3393,352 +3464,372 @@ let matricule="";
 
 if(role=="parent"){
 
-    matricule=document.getElementById("matricule")
-    .value
-    .trim()
-    .toUpperCase();
+matricule=document.getElementById("matricule")
+.value
+.trim()
+.toUpperCase();
 
-    if(matricule==""){
-        hideLoader();
-        alert("Veuillez saisir le matricule de l'élève.");
-        return;
-    }
+if(!matricule){
+hideLoader();
+alert("Veuillez saisir le matricule de l'élève.");
+return;
+}
 
 }
 
-db.ref("invitations/"+invite.code)
+let inviteSnap=await db.ref(
+"invitations/"+invite.code
+).once("value");
 
-.once("value")
+if(!inviteSnap.exists()){
+throw new Error("Invitation introuvable.");
+}
 
-.then(inviteSnap=>{
+let inv=inviteSnap.val();
 
-    if(!inviteSnap.exists()){
-        throw new Error("Invitation introuvable.");
-    }
+if(inv.used){
+throw new Error("Ce code d'invitation a déjà été utilisé.");
+}
 
-    let inv=inviteSnap.val();
 
-    if(inv.used){
-        throw new Error("Ce code d'invitation a déjà été utilisé.");
-    }
+// =========================
+// PARENT
+// =========================
 
-    return db.ref("users/"+phone).once("value");
+if(role=="parent"){
 
-})
 
-.then(userSnap=>{
-
-    if(userSnap.exists()){
-        throw new Error("Ce numéro est déjà inscrit.");
-    }
-
-    // =======================
-    // PARENT
-    // =======================
-
-    if(role=="parent"){
-
-        return db.ref(
-        "schools/"+schoolId+"/students/"+matricule
-        )
-
-        .once("value")
-
-        .then(studentSnap=>{
-
-            if(!studentSnap.exists()){
-                throw new Error("Matricule élève introuvable.");
-            }
-
-            let eleve=studentSnap.val();
-
-            
-           let password=document.getElementById("joinPassword").value.trim();
+let password=document.getElementById(
+"joinPassword"
+).value.trim();
 
 if(!password){
-
-    throw new Error("Veuillez choisir un mot de passe.");
-
+throw new Error("Veuillez choisir un mot de passe.");
 }
 
 let authEmail="par-"+phone+"@masomo.app";
 
-return auth.createUserWithEmailAndPassword(
-    authEmail,
-    password
-)
+await auth.createUserWithEmailAndPassword(
+authEmail,
+password
+);
 
-.then(()=>{
+// attendre que Firebase Auth termine réellement
+await auth.currentUser.getIdToken(true);
 
-    let parent={
+let studentSnap=await db.ref(
+"schools/"+schoolId+"/students/"+matricule
+).once("value");
 
-        phone:phone,
+if(!studentSnap.exists()){
+throw new Error("Matricule élève introuvable.");
+}
 
-        email:authEmail,
+let eleve=studentSnap.val();
 
-        role:"parent",
+let parent={
 
-        schoolId:schoolId,
+phone:phone,
 
-        studentMatricule:matricule,
+email:authEmail,
 
-        studentName:eleve.name,
+uid:auth.currentUser.uid,
 
-        name:"Parent de "+eleve.name,
+role:"parent",
 
-        authCreated:true,
+schoolId:schoolId,
 
-        createdAt:Date.now()
+studentMatricule:matricule,
 
-    };
+studentName:eleve.name,
 
-    return Promise.all([
+name:"Parent de "+eleve.name,
 
-        db.ref("users/"+phone).set(parent),
+authCreated:true,
 
-        db.ref(
-        "schools/"+schoolId+"/members/"+phone
-        ).set({
+createdAt:Date.now()
 
-            phone:phone,
+};
 
-            role:"parent",
+await Promise.all([
 
-            name:parent.name,
+db.ref("users/"+phone).set(parent),
 
-            studentMatricule:matricule,
+db.ref("loginIndex/"+phone).set({
 
-            createdAt:Date.now()
+email:authEmail
 
-        }),
+}),
 
-        db.ref(
-        "invitations/"+invite.code
-        ).update({
+db.ref(
+"schools/"+schoolId+"/members/"+phone
+).set({
 
-            used:true,
+phone:phone,
 
-            usedBy:phone,
+role:"parent",
 
-            usedAt:Date.now()
+name:parent.name,
 
-        })
+studentMatricule:matricule,
 
-    ]);
+createdAt:Date.now()
+
+}),
+
+db.ref(
+"invitations/"+invite.code
+).update({
+
+used:true,
+
+usedBy:phone,
+
+usedAt:Date.now()
+
+})
+
+]);
+
+hideLoader();
+
+alert("École rejointe avec succès.");
+
+openParent();
+
+return;
+
+}
+
+// =========================
+// ENSEIGNANT
+// =========================
+
+if(role=="teacher"){
+
+let password=document.getElementById(
+"joinPassword"
+).value.trim();
+
+if(!password){
+throw new Error("Veuillez choisir un mot de passe.");
+}
+
+// Vérifier si le numéro est déjà inscrit
+let loginSnap=await db.ref(
+"loginIndex/"+phone
+).once("value");
+
+if(loginSnap.exists()){
+throw new Error("Ce numéro est déjà inscrit.");
+}
+
+// Rechercher l'enseignant
+let snapshot=await db.ref(
+"schools/"+schoolId+"/teachers"
+).once("value");
+
+if(!snapshot.exists()){
+throw new Error("Aucun enseignant trouvé.");
+}
+
+let teacher=null;
+
+snapshot.forEach(child=>{
+
+let t=child.val();
+
+if(normalizePhone(t.telephone)==phone){
+teacher=t;
+}
 
 });
 
-        })
+if(!teacher){
+throw new Error("Cet enseignant n'est pas enregistré dans cette école.");
+}
 
-        .then(()=>{
-
-            hideLoader();
-
-            alert("École rejointe avec succès.");
-
-            openParent();
-
-        });
-
-    }
-
-    // =======================
-    // ENSEIGNANT
-    // =======================
-
-    if(role=="teacher"){
-
-        return db.ref(
-        "schools/"+schoolId+"/teachers"
-        )
-
-        .once("value")
-
-        .then(snapshot=>{
-
-            if(!snapshot.exists()){
-                throw new Error("Aucun enseignant trouvé.");
-            }
-
-            let teacher=null;
-
-            snapshot.forEach(child=>{
-
-                let t=child.val();
-
-                if(normalizePhone(t.telephone)==phone){
-                    teacher=t;
-                }
-
-            });
-
-            if(!teacher){
-                throw new Error("Cet enseignant n'est pas enregistré dans cette école.");
-            }
-
-            // <<< LA SUITE EST DANS LA PARTIE 3B >>>
-            
-                        let password=document.getElementById("joinPassword").value.trim();
-
-if(!password){
-
-    throw new Error("Veuillez choisir un mot de passe.");
-
+if(!teacher.email){
+throw new Error("Cet enseignant ne possède pas d'adresse e-mail.");
 }
 
 teacher.phone=phone;
 teacher.linked=true;
 
-return auth.createUserWithEmailAndPassword(
-    teacher.email,
-    password
-)
+// Créer le compte Firebase Auth
+await auth.createUserWithEmailAndPassword(
+teacher.email,
+password
+);
 
-.then(()=>{
+// Attendre la connexion Firebase
+await auth.currentUser.getIdToken(true);
 
-    teacher.authCreated=true;
+teacher.uid=auth.currentUser.uid;
+teacher.authCreated=true;
 
-    return Promise.all([
+await Promise.all([
 
-        db.ref("users/"+phone).set(teacher),
+db.ref("users/"+phone).set(teacher),
 
-        db.ref(
-        "schools/"+schoolId+"/teachers/"+teacher.matricule
-        ).update({
+db.ref("loginIndex/"+phone).set({
+email:teacher.email
+}),
 
-            linked:true,
+db.ref(
+"schools/"+schoolId+"/teachers/"+teacher.matricule
+).update({
 
-            authCreated:true
+linked:true,
+authCreated:true,
+phone:phone,
+uid:teacher.uid
 
-        }),
+}),
 
-        db.ref(
-        "schools/"+schoolId+"/members/"+teacher.matricule
-        ).update({
+db.ref(
+"schools/"+schoolId+"/members/"+teacher.matricule
+).update({
 
-            phone:phone,
+phone:phone,
+linked:true,
+uid:teacher.uid
 
-            linked:true
+}),
 
-        }),
+db.ref(
+"invitations/"+invite.code
+).update({
 
-        db.ref(
-        "invitations/"+invite.code
-        ).update({
+used:true,
+usedBy:phone,
+usedAt:Date.now()
 
-            used:true,
+})
 
-            usedBy:phone,
+]);
 
-            usedAt:Date.now()
+hideLoader();
 
-        })
+alert("École rejointe avec succès.");
 
-    ]);
+openTeacher();
 
-});
+return;
 
-        })
+}
 
-        .then(()=>{
+// =========================
+// ÉLÈVE
+// =========================
 
-            hideLoader();
+if(role=="student"){
 
-            alert("École rejointe avec succès.");
-
-            openTeacher();
-
-        });
-
-    }
-
-    // =======================
-    // ÉLÈVE
-    // =======================
-
-    if(role=="student"){
-
-        let password=document.getElementById("joinPassword").value.trim();
+let password=document.getElementById(
+"joinPassword"
+).value.trim();
 
 if(!password){
-
-    throw new Error("Veuillez choisir un mot de passe.");
-
+throw new Error("Veuillez choisir un mot de passe.");
 }
 
 let authEmail="stu-"+phone+"@masomo.app";
 
-return auth.createUserWithEmailAndPassword(
-    authEmail,
-    password
-)
+await auth.createUserWithEmailAndPassword(
+authEmail,
+password
+);
 
-.then(()=>{
+// attendre la connexion Firebase
+await auth.currentUser.getIdToken(true);
 
-    let student={
+let student={
 
-        phone:phone,
-        email:authEmail,
-        role:"student",
-        schoolId:schoolId,
-        name:"Nouvel élève",
-        authCreated:true,
-        createdAt:Date.now()
+phone:phone,
 
-    };
+email:authEmail,
 
-    return Promise.all([
+uid:auth.currentUser.uid,
 
-        db.ref("users/"+phone).set(student),
+role:"student",
 
-        db.ref(
-            "schools/"+schoolId+"/members/"+phone
-        ).set({
+schoolId:schoolId,
 
-            phone:phone,
-            role:"student",
-            name:student.name,
-            createdAt:Date.now()
+name:"Nouvel élève",
 
-        }),
+authCreated:true,
 
-        db.ref(
-            "invitations/"+invite.code
-        ).update({
+createdAt:Date.now()
 
-            used:true,
-            usedBy:phone,
-            usedAt:Date.now()
+};
 
-        })
+await Promise.all([
 
-    ]);
+db.ref("users/"+phone).set(student),
+
+db.ref("loginIndex/"+phone).set({
+
+email:authEmail
+
+}),
+
+db.ref(
+"schools/"+schoolId+"/members/"+phone
+).set({
+
+phone:phone,
+
+role:"student",
+
+name:student.name,
+
+uid:student.uid,
+
+createdAt:Date.now()
+
+}),
+
+db.ref(
+"invitations/"+invite.code
+).update({
+
+used:true,
+
+usedBy:phone,
+
+usedAt:Date.now()
 
 })
 
-.then(()=>{
+]);
 
-    hideLoader();
+hideLoader();
 
-    alert("École rejointe avec succès.");
+alert("École rejointe avec succès.");
 
-    openStudent();
+openStudent();
 
-});
-
-    }
-
-})
-
-.catch(error=>{
-
-    hideLoader();
-
-    alert(error.message);
-
-});
+return;
 
 }
+
+hideLoader();
+
+alert("Type d'invitation inconnu.");
+
+}catch(error){
+
+hideLoader();
+
+console.error(error);
+
+alert(error.message || "Une erreur est survenue.");
+
+}
+
+}
+
+
 // ================= DASHBOARD ADMIN =================
 
 function openAdmin(){
@@ -3906,9 +3997,9 @@ class="select-style">
 👨‍👩‍👧 Parent
 </option>
 
-<option value="student">
+<!-- <option value="student">
 🎓 Élève
-</option>
+</option> -->
 
 </select>
 
@@ -4088,20 +4179,21 @@ Mon profil
 </div>  
   
 </button>  
+
+<button class="card-btn"
+onclick="ouvrirCalendrier()">
+
+<div class="card-icon">
+📅
+</div>
+
+<div class="card-text">
+Calendrier
+</div>
+
+</button>
   
   
-<button class="card-btn danger"  
-onclick="resetDatabase()">  
-  
-<div class="card-icon">  
-🗑  
-</div>  
-  
-<div class="card-text">  
-Réinitialiser  
-</div>  
-  
-</button>  
   
   
 <button class="card-btn"  
@@ -4114,6 +4206,18 @@ onclick="pageFinance()">
   
 <div class="card-text">  
 Finance  
+</div>  
+  
+</button>  
+
+
+<button class="card-btn"  
+onclick="envoieCommentaire()">  
+<div class="card-icon">  
+💬  
+</div>  
+<div class="card-text">  
+Commentaire
 </div>  
   
 </button>  
@@ -4231,26 +4335,78 @@ document.querySelector(".login-box").innerHTML = `
 
 <p style="text-align:center;">
 Choisissez votre méthode de paiement.
-Après paiement, MASOMO vérifiera votre transaction avant d'activer votre abonnement.
+Après paiement de 10$, MASOMO vérifiera votre transaction avant d'activer votre abonnement.
 </p>
 
-<button class="card-btn"
-onclick="confirmerRenouvellement('Airtel Money')">
+<button
+onclick="confirmerRenouvellement('Airtel Money')"
+style="
+width:100%;
+padding:14px;
+margin-bottom:12px;
+background:#E53935;
+color:white;
+border:none;
+border-radius:10px;
+font-size:16px;
+font-weight:bold;
+cursor:pointer;
+box-shadow:0 2px 6px rgba(0,0,0,.2);
+">
 📱 Airtel Money
 </button>
 
-<button class="card-btn"
-onclick="confirmerRenouvellement('Orange Money')">
+<button
+onclick="confirmerRenouvellement('Orange Money')"
+style="
+width:100%;
+padding:14px;
+margin-bottom:12px;
+background:#FB8C00;
+color:white;
+border:none;
+border-radius:10px;
+font-size:16px;
+font-weight:bold;
+cursor:pointer;
+box-shadow:0 2px 6px rgba(0,0,0,.2);
+">
 🟠 Orange Money
 </button>
 
-<button class="card-btn"
-onclick="confirmerRenouvellement('M-Pesa')">
+<button
+onclick="confirmerRenouvellement('M-Pesa')"
+style="
+width:100%;
+padding:14px;
+margin-bottom:12px;
+background:#1565C0;
+color:white;
+border:none;
+border-radius:10px;
+font-size:16px;
+font-weight:bold;
+cursor:pointer;
+box-shadow:0 2px 6px rgba(0,0,0,.2);
+">
 🔵 M-Pesa
 </button>
 
-<button class="card-btn"
-onclick="confirmerRenouvellement('Paiement direct')">
+<button
+onclick="confirmerRenouvellement('Paiement direct')"
+style="
+width:100%;
+padding:14px;
+margin-bottom:12px;
+background:#2E7D32;
+color:white;
+border:none;
+border-radius:10px;
+font-size:16px;
+font-weight:bold;
+cursor:pointer;
+box-shadow:0 2px 6px rgba(0,0,0,.2);
+">
 🏦 Paiement direct
 </button>
 
@@ -5551,72 +5707,118 @@ Retour
 
 function viewStudent(matricule){
 
-    showLoader();
+showLoader();
 
-    db.ref(
-        "schools/"+window.currentSchoolId+"/students/"+matricule
-    )
+db.ref(
+"schools/"+window.currentSchoolId+"/students/"+matricule
+)
 
-    .once("value")
+.once("value")
 
-    .then(snapshot=>{
+.then(snapshot=>{
 
-        hideLoader();
+hideLoader();
 
-        if(!snapshot.exists()){
-            alert("Élève introuvable.");
-            studentRecords();
-            return;
-        }
+if(!snapshot.exists()){
+alert("Élève introuvable.");
+studentRecords();
+return;
+}
 
-        let e = snapshot.val();
+let e=snapshot.val();
 
-        document.querySelector(".login-box").innerHTML = `
+document.querySelector(".login-box").innerHTML=`
 
-<h2 style="text-align:center;color:#1f4cff;">
-Fiche élève
+<h2 style="
+text-align:center;
+color:#1f4cff;
+margin-bottom:15px;
+">
+👨‍🎓 Fiche élève
 </h2>
 
 <div style="
 background:#fff;
 padding:15px;
 border-radius:15px;
-box-shadow:0 4px 10px rgba(0,0,0,.08);
+box-shadow:0 3px 10px rgba(0,0,0,.08);
+font-size:14px;
+line-height:1.8;
 ">
 
-<p><b>Nom :</b> ${e.name}</p>
+<div><b>👤 Nom :</b><br>${e.name||"-"}</div>
 
-<p><b>Matricule :</b> ${e.matricule}</p>
+<hr>
 
-<p><b>Classe :</b> ${e.className}</p>
+<div><b>🆔 Matricule :</b><br>${e.matricule||"-"}</div>
 
-<p><b>Sexe :</b> ${e.sexe||""}</p>
+<hr>
 
-<p><b>Date de naissance :</b> ${e.dateNaissance||""}</p>
+<div><b>🏫 Classe :</b><br>${e.className||"-"}</div>
 
-<p><b>Lieu de naissance :</b> ${e.lieuNaissance||""}</p>
+<hr>
 
-<p><b>Père :</b> ${e.fatherName||""}</p>
+<div><b>⚧ Sexe :</b><br>${e.sexe||"-"}</div>
 
-<p><b>Téléphone père :</b> ${e.fatherPhone||""}</p>
+<hr>
 
-<p><b>Mère :</b> ${e.motherName||""}</p>
+<div><b>🎂 Date de naissance :</b><br>${e.dateNaissance||"-"}</div>
 
-<p><b>Téléphone mère :</b> ${e.motherPhone||""}</p>
+<hr>
+
+<div><b>📍 Lieu de naissance :</b><br>${e.lieuNaissance||"-"}</div>
+
+<hr>
+
+<div><b>👨 Père :</b><br>${e.fatherName||"-"}</div>
+
+<hr>
+
+<div><b>📞 Téléphone père :</b><br>${e.fatherPhone||"-"}</div>
+
+<hr>
+
+<div><b>👩 Mère :</b><br>${e.motherName||"-"}</div>
+
+<hr>
+
+<div><b>📞 Téléphone mère :</b><br>${e.motherPhone||"-"}</div>
 
 </div>
 
 <div style="
 display:flex;
 gap:10px;
-margin-top:15px;
+margin-top:18px;
 ">
 
-<button onclick="modifierEleve('${e.matricule}')">
+<button
+onclick="modifierEleve('${e.matricule}')"
+style="
+flex:1;
+background:#1565C0;
+color:white;
+border:none;
+border-radius:10px;
+padding:12px;
+font-size:14px;
+font-weight:bold;
+">
 ✏ Modifier
 </button>
 
-<button onclick="supprimerEleve('${e.matricule}')">
+<button
+onclick="supprimerEleve('${e.matricule}')"
+style="
+flex:1;
+background:#D32F2F;
+color:white;
+border:none;
+border-radius:10px;
+padding:12px;
+font-size:14px;
+font-weight:bold;
+">
 🗑 Supprimer
 </button>
 
@@ -5624,23 +5826,34 @@ margin-top:15px;
 
 <button
 onclick="studentRecords()"
-style="margin-top:15px;">
+style="
+width:100%;
+margin-top:12px;
+background:#757575;
+color:white;
+border:none;
+border-radius:10px;
+padding:12px;
+font-size:14px;
+font-weight:bold;
+">
 ⬅ Retour
 </button>
 
 `;
 
-    })
+})
 
-    .catch(error=>{
+.catch(error=>{
 
-        hideLoader();
+hideLoader();
 
-        alert(error.message);
+alert(error.message);
 
-    });
+});
 
 }
+
 // ================= OUVRIR MEMBRES AVEC VRAI CHARGEMENT =================
 
 function openMembers(){
@@ -6986,301 +7199,128 @@ try{
 
 showLoader();
 
-
 // récupérer champs
-
-const schoolName=
-document.getElementById(
-"schoolName"
-)?.value.trim() || "";
-
-const schoolMotto=
-document.getElementById(
-"schoolMotto"
-)?.value.trim() || "";
-
-const schoolPhone=
-document.getElementById(
-"schoolPhone"
-)?.value.trim() || "";
-
-const directorName=
-document.getElementById(
-"directorName"
-)?.value.trim() || "";
-
-const adminPassword =
-document.getElementById("adminPassword")
-?.value.trim() || "";
-
-const email=
-document.getElementById(
-"email"
-)?.value.trim() || "";
-
-const schoolAddress=
-document.getElementById(
-"schoolAddress"
-)?.value.trim() || "";
-
-const province=
-document.getElementById(
-"province"
-)?.value.trim() || "";
-
-const territoire=
-document.getElementById(
-"territoire"
-)?.value.trim() || "";
-
-const commune=
-document.getElementById(
-"commune"
-)?.value.trim() || "";
-
-const schoolYear=
-document.getElementById(
-"schoolYear"
-)?.value.trim() || "";
-
+const schoolName=document.getElementById("schoolName")?.value.trim()||"";
+const schoolMotto=document.getElementById("schoolMotto")?.value.trim()||"";
+const schoolPhone=document.getElementById("schoolPhone")?.value.trim()||"";
+const directorName=document.getElementById("directorName")?.value.trim()||"";
+const adminPassword=document.getElementById("adminPassword")?.value.trim()||"";
+const email=document.getElementById("email")?.value.trim()||"";
+const schoolAddress=document.getElementById("schoolAddress")?.value.trim()||"";
+const province=document.getElementById("province")?.value.trim()||"";
+const territoire=document.getElementById("territoire")?.value.trim()||"";
+const commune=document.getElementById("commune")?.value.trim()||"";
+const schoolYear=document.getElementById("schoolYear")?.value.trim()||"";
 
 // vérifier champs
-
 let missing=[];
 
-if(!schoolName)
-missing.push("Nom école");
-
-if(!directorName)
-missing.push("Nom directeur");
-
-if(!schoolPhone)
-missing.push("Téléphone école");
-
-if(!schoolAddress)
-missing.push("Adresse");
-
-if(!adminPassword)
-missing.push("Mot de passe administrateur");
-
+if(!schoolName) missing.push("Nom école");
+if(!directorName) missing.push("Nom directeur");
+if(!schoolPhone) missing.push("Téléphone école");
+if(!schoolAddress) missing.push("Adresse");
+if(!email) missing.push("E-mail");
+if(!adminPassword) missing.push("Mot de passe administrateur");
 
 if(missing.length){
-
 hideLoader();
-
-alert(
-"Complétez :\n\n"+
-missing.join("\n")
-);
-
+alert("Complétez :\n\n"+missing.join("\n"));
 return;
-
 }
-
 
 // niveaux
+let primary=document.getElementById("primaryLevel").checked;
+let secondary=document.getElementById("secondaryLevel").checked;
 
-let primary=
-document.getElementById(
-"primaryLevel"
-).checked;
-
-let secondary=
-document.getElementById(
-"secondaryLevel"
-).checked;
-
-
-if(
-!primary &&
-!secondary
-){
-
+if(!primary && !secondary){
 hideLoader();
-
-alert(
-"Sélectionnez un niveau"
-);
-
+alert("Sélectionnez un niveau");
 return;
-
 }
-
 
 // classes
-
 let classes=[];
-
-document
-.querySelectorAll(
-".schoolClass:checked"
-)
-.forEach(c=>{
-
-classes.push(
-c.value
-);
-
+document.querySelectorAll(".schoolClass:checked").forEach(c=>{
+classes.push(c.value);
 });
-
-
-// options
-
-let options=[];
-
-document
-.querySelectorAll(
-".schoolOption:checked"
-)
-.forEach(c=>{
-
-options.push(
-c.value
-);
-
-});
-
 
 if(classes.length===0){
-
 hideLoader();
-
-alert(
-"Choisissez au moins une classe"
-);
-
+alert("Choisissez au moins une classe");
 return;
-
 }
 
+// options
+let options=[];
+document.querySelectorAll(".schoolOption:checked").forEach(c=>{
+options.push(c.value);
+});
 
-// vérifier doublon
+// créer le compte administrateur
+await auth.createUserWithEmailAndPassword(
+email,
+adminPassword
+);
 
-const schoolsSnap=
-await db.ref(
-"schools"
-)
-.once("value");
-
+// maintenant la lecture est autorisée
+const schoolsSnap=await db.ref("schools").once("value");
 
 let existe=false;
 
 schoolsSnap.forEach(item=>{
 
-let school=
-item.val();
+let school=item.val();
 
 if(
-
-school.schoolName
-?.toLowerCase()
-===
-schoolName.toLowerCase()
-
-&&
-
-school.province===
-province
-
-&&
-
-school.commune===
-commune
-
+school.schoolName &&
+school.schoolName.toLowerCase()===schoolName.toLowerCase() &&
+school.province===province &&
+school.commune===commune
 ){
-
 existe=true;
-
 }
 
 });
 
-
 if(existe){
-
 hideLoader();
-
-alert(
-"Une école avec ce nom existe déjà"
-);
-
+alert("Une école avec ce nom existe déjà.");
 return;
-
 }
 
-
 // code école
-
-let schoolCode=
-
-"MAS-"+
-
-Math.floor(
-1000+
-Math.random()*9000
-);
-
+let schoolCode="MAS-"+Math.floor(1000+Math.random()*9000);
 
 // créer école
-
-let schoolRef=
-
-db.ref(
-"schools"
-).push();
-
-await auth.createUserWithEmailAndPassword(
-    email,
-    adminPassword
-);
+let schoolRef=db.ref("schools").push();
 
 await schoolRef.set({
 
 schoolName,
 schoolCode,
-logo:
-enregistrerPhoto(),
+logo:enregistrerPhoto(),
 
+status:"pending",
+paymentStatus:"unpaid",
+paymentMethod:"",
+verifiedBy:"",
+verifiedAt:0,
 
-status: "pending",
+trialStart:0,
+trialEnd:0,
 
-paymentStatus: "unpaid",
+subscriptionStart:0,
+subscriptionEnd:0,
+subscriptionNumber:0,
 
-paymentMethod: "",
-
-verifiedBy: "",
-
-verifiedAt: 0,
-
-trialStart: 0,
-
-trialEnd: 0,
-
-subscriptionStart: 0,
-
-subscriptionEnd: 0,
-
-subscriptionNumber: 0,
-
-motto:
-schoolMotto,
-
-phone:
-schoolPhone,
-
+motto:schoolMotto,
+phone:schoolPhone,
 directorName,
-
 email,
-
-address:
-schoolAddress,
-
+address:schoolAddress,
 province,
-
 territoire,
-
 commune,
-
 schoolYear,
 
 levels:{
@@ -7295,87 +7335,53 @@ totalStudents:0,
 totalTeachers:0,
 totalParents:0,
 
-createdAt:
-Date.now()
+createdAt:Date.now()
 
 });
 
-
-// créer directeur
-
-let phone=
-window.currentPhone;
-
+// créer administrateur
+let phone=normalizePhone(window.currentPhone);
 
 let adminData={
 
 phone:phone,
-
+uid:auth.currentUser.uid,
 name:directorName,
-
 schoolId:schoolRef.key,
-
-email: email,
-
+email:email,
 role:"admin",
-
-
 createdAt:Date.now()
 
 };
 
-await db.ref(
-"users/"+phone
-)
-.set(
-adminData
-);
+await db.ref("users/"+phone).set(adminData);
 
-
-// ajouter aussi dans membres
+await db.ref("loginIndex/"+phone).set({
+email:email
+});
 
 await db.ref(
-"schools/"
-+
-schoolRef.key+
-"/members/"
-+
-phone.replace(
-/\D/g,
-""
-)
-)
-.set(
-adminData
-);
-
+"schools/"+schoolRef.key+"/members/"+phone.replace(/\D/g,"")
+).set(adminData);
 
 hideLoader();
 
 alert(
-
-"Votre école a été créée.\n\n"
-
-+
-
-"Effectuez maintenant le paiement afin que MASOMO puisse valider votre école."
-
+"Votre école a été créée.\n\nEffectuez maintenant le paiement afin que MASOMO puisse valider votre école."
 );
 
 ouvrirPaiementEcole(schoolRef.key);
-}
 
-catch(error){
+}catch(error){
 
 hideLoader();
-
-alert(
-error.message
-);
+console.error(error);
+alert(error.message);
 
 }
 
 }
+
 
 function ouvrirPaiementEcole(schoolId){
 
@@ -10066,39 +10072,33 @@ function voirFicheEleve(matricule){
 
 showLoader();
 
-db.ref(
-"eleves/"+matricule
-)
+db.ref("eleves/"+matricule)
 
 .once("value")
 
 .then(snapshot=>{
 
-let e=
-snapshot.val();
+hideLoader();
+
+let e=snapshot.val();
 
 if(!e){
 
-hideLoader();
-
-alert(
-"Élève introuvable"
-);
+alert("Élève introuvable");
 
 return;
 
 }
 
-document.querySelector(
-".login-box"
-).innerHTML=`
+document.querySelector(".login-box").innerHTML=`
 
 <h2 style="
 text-align:center;
 color:#1f4cff;
+margin-bottom:15px;
 ">
 
-Fiche élève
+👨‍🎓 Fiche élève
 
 </h2>
 
@@ -10106,135 +10106,172 @@ Fiche élève
 id="ficheDocument"
 
 style="
-background:white;
-padding:20px;
-border-radius:20px;
-line-height:2;
-box-shadow:
-0 4px 10px rgba(0,0,0,.08);
+background:#fff;
+padding:15px;
+border-radius:15px;
+box-shadow:0 3px 10px rgba(0,0,0,.08);
+font-size:14px;
+line-height:1.8;
 ">
 
-👤 <b>Nom :</b>
-${e.name||"-"}
+<div><b>👤 Nom :</b><br>${e.name||"-"}</div>
 
-<br>
+<hr>
 
-🆔 <b>Matricule :</b>
-${e.matricule||"-"}
+<div><b>🆔 Matricule :</b><br>${e.matricule||"-"}</div>
 
-<br>
+<hr>
 
-🎓 <b>Classe :</b>
-${e.className||"-"}
+<div><b>🎓 Classe :</b><br>${e.className||"-"}</div>
 
-<br>
+<hr>
 
-⚥ <b>Sexe :</b>
-${e.sexe||"-"}
+<div><b>⚧ Sexe :</b><br>${e.sexe||"-"}</div>
 
-<br>
+<hr>
 
-<br>
+<div><b>🎂 Date de naissance :</b><br>${e.dateNaissance||"-"}</div>
 
-🎂 <b>Date naissance :</b>
-${e.dateNaissance||"-"}
+<hr>
 
-<br>
+<div><b>📍 Lieu de naissance :</b><br>${e.lieuNaissance||"-"}</div>
 
-📍 <b>Lieu naissance :</b>
-${e.lieuNaissance||"-"}
+<hr>
 
-<br> 
+<div><b>👨 Père :</b><br>${e.fatherName||"-"}</div>
 
-👨 <b>Père :</b>
-${e.fatherName||"-"}
+<hr>
 
-<br>
+<div><b>📞 Téléphone père :</b><br>${e.fatherPhone||"-"}</div>
 
-📞 ${e.fatherPhone||"-"}
+<hr>
 
-<br>
+<div><b>👩 Mère :</b><br>${e.motherName||"-"}</div>
 
-👩 <b>Mère :</b>
-${e.motherName||"-"}
+<hr>
 
-<br>
+<div><b>📞 Téléphone mère :</b><br>${e.motherPhone||"-"}</div>
 
-📞 ${e.motherPhone||"-"}
+<hr>
 
-<br>
+<div><b>🌍 Province :</b><br>${e.province||"-"}</div>
 
-📍 <b>Province :</b>
-${e.province||"-"}
+<hr>
 
-<br>
-
-🏠 <b>Secteur :</b>
-${e.secteur||"-"}
+<div><b>🏠 Secteur :</b><br>${e.secteur||"-"}</div>
 
 </div>
 
 <div style="
-display:flex;
-flex-direction:column;
+display:grid;
+grid-template-columns:1fr 1fr;
 gap:10px;
 margin-top:15px;
 ">
 
-<button onclick="imprimerFiche()">
-
+<button
+onclick="imprimerFiche()"
+style="
+background:#1565C0;
+color:white;
+border:none;
+border-radius:10px;
+padding:12px;
+font-size:13px;
+font-weight:bold;
+">
 🖨 Imprimer
-
 </button>
 
-<button onclick="telechargerPDF()">
-
-📄 Télécharger PDF
-
+<button
+onclick="telechargerPDF()"
+style="
+background:#D32F2F;
+color:white;
+border:none;
+border-radius:10px;
+padding:12px;
+font-size:13px;
+font-weight:bold;
+">
+📄 PDF
 </button>
 
-<button onclick="telechargerWord()">
-
-📝 Télécharger Word
-
+<button
+onclick="telechargerWord()"
+style="
+background:#1976D2;
+color:white;
+border:none;
+border-radius:10px;
+padding:12px;
+font-size:13px;
+font-weight:bold;
+">
+📝 Word
 </button>
 
-<button onclick="telechargerExcel()">
-
-📊 Télécharger Excel
-
+<button
+onclick="telechargerExcel()"
+style="
+background:#2E7D32;
+color:white;
+border:none;
+border-radius:10px;
+padding:12px;
+font-size:13px;
+font-weight:bold;
+">
+📊 Excel
 </button>
 
 <button
 onclick="modifierEleve('${e.matricule}')"
->
-
+style="
+background:#FB8C00;
+color:white;
+border:none;
+border-radius:10px;
+padding:12px;
+font-size:13px;
+font-weight:bold;
+">
 ✏ Modifier
-
 </button>
 
 <button
 onclick="supprimerEleve('${e.matricule}')"
 style="
-background:red;
-"
->
-
+background:#C62828;
+color:white;
+border:none;
+border-radius:10px;
+padding:12px;
+font-size:13px;
+font-weight:bold;
+">
 🗑 Supprimer
-
-</button>
-
-<button onclick="ouvrirListeEleves()">
-
-⬅ Retour
-
 </button>
 
 </div>
 
-`;
+<button
+onclick="ouvrirListeEleves()"
+style="
+width:100%;
+margin-top:12px;
+background:#616161;
+color:white;
+border:none;
+border-radius:10px;
+padding:12px;
+font-size:14px;
+font-weight:bold;
+">
+⬅ Retour
+</button>
 
-hideLoader();
+`;
 
 })
 
@@ -10242,14 +10279,11 @@ hideLoader();
 
 hideLoader();
 
-alert(
-error.message
-);
+alert(error.message);
 
 });
 
 }
-
 
 // ================= IMPRIMER =================
 
@@ -10661,241 +10695,360 @@ switch(user.role){
 
 function openControleMasomo(){
 
-    showLoader();
+if(window.masomoSchoolsListener){
+db.ref("schools").off("value",window.masomoSchoolsListener);
+}
 
-    Promise.all([
-        db.ref("schools").once("value"),
-        db.ref("users").once("value")
-    ]).then(([schoolsSnap, usersSnap])=>{
+if(window.masomoUsersListener){
+db.ref("users").off("value",window.masomoUsersListener);
+}
 
-        hideLoader();
+showLoader();
 
-        const schools = schoolsSnap.val() || {};
-        const users = usersSnap.val() || {};
+window.masomoSchoolsListener=function(schoolsSnap){
 
-        // Mise en mémoire
-        window.masomoSchools = schools;
-        window.masomoUsers = users;
-        window.schoolStats = {};
-        window.schoolUsers = {};
+window._schoolsSnap=schoolsSnap;
 
-        // Calcul des statistiques UNE SEULE FOIS
-        Object.values(users).forEach(user=>{
+if(window._usersSnap){
+chargerControleMasomo(
+window._schoolsSnap,
+window._usersSnap
+);
+}
 
-    if(!user.schoolId) return;
+};
 
-    // Regrouper les utilisateurs par école
-    if(!window.schoolUsers[user.schoolId]){
-        window.schoolUsers[user.schoolId] = [];
-    }
+window.masomoUsersListener=function(usersSnap){
 
-    window.schoolUsers[user.schoolId].push(user);
+window._usersSnap=usersSnap;
 
-    // Statistiques
-    if(!window.schoolStats[user.schoolId]){
-        window.schoolStats[user.schoolId] = {
-            total:0,
-            admins:0,
-            teachers:0,
-            parents:0,
-            students:0
-        };
-    }
+if(window._schoolsSnap){
+chargerControleMasomo(
+window._schoolsSnap,
+window._usersSnap
+);
+}
 
-    const s = window.schoolStats[user.schoolId];
+};
 
-    s.total++;
+db.ref("schools").on(
+"value",
+window.masomoSchoolsListener
+);
 
-    switch(user.role){
-        case "admin":
-            s.admins++;
-            break;
-        case "teacher":
-            s.teachers++;
-            break;
-        case "parent":
-            s.parents++;
-            break;
-        case "student":
-            s.students++;
-            break;
-    }
-
-});
-        let html=`
-        <div style="padding:20px;font-family:Arial,sans-serif;background:#F4F7FC;min-height:100vh;">
-
-            <h2 style="text-align:center;color:#1565C0;margin-bottom:20px;">
-                🛡️ CONTRÔLE MASOMO
-            </h2>
-
-            <div style="display:flex;gap:12px;margin-bottom:20px;">
-
-                <div style="flex:1;background:#1565C0;color:white;padding:15px;border-radius:15px;text-align:center;">
-                    <div style="font-size:30px;">🏫</div>
-                    <div>Écoles</div>
-                    <h2>${Object.keys(schools).length}</h2>
-                </div>
-
-                <div style="flex:1;background:#2E7D32;color:white;padding:15px;border-radius:15px;text-align:center;">
-                    <div style="font-size:30px;">👥</div>
-                    <div>Utilisateurs</div>
-                    <h2>${Object.keys(users).length}</h2>
-                </div>
-
-            </div>
-
-            <input
-                id="searchSchool"
-                placeholder="🔎 Rechercher une école..."
-                onkeyup="filterSchools()"
-                style="width:100%;padding:12px;border-radius:10px;border:1px solid #ccc;margin-bottom:15px;">
-
-            <div id="schoolsList">
-        `;
-
-        Object.keys(schools).forEach(id=>{
-
-            const school=schools[id];
-            const stats=window.schoolStats[id]||{total:0};
-
-            html+=`
-            <div class="schoolItem"
-                 data-name="${(school.name||school.schoolName||'').toLowerCase()}"
-                 style="background:white;border-radius:12px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.12);overflow:hidden;">
-
-                <div onclick="showSchoolDetails('${id}')"
-                     style="display:flex;justify-content:space-between;align-items:center;padding:15px;cursor:pointer;">
-
-                    <div>
-                        <b>${school.name||school.schoolName||id}</b><br>
-                        <small>${stats.total} utilisateur(s)</small>
-                    </div>
-
-                    <span id="icon_${id}" style="font-size:22px;color:#1565C0;">▶</span>
-
-                </div>
-
-                <div id="school_${id}" style="display:none;"></div>
-
-            </div>
-            `;
-
-        });
-
-        html+=`
-            </div>
-        </div>
-        `;
-
-        document.querySelector(".login-box").innerHTML=html;
-
-    }).catch(error=>{
-
-        hideLoader();
-        alert(error.message);
-
-    });
+db.ref("users").on(
+"value",
+window.masomoUsersListener
+);
 
 }
 
+function chargerControleMasomo(schoolsSnap,usersSnap){
+
+hideLoader();
+
+const schools=schoolsSnap.val()||{};
+const users=usersSnap.val()||{};
+
+window.masomoSchools=schools;
+window.masomoUsers=users;
+window.schoolStats={};
+window.schoolUsers={};
+
+Object.values(users).forEach(user=>{
+
+if(!user.schoolId)return;
+
+if(!window.schoolUsers[user.schoolId]){
+window.schoolUsers[user.schoolId]=[];
+}
+
+window.schoolUsers[user.schoolId].push(user);
+
+if(!window.schoolStats[user.schoolId]){
+window.schoolStats[user.schoolId]={
+total:0,
+admins:0,
+teachers:0,
+parents:0,
+students:0
+};
+}
+
+const s=window.schoolStats[user.schoolId];
+
+s.total++;
+
+switch(user.role){
+
+case"admin":
+s.admins++;
+break;
+
+case"teacher":
+s.teachers++;
+break;
+
+case"parent":
+s.parents++;
+break;
+
+case"student":
+s.students++;
+break;
+
+}
+
+});
+
+let nouvelles=0;
+let expirees=0;
+let maintenant=Date.now();
+
+let html=`
+<div style="padding:20px;font-family:Arial,sans-serif;background:#F4F7FC;min-height:100vh;">
+
+<h2 style="text-align:center;color:#1565C0;margin-bottom:20px;">
+🛡️ CONTRÔLE MASOMO
+</h2>
+`;
+
+Object.keys(schools).forEach(id=>{
+
+const school=schools[id];
+const stats=window.schoolStats[id]||{total:0};
+
+let nouveau=school.status!="active";
+
+let expire=false;
+
+if(school.subscriptionEnd){
+expire=school.subscriptionEnd<maintenant;
+}else if(school.trialEnd){
+expire=school.trialEnd<maintenant;
+}
+
+if(nouveau)nouvelles++;
+if(expire)expirees++;
+
+html+=`
+
+<div class="schoolItem"
+data-name="${(school.name||school.schoolName||'').toLowerCase()}"
+style="background:white;border-radius:12px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.12);overflow:hidden;">
+
+<div onclick="showSchoolDetails('${id}')"
+style="display:flex;justify-content:space-between;align-items:center;padding:15px;cursor:pointer;">
+
+<div>
+
+<b>
+
+${nouveau?"🟢 ":""}
+
+${expire?"🔴 ":""}
+
+${school.name||school.schoolName||id}
+
+</b><br>
+
+<small>${stats.total} utilisateur(s)</small>
+
+</div>
+
+<span id="icon_${id}"
+style="font-size:22px;color:#1565C0;">▶</span>
+
+</div>
+
+<div id="school_${id}" style="display:none;"></div>
+
+</div>
+`;
+
+});
+
+html=html.replace(
+"</h2>",
+`</h2>
+
+<div style="
+background:#FFF8E1;
+padding:12px;
+border-radius:10px;
+margin-bottom:15px;
+font-weight:bold;
+">
+
+🟢 Nouvelles écoles : <b>${nouvelles}</b>
+
+&nbsp;&nbsp;&nbsp;
+
+🔴 Expirées : <b>${expirees}</b>
+
+</div>
+
+<div style="display:flex;gap:12px;margin-bottom:20px;">
+
+<div style="flex:1;background:#1565C0;color:white;padding:15px;border-radius:15px;text-align:center;">
+<div style="font-size:30px;">🏫</div>
+<div>Écoles</div>
+<h2>${Object.keys(schools).length}</h2>
+</div>
+
+<div style="flex:1;background:#2E7D32;color:white;padding:15px;border-radius:15px;text-align:center;">
+<div style="font-size:30px;">👥</div>
+<div>Utilisateurs</div>
+<h2>${Object.keys(users).length}</h2>
+</div>
+
+</div>
+
+<input
+id="searchSchool"
+placeholder="🔎 Rechercher une école..."
+onkeyup="filterSchools()"
+style="width:100%;padding:12px;border-radius:10px;border:1px solid #ccc;margin-bottom:15px;">
+
+<div id="schoolsList">
+
+<button
+onclick="logout()"
+style="
+position:absolute;
+top:10px;
+right:10px;
+background:red;
+padding:8px 12px;
+font-size:12px;
+border-radius:10px;
+">
+
+🚪 Déconnexion
+
+</button>`
+);
+
+html+=`
+</div>
+</div>
+`;
+
+document.querySelector(".login-box").innerHTML=html;
+
+}
+
+
 function showSchoolDetails(schoolId){
 
-    const box = document.getElementById("school_" + schoolId);
-    const icon = document.getElementById("icon_" + schoolId);
+const box=document.getElementById("school_"+schoolId);
+const icon=document.getElementById("icon_"+schoolId);
 
-    // Fermer si déjà ouvert
-    if(box.style.display === "block"){
-        box.style.display = "none";
-        icon.innerHTML = "▶";
-        return;
-    }
+// Fermer si déjà ouvert
+if(box.style.display=="block"){
+box.style.display="none";
+icon.innerHTML="▶";
+return;
+}
 
-    // Fermer les autres écoles
-    document.querySelectorAll("[id^='school_']").forEach(div=>{
-        div.style.display="none";
-    });
+// Fermer les autres écoles
+document.querySelectorAll("[id^='school_']").forEach(div=>{
+div.style.display="none";
+});
 
-    document.querySelectorAll("[id^='icon_']").forEach(span=>{
-        span.innerHTML="▶";
-    });
+document.querySelectorAll("[id^='icon_']").forEach(span=>{
+span.innerHTML="▶";
+});
 
-    box.style.display = "block";
-    icon.innerHTML = "▼";
+box.style.display="block";
+icon.innerHTML="▼";
 
-    const school = window.masomoSchools[schoolId];
-    const stats = window.schoolStats[schoolId] || {
-        total:0,
-        admins:0,
-        teachers:0,
-        parents:0,
-        students:0
-    };
+const school=window.masomoSchools[schoolId];
 
-    let usersHtml="";
+const stats=window.schoolStats[schoolId]||{
+total:0,
+admins:0,
+teachers:0,
+parents:0,
+students:0
+};
 
-    const schoolUsers = window.schoolUsers[schoolId] || [];
+let expire=false;
+
+if(school.subscriptionEnd){
+expire=school.subscriptionEnd<Date.now();
+}else if(school.trialEnd){
+expire=school.trialEnd<Date.now();
+}
+
+let usersHtml="";
+
+const schoolUsers=window.schoolUsers[schoolId]||[];
 
 schoolUsers.forEach(user=>{
 
-        if(user.schoolId!=schoolId) return;
+if(user.schoolId!=schoolId)return;
 
-        usersHtml+=`
+usersHtml+=`
 
-        <div style="
-            background:#fff;
-            border-radius:10px;
-            padding:12px;
-            margin:10px 0;
-            box-shadow:0 2px 6px rgba(0,0,0,.08);
-        ">
+<div style="
+background:#fff;
+border-radius:10px;
+padding:12px;
+margin:10px 0;
+box-shadow:0 2px 6px rgba(0,0,0,.08);
+">
 
-            <b>${user.name||"Sans nom"}</b><br>
+<b>${user.name||"Sans nom"}</b><br>
 
-            👤 ${user.role}<br>
+👤 ${user.role}<br>
 
-            📞 ${user.phone}<br>
+📞 ${user.phone}<br>
 
-            🔑 <span id="pwd_${user.phone}">••••••••</span>
+🔑 <span id="pwd_${user.phone}">••••••••</span>
 
-            <button
-                onclick="
-                    let p=document.getElementById('pwd_${user.phone}');
-                    p.innerHTML=p.innerHTML==='••••••••'
-                    ?'${user.password}'
-                    :'••••••••';
-                "
-                style="
-                    margin-top:8px;
-                    background:#1565C0;
-                    color:white;
-                    border:none;
-                    border-radius:6px;
-                    padding:6px 12px;
-                    cursor:pointer;
-                ">
-                Voir le mot de passe
-            </button>
+<button
+onclick="
+let p=document.getElementById('pwd_${user.phone}');
+p.innerHTML=p.innerHTML==='••••••••'
+?'${user.password}'
+:'••••••••';
+"
+style="
+margin-top:8px;
+background:#1565C0;
+color:white;
+border:none;
+border-radius:6px;
+padding:6px 12px;
+cursor:pointer;
+">
 
-        </div>
+Voir le mot de passe
 
-        `;
+</button>
 
-    });
+</div>
 
-    box.innerHTML = `
+`;
 
-    <div style="
-        padding:15px;
-        background:#F8F9FA;
-        border-top:1px solid #DDD;
-    ">
+});
 
-        <h3 style="margin-top:0;color:#1565C0;">
-            🏫 ${school.name || school.schoolName || "École"}
-        </h3>
-        
-        <div style="
+box.innerHTML=`
+
+<div style="
+padding:15px;
+background:#F8F9FA;
+border-top:1px solid #DDD;
+">
+
+<h3 style="margin-top:0;color:#1565C0;">
+
+🏫 ${school.name||school.schoolName||"École"}
+
+</h3>
+
+<div style="
 background:#FFF8E1;
 padding:12px;
 border-radius:10px;
@@ -10903,36 +11056,41 @@ margin-bottom:15px;
 ">
 
 <b>Statut :</b>
-${school.status=="active" ? "🟢 Active" : "🟡 En attente"}
+
+${school.status=="active"?"🟢 Active":"🟡 En attente"}
+
+${expire?'<br><br><span style="color:red;font-weight:bold;">🔴 Essai / abonnement expiré</span>':""}
 
 <br><br>
 
 <b>Paiement :</b>
-${school.paymentStatus || "unpaid"}
+
+${school.paymentStatus||"unpaid"}
 
 <br><br>
 
 <b>Méthode :</b>
-${school.paymentMethod || "-"}
+
+${school.paymentMethod||"-"}
 
 </div>
 
-        <div style="
-            display:grid;
-            grid-template-columns:repeat(2,1fr);
-            gap:10px;
-            margin-bottom:15px;
-        ">
+<div style="
+display:grid;
+grid-template-columns:repeat(2,1fr);
+gap:10px;
+margin-bottom:15px;
+">
 
-            <div class="info">👥 Total : <b>${stats.total}</b></div>
-            <div class="info">👔 Directeurs : <b>${stats.admins}</b></div>
-            <div class="info">👨‍🏫 Enseignants : <b>${stats.teachers}</b></div>
-            <div class="info">👨‍👩‍👧 Parents : <b>${stats.parents}</b></div>
-            <div class="info">🎓 Élèves : <b>${stats.students}</b></div>
+<div class="info">👥 Total : <b>${stats.total}</b></div>
+<div class="info">👔 Directeurs : <b>${stats.admins}</b></div>
+<div class="info">👨‍🏫 Enseignants : <b>${stats.teachers}</b></div>
+<div class="info">👨‍👩‍👧 Parents : <b>${stats.parents}</b></div>
+<div class="info">🎓 Élèves : <b>${stats.students}</b></div>
 
-        </div>
+</div>
 
-        ${
+${
 school.status!="active"
 
 ?
@@ -10996,13 +11154,17 @@ margin-bottom:20px;
 
 }
 
-        <h4 style="color:#1565C0;">👥 Comptes enregistrés</h4>
+<h4 style="color:#1565C0;">
 
-        ${usersHtml}
+👥 Comptes enregistrés
 
-    </div>
+</h4>
 
-    `;
+${usersHtml}
+
+</div>
+
+`;
 
 }
 
@@ -11032,23 +11194,23 @@ verifiedAt:Date.now()
 };
 
 // Première activation : pas encore d'essai
-// Première activation → Essai de 30 minutes
+// Première activation → Essai de 90 jours
 if(!school.trialStart){
 
 data.trialStart = Date.now();
 
-data.trialEnd = Date.now() + (30*60*1000);
+data.trialEnd = Date.now() + (90*24*60*60*1000);
 
-// 30 minutes
+// 90 jours
 
 }else{
 
-// Renouvellement → Abonnement de 10 minutes
+// Renouvellement → Abonnement de 30 jours
 data.subscriptionStart = Date.now();
 
-data.subscriptionEnd = Date.now() + (10*60*1000);
+data.subscriptionEnd = Date.now() + (30*24*60*60*1000);
 
-// 10 minutes
+// 30 jours
 
 data.subscriptionNumber = (school.subscriptionNumber || 0) + 1;
 
@@ -11868,98 +12030,238 @@ function supprimerEleve(matricule){
     });
 
 }
-function modifierEnseignant(
-matricule
-){
+function modifierEnseignant(matricule){
+
+showLoader();
 
 db.ref(
-"schools/" +
-  window.currentSchoolId +
-  "/teachers/" +
-  matricule
+"schools/"+window.currentSchoolId+"/teachers/"+matricule
 )
 
 .once("value")
 
 .then(snapshot=>{
 
+hideLoader();
+
 let e=snapshot.val();
 
-document.querySelector(
-".login-box"
-).innerHTML=`
+document.querySelector(".login-box").innerHTML=`
 
-<h2>
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
 
 Modifier enseignant
 
 </h2>
 
 <input
-id="matiere"
-value="${e.matiere||""}"
+id="nom"
+placeholder="Nom"
+value="${e.nom||""}"
 >
 
 <input
+id="postnom"
+placeholder="Postnom"
+value="${e.postnom||""}"
+>
+
+<input
+id="prenom"
+placeholder="Prénom"
+value="${e.prenom||""}"
+>
+
+<select id="sexe">
+
+<option ${e.sexe=="Masculin"?"selected":""}>Masculin</option>
+
+<option ${e.sexe=="Féminin"?"selected":""}>Féminin</option>
+
+</select>
+
+<input
+id="dateNaissance"
+type="date"
+value="${e.dateNaissance||""}"
+>
+
+<input
+id="lieuNaissance"
+placeholder="Lieu de naissance"
+value="${e.lieuNaissance||""}"
+>
+
+<input
+id="dateEngagement"
+type="date"
+value="${e.dateEngagement||""}"
+>
+
+<input
+id="matiere"
+placeholder="Matière"
+value="${e.matiere||""}"
+>
+
+<select id="classeEns">
+
+<option value="">
+Choisir une classe
+</option>
+
+</select>
+
+<input
 id="telephone"
-value="${e.telephone||""}"
+type="tel"
+maxlength="10"
+inputmode="numeric"
+value="${(e.telephone||"").replace(/^243/,"0")}"
+oninput="
+this.value=this.value.replace(/\D/g,'').substring(0,10);
+">
+
+<input
+id="adresse"
+placeholder="Adresse"
+value="${e.adresse||""}"
 >
 
 <button
-onclick="
-enregistrerModificationEnseignant(
-'${matricule}'
-)"
+onclick="enregistrerModificationEnseignant('${matricule}')"
 >
 
 💾 Sauvegarder
 
 </button>
 
+<button
+onclick="voirFicheEnseignant('${matricule}')"
+>
+
+⬅ Retour
+
+</button>
+
+`;
+
+setTimeout(()=>{
+
+let select=document.getElementById("classeEns");
+
+db.ref("schools/"+window.currentSchoolId+"/classes")
+
+.once("value")
+
+.then(snapshot=>{
+
+snapshot.forEach(item=>{
+
+let classe=item.val();
+
+select.innerHTML+=`
+<option value="${classe}" ${classe==e.classe?"selected":""}>
+${classe}
+</option>
 `;
 
 });
 
-}
+});
 
-function enregistrerModificationEnseignant(
-matricule
-){
-
-db.ref(
-"schools/" +
-  window.currentSchoolId +
-  "/teachers/" +
-  matricule
-)
-
-.update({
-
-matiere:
-document.getElementById(
-"matiere"
-).value,
-
-telephone:
-document.getElementById(
-"telephone"
-).value
-
-})
-
-.then(()=>{
-
-alert(
-"Modification enregistrée"
-);
-
-voirFicheEnseignant(
-matricule
-);
+},100);
 
 });
 
 }
+
+function enregistrerModificationEnseignant(matricule){
+
+showLoader();
+
+let telephone=document.getElementById("telephone").value.replace(/\D/g,"");
+
+if(telephone.startsWith("0")){
+telephone=telephone.substring(1);
+}
+
+if(telephone && !telephone.startsWith("243")){
+telephone="243"+telephone;
+}
+
+telephone=normalizePhone(telephone);
+
+let data={
+
+nom:document.getElementById("nom").value.trim(),
+
+postnom:document.getElementById("postnom").value.trim(),
+
+prenom:document.getElementById("prenom").value.trim(),
+
+name:
+document.getElementById("nom").value.trim()+" "+
+document.getElementById("postnom").value.trim()+" "+
+document.getElementById("prenom").value.trim(),
+
+sexe:document.getElementById("sexe").value,
+
+dateNaissance:document.getElementById("dateNaissance").value,
+
+lieuNaissance:document.getElementById("lieuNaissance").value,
+
+dateEngagement:document.getElementById("dateEngagement").value,
+
+matiere:document.getElementById("matiere").value,
+
+classe:document.getElementById("classeEns").value,
+
+telephone:telephone,
+
+adresse:document.getElementById("adresse").value
+
+};
+
+Promise.all([
+
+db.ref("schools/"+window.currentSchoolId+"/teachers/"+matricule).update(data),
+
+db.ref("schools/"+window.currentSchoolId+"/members/"+matricule).update({
+
+name:data.name,
+
+phone:telephone,
+
+classe:data.classe
+
+})
+
+])
+
+.then(()=>{
+
+hideLoader();
+
+alert("Modification enregistrée avec succès.");
+
+voirFicheEnseignant(matricule);
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
 
 function supprimerEnseignant(matricule){
 
@@ -12384,10 +12686,7 @@ function modifierTeacher(matricule){
 showLoader();
 
 db.ref(
-"schools/" +
-window.currentSchoolId +
-"/teachers/" +
-matricule
+"schools/"+window.currentSchoolId+"/teachers/"+matricule
 )
 
 .once("value")
@@ -12399,270 +12698,248 @@ hideLoader();
 let t=snapshot.val();
 
 if(!t){
-
 alert("Enseignant introuvable");
-
 return;
-
 }
 
 document.querySelector(".login-box").innerHTML=`
 
-<h2 style="text-align:center;color:#1f4cff;">
-✏ Modifier enseignant
+<h2 style="
+text-align:center;
+color:#1f4cff;
+">
+
+Modifier enseignant
+
 </h2>
 
-<input id="nom" value="${t.nom||""}" placeholder="Nom">
+<input
+id="nom"
+placeholder="Nom"
+value="${t.nom||""}"
+>
 
-<input id="postnom" value="${t.postnom||""}" placeholder="Postnom">
+<input
+id="postnom"
+placeholder="Postnom"
+value="${t.postnom||""}"
+>
 
-<input id="prenom" value="${t.prenom||""}" placeholder="Prénom">
+<input
+id="prenom"
+placeholder="Prénom"
+value="${t.prenom||""}"
+>
 
 <select id="sexe">
+
 <option ${t.sexe=="Masculin"?"selected":""}>Masculin</option>
+
 <option ${t.sexe=="Féminin"?"selected":""}>Féminin</option>
+
 </select>
 
 <input
 id="dateNaissance"
 type="date"
-value="${t.dateNaissance||""}">
+value="${t.dateNaissance||""}"
+>
 
 <input
 id="lieuNaissance"
+placeholder="Lieu de naissance"
 value="${t.lieuNaissance||""}"
-placeholder="Lieu de naissance">
+>
 
 <input
 id="dateEngagement"
 type="date"
-value="${t.dateEngagement||""}">
+value="${t.dateEngagement||""}"
+>
 
 <input
 id="matiere"
+placeholder="Matière"
 value="${t.matiere||""}"
-placeholder="Matière">
+>
+
+<select id="classeEns">
+
+<option value="">
+Choisir une classe
+</option>
+
+</select>
 
 <input
 id="telephone"
-value="${(t.telephone||"").replace("+243","0")}"
-placeholder="Téléphone">
-
-<input
-id="password"
-type="password"
-value="${t.password||""}"
-placeholder="Mot de passe">
-
-<input
-id="classeEns"
-value="${t.classe||""}"
-placeholder="Classe">
+type="tel"
+placeholder="Téléphone"
+maxlength="10"
+inputmode="numeric"
+value="${(t.telephone||"").replace(/^243/,"0").replace(/^\+243/,"0")}"
+oninput="
+this.value=this.value.replace(/\D/g,'').substring(0,10);
+">
 
 <input
 id="adresse"
+placeholder="Adresse"
 value="${t.adresse||""}"
-placeholder="Adresse">
+>
 
 <button
-onclick="updateTeacher('${matricule}','${t.telephone}')">
+onclick="updateTeacher('${matricule}','${t.telephone||""}')"
+>
+
 💾 Enregistrer
+
 </button>
 
 <button
-onclick="viewTeacher('${matricule}')">
-⬅ Annuler
+onclick="viewTeacher('${matricule}')"
+>
+
+⬅ Retour
+
 </button>
 
 `;
 
-});
+setTimeout(()=>{
 
-}
+let select=document.getElementById("classeEns");
 
-// ======== Mise à jour ========
-
-function updateTeacher(
-matricule,
-ancienTelephone
-){
-
-showLoader();
-
-let telephone=
-
-document
-.getElementById("telephone")
-.value
-.replace(/\D/g,"");
-
-if(
-telephone.startsWith("0")
-){
-telephone=
-telephone.substring(1);
-}
-
-if(
-telephone &&
-!telephone.startsWith("243")
-){
-telephone=
-"243"+telephone;
-}
-
-telephone=
-"+"+telephone;
-
-let data={
-
-nom:
-document.getElementById("nom").value.trim(),
-
-postnom:
-document.getElementById("postnom").value.trim(),
-
-prenom:
-document.getElementById("prenom").value.trim(),
-
-name:
-document.getElementById("nom").value.trim()
-+" "+
-document.getElementById("postnom").value.trim()
-+" "+
-document.getElementById("prenom").value.trim(),
-
-sexe:
-document.getElementById("sexe").value,
-
-dateNaissance:
-document.getElementById("dateNaissance").value,
-
-lieuNaissance:
-document.getElementById("lieuNaissance").value,
-
-dateEngagement:
-document.getElementById("dateEngagement").value,
-
-password:
-document.getElementById("password").value,
-
-classe:
-document.getElementById("classeEns").value,
-
-matiere:
-document.getElementById("matiere").value,
-
-telephone:
-telephone,
-
-adresse:
-document.getElementById("adresse").value
-
-};
-
-db.ref(
-"schools/"
-+
-window.currentSchoolId+
-"/teachers/"
-+
-matricule
-)
-
-.update(data)
-
-.then(()=>{
-
-return db.ref(
-"schools/"
-+
-window.currentSchoolId+
-"/members/"
-+
-matricule
-)
-
-.update({
-
-name:data.name,
-
-phone:telephone
-
-});
-
-})
-
-.then(()=>{
-
-if(
-ancienTelephone!=telephone
-){
-
-return db.ref(
-"users/"
-+
-ancienTelephone
-)
+db.ref("schools/"+window.currentSchoolId+"/classes")
 
 .once("value")
 
 .then(snapshot=>{
 
-let user=
-snapshot.val();
+snapshot.forEach(item=>{
 
-if(user){
+let classe=item.val();
 
-user.phone=
-telephone;
+select.innerHTML+=`
+<option value="${classe}" ${classe==t.classe?"selected":""}>
+${classe}
+</option>
+`;
 
-user.name=
-data.name;
+});
 
-return db.ref(
-"users/"
-+
-telephone
-)
+});
 
-.set(user)
-
-.then(()=>{
-
-return db.ref(
-"users/"
-+
-ancienTelephone
-)
-
-.remove();
+},100);
 
 });
 
 }
 
-});
+function updateTeacher(matricule,ancienTelephone){
 
+showLoader();
+
+let telephone=document.getElementById("telephone").value.replace(/\D/g,"");
+
+if(telephone.startsWith("0")){
+telephone=telephone.substring(1);
 }
 
-return db.ref(
-"users/"
-+
-telephone
-)
+if(telephone && !telephone.startsWith("243")){
+telephone="243"+telephone;
+}
 
-.update({
+telephone=normalizePhone(telephone);
+
+let data={
+
+nom:document.getElementById("nom").value.trim(),
+
+postnom:document.getElementById("postnom").value.trim(),
+
+prenom:document.getElementById("prenom").value.trim(),
+
+name:
+document.getElementById("nom").value.trim()+" "+
+document.getElementById("postnom").value.trim()+" "+
+document.getElementById("prenom").value.trim(),
+
+sexe:document.getElementById("sexe").value,
+
+dateNaissance:document.getElementById("dateNaissance").value,
+
+lieuNaissance:document.getElementById("lieuNaissance").value,
+
+dateEngagement:document.getElementById("dateEngagement").value,
+
+classe:document.getElementById("classeEns").value,
+
+matiere:document.getElementById("matiere").value,
+
+telephone:telephone,
+
+adresse:document.getElementById("adresse").value
+
+};
+
+Promise.all([
+
+db.ref("schools/"+window.currentSchoolId+"/teachers/"+matricule).update(data),
+
+db.ref("schools/"+window.currentSchoolId+"/members/"+matricule).update({
 
 name:data.name,
 
 phone:telephone,
 
-password:data.password,
-
 classe:data.classe
 
+})
 
+])
+
+.then(()=>{
+
+if(ancienTelephone!=telephone){
+
+return db.ref("users/"+ancienTelephone)
+
+.once("value")
+
+.then(snapshot=>{
+
+let user=snapshot.val();
+
+if(user){
+
+user.phone=telephone;
+user.name=data.name;
+user.classe=data.classe;
+
+return db.ref("users/"+telephone)
+
+.set(user)
+
+.then(()=>{
+
+return db.ref("users/"+ancienTelephone).remove();
+
+});
+
+}
+
+});
+
+}
+
+return db.ref("users/"+telephone).update({
+
+name:data.name,
+
+phone:telephone,
+
+classe:data.classe
 
 });
 
@@ -12672,13 +12949,9 @@ classe:data.classe
 
 hideLoader();
 
-alert(
-"Enseignant modifié avec succès."
-);
+alert("Enseignant modifié avec succès.");
 
-viewTeacher(
-matricule
-);
+viewTeacher(matricule);
 
 })
 
@@ -12686,13 +12959,12 @@ matricule
 
 hideLoader();
 
-alert(
-error.message
-);
+alert(error.message);
 
 });
 
 }
+
 
 function normalizePhone(phone){
 
@@ -12737,74 +13009,7 @@ return phone;
 
 
 
- function resetDatabase(){
-
-let confirmation=
-
-prompt(
-"Tapez RESET pour confirmer"
-);
-
-if(
-confirmation!=="RESET"
-){
-
-alert(
-"Réinitialisation annulée"
-);
-
-return;
-
-}
-
-showLoader();
-
-
-// supprimer anciennes données
-
-Promise.all([
-
-db.ref("users").remove(),
-
-db.ref("schools").remove(),
-
-db.ref("invitations").remove(),
-
-db.ref("devoirs").remove(),
-
-db.ref("emploisTemps").remove(),
-
-db.ref("eleves").remove()
-
-])
-
-.then(()=>{
-
-hideLoader();
-
-alert(
-"Base Firebase réinitialisée"
-);
-
-
-// recharger application
-
-location.reload();
-
-})
-
-.catch(error=>{
-
-hideLoader();
-
-alert(
-error.message
-);
-
-});
-
-}
-
+ 
 /* function activerNotification(){
 
 Notification.requestPermission()
@@ -22705,28 +22910,27 @@ chargerAbsences();
 }
 
 
-
 function ouvrirCalendrierExamens(){
 
-document.getElementById("content").innerHTML=`
+document.querySelector(".login-box").innerHTML=`
 
 <div class="page">
 
-<h2>📅 Calendrier des examens</h2>
+<h2 style="text-align:center;margin-bottom:20px;">
+📅 Calendrier des examens
+</h2>
 
 <div class="card">
 
 <label>Classe</label>
 
 <select id="classeCalendrier">
-<option value="">Choisir une classe</option>
+<option value="">Chargement des classes...</option>
 </select>
 
 <label>Date</label>
 
-<input
-type="date"
-id="dateExamen">
+<input type="date" id="dateExamen">
 
 <label>Cours</label>
 
@@ -22737,9 +22941,7 @@ placeholder="Nom du cours">
 
 <label>Heure</label>
 
-<input
-type="time"
-id="heureExamen">
+<input type="time" id="heureExamen">
 
 <label>Lieu</label>
 
@@ -22748,8 +22950,11 @@ type="text"
 id="lieuExamen"
 placeholder="Salle ou lieu">
 
+<br>
+
 <button
 class="btn"
+style="width:100%;"
 onclick="enregistrerCalendrierExamen()">
 
 💾 Enregistrer
@@ -22760,23 +22965,24 @@ onclick="enregistrerCalendrierExamen()">
 
 <div class="card">
 
-<h3>Examens programmés</h3>
+<h3 style="text-align:center;margin-bottom:15px;">
+📋 Examens programmés
+</h3>
 
-<table id="tableCalendrierExamens">
+<div style="overflow-x:auto;">
+
+<table id="tableCalendrierExamens"
+style="width:100%;border-collapse:collapse;">
 
 <thead>
 
-<tr>
+<tr style="background:#2d4df5;color:#fff;">
 
-<th>Classe</th>
-
-<th>Date</th>
-
-<th>Heure</th>
-
-<th>Cours</th>
-
-<th>Lieu</th>
+<th style="padding:10px;">Classe</th>
+<th style="padding:10px;">Date</th>
+<th style="padding:10px;">Heure</th>
+<th style="padding:10px;">Cours</th>
+<th style="padding:10px;">Lieu</th>
 
 </tr>
 
@@ -22786,8 +22992,7 @@ onclick="enregistrerCalendrierExamen()">
 
 <tr>
 
-<td colspan="5"
-style="text-align:center;">
+<td colspan="5" style="padding:20px;text-align:center;">
 
 Aucun examen programmé.
 
@@ -22803,53 +23008,169 @@ Aucun examen programmé.
 
 </div>
 
+<div style="margin-top:20px;text-align:center;">
+
+<button
+class="btn"
+style="padding:10px 30px;"
+onclick="openTeacher()">
+
+⬅ Retour
+
+</button>
+
+</div>
+
+</div>
+
 `;
 
-if(typeof chargerClassesCalendrier==="function"){
-
 chargerClassesCalendrier();
-
-}else if(typeof chargerClasses==="function"){
-
-chargerClasses("classeCalendrier");
-
-}
-
-if(typeof chargerCalendrierExamens==="function"){
-
 chargerCalendrierExamens();
 
 }
 
+function chargerCalendrierExamens(){
+
+let tbody=document.getElementById("listeCalendrierExamens");
+
+if(!tbody) return;
+
+tbody.innerHTML=`
+<tr>
+<td colspan="5" style="text-align:center;padding:20px;">
+Chargement...
+</td>
+</tr>
+`;
+
+if(!window.currentSchoolId){
+
+tbody.innerHTML=`
+<tr>
+<td colspan="5" style="text-align:center;color:red;padding:20px;">
+École introuvable.
+</td>
+</tr>
+`;
+
+return;
+
 }
 
-function chargerClassesCalendrier(){
+showLoader();
 
-let select=document.getElementById("classeCalendrier");
+Promise.all([
 
-if(!select) return;
+db.ref("schools/"+window.currentSchoolId+"/classes").once("value"),
 
-select.innerHTML='<option value="">Choisir une classe</option>';
+db.ref("schools/"+window.currentSchoolId+"/calendrierExamens").once("value")
 
-db.ref("schools/"+schoolId+"/classes")
+])
 
-.once("value")
+.then(([classesSnap, examensSnap])=>{
 
-.then(snapshot=>{
+hideLoader();
 
-snapshot.forEach(child=>{
+tbody.innerHTML="";
+
+let classes={};
+
+classesSnap.forEach(child=>{
 
 let classe=child.val();
 
-let option=document.createElement("option");
+if(typeof classe==="string"){
 
-option.value=child.key;
+classes[child.key]=classe;
 
-option.textContent=classe.nom||child.key;
+}else{
 
-select.appendChild(option);
+classes[child.key]=classe.nom || classe.nomClasse || child.key;
+
+}
 
 });
+
+if(!examensSnap.exists()){
+
+tbody.innerHTML=`
+<tr>
+<td colspan="5" style="text-align:center;padding:20px;">
+Aucun examen programmé.
+</td>
+</tr>
+`;
+
+return;
+
+}
+
+let liste=[];
+
+examensSnap.forEach(child=>{
+
+liste.push(child.val());
+
+});
+
+liste.sort((a,b)=>{
+
+let d1=(a.date||"")+" "+(a.heure||"00:00");
+
+let d2=(b.date||"")+" "+(b.heure||"00:00");
+
+return d1.localeCompare(d2);
+
+});
+
+liste.forEach(e=>{
+
+tbody.innerHTML+=`
+
+<tr style="border-bottom:1px solid #e5e5e5;">
+
+<td style="padding:10px;font-weight:bold;">
+${classes[e.classe] || e.classe}
+</td>
+
+<td style="padding:10px;text-align:center;">
+${e.date || ""}
+</td>
+
+<td style="padding:10px;text-align:center;">
+${e.heure || ""}
+</td>
+
+<td style="padding:10px;">
+${e.cours || ""}
+</td>
+
+<td style="padding:10px;">
+${e.lieu || ""}
+</td>
+
+</tr>
+
+`;
+
+});
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+tbody.innerHTML=`
+<tr>
+<td colspan="5" style="text-align:center;color:red;padding:20px;">
+Erreur de chargement.
+</td>
+</tr>
+`;
+
+alert(error.message);
 
 });
 
@@ -22858,43 +23179,34 @@ select.appendChild(option);
 function enregistrerCalendrierExamen(){
 
 let classe=document.getElementById("classeCalendrier").value;
-
 let date=document.getElementById("dateExamen").value;
-
 let heure=document.getElementById("heureExamen").value;
-
 let cours=document.getElementById("coursExamen").value.trim();
-
 let lieu=document.getElementById("lieuExamen").value.trim();
 
-if(!classe||!date||!heure||!cours){
-
-alert("Complète tous les champs.");
-
+if(!window.currentSchoolId){
+alert("École introuvable.");
 return;
+}
 
+if(!classe || !date || !heure || !cours){
+alert("Complète tous les champs obligatoires.");
+return;
 }
 
 showLoader();
 
-let id=db.ref("schools/"+schoolId+"/calendrierExamens").push().key;
+let id=db.ref("schools/"+window.currentSchoolId+"/calendrierExamens").push().key;
 
-db.ref("schools/"+schoolId+"/calendrierExamens/"+id)
-
+db.ref("schools/"+window.currentSchoolId+"/calendrierExamens/"+id)
 .set({
 
 id:id,
-
 classe:classe,
-
 date:date,
-
 heure:heure,
-
 cours:cours,
-
 lieu:lieu,
-
 timestamp:Date.now()
 
 })
@@ -22903,10 +23215,12 @@ timestamp:Date.now()
 
 hideLoader();
 
-alert("Examen enregistré.");
+alert("Examen enregistré avec succès.");
 
+document.getElementById("classeCalendrier").value="";
+document.getElementById("dateExamen").value="";
+document.getElementById("heureExamen").value="";
 document.getElementById("coursExamen").value="";
-
 document.getElementById("lieuExamen").value="";
 
 chargerCalendrierExamens();
@@ -22923,19 +23237,41 @@ alert(error.message);
 
 }
 
+
 function chargerCalendrierExamens(){
 
 let tbody=document.getElementById("listeCalendrierExamens");
 
 if(!tbody) return;
 
-tbody.innerHTML="";
+if(!window.currentSchoolId){
+tbody.innerHTML=`
+<tr>
+<td colspan="5" style="text-align:center;">
+École introuvable.
+</td>
+</tr>
+`;
+return;
+}
 
-db.ref("schools/"+schoolId+"/calendrierExamens")
+tbody.innerHTML=`
+<tr>
+<td colspan="5" style="text-align:center;">
+Chargement...
+</td>
+</tr>
+`;
 
+showLoader();
+
+db.ref("schools/"+window.currentSchoolId+"/calendrierExamens")
 .once("value")
-
 .then(snapshot=>{
+
+hideLoader();
+
+tbody.innerHTML="";
 
 if(!snapshot.exists()){
 
@@ -22959,15 +23295,15 @@ tbody.innerHTML+=`
 
 <tr>
 
-<td>${e.classe||""}</td>
+<td>${e.classe || ""}</td>
 
-<td>${e.date||""}</td>
+<td>${e.date || ""}</td>
 
-<td>${e.heure||""}</td>
+<td>${e.heure || ""}</td>
 
-<td>${e.cours||""}</td>
+<td>${e.cours || ""}</td>
 
-<td>${e.lieu||""}</td>
+<td>${e.lieu || ""}</td>
 
 </tr>
 
@@ -22975,15 +23311,30 @@ tbody.innerHTML+=`
 
 });
 
+})
+
+.catch(error=>{
+
+hideLoader();
+
+tbody.innerHTML=`
+<tr>
+<td colspan="5" style="text-align:center;color:red;">
+Erreur de chargement.
+</td>
+</tr>
+`;
+
+alert(error.message);
+
 });
 
 }
 
 
-
 function ouvrirDocumentsPedagogiques(){
 
-document.getElementById("content").innerHTML=`
+document.querySelector(".login-box").innerHTML=`
 
 <div class="page">
 
@@ -23027,6 +23378,16 @@ onclick="enregistrerDocumentPedagogique()">
 
 </button>
 
+<br><br>
+
+<button
+class="btn"
+onclick="openTeacher()">
+
+Retour
+
+</button>
+
 </div>
 
 <div class="card">
@@ -23045,9 +23406,9 @@ onclick="enregistrerDocumentPedagogique()">
 
 <th>Description</th>
 
-<th>Document</th>
+<th>Fichier</th>
 
-<th>Actions</th>
+<th>Date</th>
 
 </tr>
 
@@ -23071,23 +23432,17 @@ Aucun document disponible.
 
 </div>
 
+
 </div>
+
 
 `;
 
-if(typeof chargerClassesDocuments==="function"){
-
 chargerClassesDocuments();
-
-}
-
-if(typeof chargerDocumentsPedagogiques==="function"){
-
 chargerDocumentsPedagogiques();
 
 }
 
-}
 
 function chargerClassesDocuments(){
 
@@ -23097,69 +23452,87 @@ if(!select) return;
 
 select.innerHTML='<option value="">Choisir une classe</option>';
 
-db.ref("schools/"+schoolId+"/classes")
+if(!window.currentSchoolId){
+alert("École introuvable.");
+return;
+}
 
+showLoader();
+
+db.ref("schools/"+window.currentSchoolId+"/classes")
 .once("value")
-
 .then(snapshot=>{
+
+hideLoader();
+
+if(!snapshot.exists()) return;
 
 snapshot.forEach(child=>{
 
 let classe=child.val();
 
+let nomClasse="";
+
+if(typeof classe==="string"){
+
+nomClasse=classe;
+
+}else{
+
+nomClasse=classe.nom || classe.nomClasse || classe.classe || child.key;
+
+}
+
 let option=document.createElement("option");
 
-option.value=child.key;
-
-option.textContent=classe.nom||child.key;
+option.value=nomClasse;
+option.textContent=nomClasse;
 
 select.appendChild(option);
 
 });
 
+})
+.catch(error=>{
+
+hideLoader();
+alert(error.message);
+
 });
 
 }
 
-
 function enregistrerDocumentPedagogique(){
 
 let classe=document.getElementById("classeDocument").value;
-
-let cours=document.getElementById("coursDocument").value.trim();
-
 let titre=document.getElementById("titreDocument").value.trim();
-
+let description=document.getElementById("descriptionDocument").value.trim();
 let fichier=document.getElementById("fichierDocument").files[0];
 
-if(!classe||!cours||!titre){
-
-alert("Complète tous les champs.");
-
+if(!window.currentSchoolId){
+alert("École introuvable.");
 return;
+}
 
+if(!classe || !titre){
+alert("Complète les champs obligatoires.");
+return;
 }
 
 showLoader();
 
-let id=db.ref("schools/"+schoolId+"/documentsPedagogiques").push().key;
+let id=db.ref("schools/"+window.currentSchoolId+"/documentsPedagogiques").push().key;
 
-db.ref("schools/"+schoolId+"/documentsPedagogiques/"+id)
+db.ref("schools/"+window.currentSchoolId+"/documentsPedagogiques/"+id)
 
 .set({
 
 id:id,
-
 classe:classe,
-
-cours:cours,
-
 titre:titre,
-
-nomFichier:fichier?fichier.name:"Aucun fichier",
-
+description:description,
+nomFichier:fichier ? fichier.name : "",
 date:new Date().toLocaleDateString(),
-
 timestamp:Date.now()
 
 })
@@ -23170,10 +23543,9 @@ hideLoader();
 
 alert("Document enregistré.");
 
+document.getElementById("classeDocument").value="";
 document.getElementById("titreDocument").value="";
-
-document.getElementById("coursDocument").value="";
-
+document.getElementById("descriptionDocument").value="";
 document.getElementById("fichierDocument").value="";
 
 chargerDocumentsPedagogiques();
@@ -23190,19 +23562,46 @@ alert(error.message);
 
 }
 
+
 function chargerDocumentsPedagogiques(){
 
-let tbody=document.getElementById("listeDocuments");
+let tbody=document.getElementById("listeDocumentsPedagogiques");
 
 if(!tbody) return;
 
-tbody.innerHTML="";
+tbody.innerHTML=`
+<tr>
+<td colspan="5" style="text-align:center;">
+Chargement...
+</td>
+</tr>
+`;
 
-db.ref("schools/"+schoolId+"/documentsPedagogiques")
+if(!window.currentSchoolId){
+
+tbody.innerHTML=`
+<tr>
+<td colspan="5" style="text-align:center;">
+École introuvable.
+</td>
+</tr>
+`;
+
+return;
+
+}
+
+showLoader();
+
+db.ref("schools/"+window.currentSchoolId+"/documentsPedagogiques")
 
 .once("value")
 
 .then(snapshot=>{
+
+hideLoader();
+
+tbody.innerHTML="";
 
 if(!snapshot.exists()){
 
@@ -23226,23 +23625,15 @@ tbody.innerHTML+=`
 
 <tr>
 
-<td>${d.classe}</td>
+<td>${d.classe || ""}</td>
 
-<td>${d.cours}</td>
+<td>${d.titre || ""}</td>
 
-<td>${d.titre}</td>
+<td>${d.description || ""}</td>
 
-<td>${d.date}</td>
+<td>${d.nomFichier || "Aucun"}</td>
 
-<td>
-
-<button onclick="telechargerDocument('${d.id}')">
-
-📄 Voir
-
-</button>
-
-</td>
+<td>${d.date || ""}</td>
 
 </tr>
 
@@ -23250,17 +23641,43 @@ tbody.innerHTML+=`
 
 });
 
+})
+
+.catch(error=>{
+
+hideLoader();
+
+tbody.innerHTML=`
+<tr>
+<td colspan="5" style="text-align:center;color:red;">
+Erreur de chargement.
+</td>
+</tr>
+`;
+
+alert(error.message);
+
 });
 
 }
 
+
 function telechargerDocument(id){
 
-db.ref("schools/"+schoolId+"/documentsPedagogiques/"+id)
+if(!window.currentSchoolId){
+alert("École introuvable.");
+return;
+}
+
+showLoader();
+
+db.ref("schools/"+window.currentSchoolId+"/documentsPedagogiques/"+id)
 
 .once("value")
 
 .then(snapshot=>{
+
+hideLoader();
 
 if(!snapshot.exists()){
 
@@ -23272,13 +23689,33 @@ return;
 
 let doc=snapshot.val();
 
+let message="";
+
+message+="Titre : "+(doc.titre || "")+"\n";
+message+="Classe : "+(doc.classe || "")+"\n";
+message+="Description : "+(doc.description || "")+"\n";
+message+="Fichier : "+(doc.nomFichier || "Aucun")+"\n";
+
+if(doc.urlFichier){
+
+window.open(doc.urlFichier,"_blank");
+
+}else{
+
 alert(
-"Titre : "+doc.titre+
-"\nClasse : "+doc.classe+
-"\nCours : "+doc.cours+
-"\nFichier : "+doc.nomFichier+
-"\n\nLe téléchargement sera disponible après l'ajout de Firebase Storage."
+message+
+"\n\nLe fichier n'est pas encore stocké dans Firebase Storage.\nAjoute Firebase Storage pour permettre le téléchargement."
 );
+
+}
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
 
 });
 
@@ -23437,11 +23874,18 @@ html+=`
 
 <label style="
 display:block;
-padding:10px;
+padding:12px;
 background:white;
-margin-bottom:8px;
-border-radius:10px;
+margin-bottom:10px;
+border-radius:12px;
 box-shadow:0 2px 6px rgba(0,0,0,.08);
+cursor:pointer;
+">
+
+<div style="
+display:flex;
+align-items:center;
+gap:12px;
 ">
 
 <input
@@ -23450,9 +23894,33 @@ class="eleveNotif"
 value="${e.key}"
 data-phone="${normalizePhone(s.fatherPhone || s.motherPhone || "")}"
 data-name="${s.name||""}"
->
+style="
+width:20px;
+height:20px;
+margin:0;
+flex-shrink:0;
+">
 
+<div>
+
+<div style="
+font-weight:bold;
+font-size:15px;
+color:#222;
+">
 ${s.name||""}
+</div>
+
+<div style="
+font-size:12px;
+color:#666;
+">
+${s.className||""}
+</div>
+
+</div>
+
+</div>
 
 </label>
 
@@ -24353,11 +24821,1358 @@ a.remove();
 }
 
 
+function ouvrirCalendrier(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+margin-bottom:20px;
+">
+📅 Calendrier scolaire
+</h2>
+
+<div style="
+display:grid;
+grid-template-columns:repeat(2,1fr);
+gap:12px;
+">
+
+<button class="card-btn"
+onclick="ajouterEvenement()">
+<div class="card-icon">➕</div>
+<div class="card-text">Ajouter</div>
+</button>
+
+<button class="card-btn"
+onclick="voirCalendrier()">
+<div class="card-icon">📅</div>
+<div class="card-text">Calendrier</div>
+</button>
+
+<button class="card-btn"
+onclick="voirEvenements()">
+<div class="card-icon">🎉</div>
+<div class="card-text">Évènements</div>
+</button>
+
+<button class="card-btn"
+onclick="voirExamens()">
+<div class="card-icon">📝</div>
+<div class="card-text">Examens</div>
+</button>
+
+<button class="card-btn"
+onclick="voirConges()">
+<div class="card-icon">🏖️</div>
+<div class="card-text">Congés</div>
+</button>
+
+<button class="card-btn"
+onclick="voirReunions()">
+<div class="card-icon">👥</div>
+<div class="card-text">Réunions</div>
+</button>
+
+</div>
+
+<button class="card-btn"
+onclick="examensEnAttente()">
+
+<div class="card-icon">
+📋
+</div>
+
+<div class="card-text">
+Examens proposés
+</div>
+
+</button>
+
+<button
+onclick="openAdmin()"
+style="
+width:100%;
+margin-top:20px;
+padding:14px;
+border:none;
+border-radius:12px;
+background:#1f4cff;
+color:white;
+font-weight:bold;
+">
+⬅ Retour
+</button>
+
+`;
+
+}
+
+function ajouterEvenement(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+margin-bottom:20px;
+">
+📅 Nouvel événement
+</h2>
+
+<input
+id="titreEvenement"
+placeholder="Titre de l'événement">
+
+<input
+id="dateEvenement"
+type="date">
+
+<input
+id="heureEvenement"
+type="time">
+
+<select id="typeEvenement">
+
+<option value="Réunion">👥 Réunion</option>
+<option value="Examen">📝 Examen</option>
+<option value="Vacances">🏖 Vacances</option>
+<option value="Formation">🎓 Formation</option>
+<option value="Sport">⚽ Sport</option>
+<option value="Cérémonie">🎉 Cérémonie</option>
+<option value="Autre">📌 Autre</option>
+
+</select>
+
+<textarea
+id="descriptionEvenement"
+placeholder="Description..."
+style="
+width:100%;
+height:120px;
+padding:12px;
+border-radius:12px;
+margin-top:10px;
+margin-bottom:15px;
+"></textarea>
+
+<button
+class="card-btn"
+onclick="enregistrerEvenement()">
+💾 Enregistrer
+</button>
+
+<button
+class="card-btn"
+onclick="ouvrirCalendrier()"
+style="background:#6c757d;margin-top:10px;">
+⬅ Retour
+</button>
+
+`;
+
+}
+
+function enregistrerEvenement(){
+
+let titre=document.getElementById("titreEvenement").value.trim();
+
+let date=document.getElementById("dateEvenement").value;
+
+let heure=document.getElementById("heureEvenement").value;
+
+let type=document.getElementById("typeEvenement").value;
+
+let description=document.getElementById("descriptionEvenement").value.trim();
+
+if(!titre){
+alert("Saisissez le titre.");
+return;
+}
+
+if(!date){
+alert("Choisissez une date.");
+return;
+}
+
+showLoader();
+
+let id="EVT-"+Date.now();
+
+let data={
+
+id:id,
+
+titre:titre,
+
+date:date,
+
+heure:heure,
+
+type:type,
+
+description:description,
+
+schoolId:window.currentSchoolId,
+
+createdAt:Date.now()
+
+};
+
+db.ref(
+"schools/"+window.currentSchoolId+"/calendar/"+id
+)
+
+.set(data)
+
+.then(()=>{
+
+hideLoader();
+
+alert("✅ Événement enregistré avec succès.");
+
+ouvrirCalendrier();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function voirCalendrier(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+margin-bottom:20px;
+">
+📅 Calendrier scolaire
+</h2>
+
+<div style="
+background:#fff;
+padding:20px;
+border-radius:18px;
+box-shadow:0 4px 12px rgba(0,0,0,.08);
+text-align:center;
+">
+
+<div style="font-size:60px;">📆</div>
+
+<h3 style="
+color:#1f4cff;
+margin:15px 0 10px;
+">
+Calendrier scolaire
+</h3>
+
+<p style="
+color:#666;
+line-height:1.6;
+">
+Cette fonctionnalité permettra bientôt de consulter tous les événements de l'école, les examens, les réunions, les vacances et les activités programmées.
+</p>
+
+<button
+onclick="ouvrirCalendrier()"
+style="
+margin-top:20px;
+padding:12px 20px;
+border:none;
+border-radius:12px;
+background:#1f4cff;
+color:white;
+font-weight:bold;
+cursor:pointer;
+">
+⬅ Retour
+</button>
+
+</div>
+
+`;
+
+}
+
+function voirEvenements(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+margin-bottom:20px;
+">
+
+📋 Liste des événements
+
+</h2>
+
+<div style="
+background:#fff;
+padding:20px;
+border-radius:18px;
+box-shadow:0 4px 10px rgba(0,0,0,.08);
+text-align:center;
+line-height:1.8;
+">
+
+<div style="font-size:60px;">📅</div>
+
+<h3 style="color:#1f4cff;">
+Aucun événement disponible
+</h3>
+
+<p style="color:#666;">
+Les événements créés apparaîtront ici.
+</p>
+
+</div>
+
+<button
+onclick="ouvrirCalendrier()"
+style="
+width:100%;
+margin-top:20px;
+padding:14px;
+background:#1f4cff;
+color:white;
+border:none;
+border-radius:12px;
+font-weight:bold;
+">
+
+⬅ Retour
+
+</button>
+
+`;
+
+}
+
+function voirExamens(){
+
+showLoader();
+
+db.ref("schools/"+window.currentSchoolId+"/examens")
+.once("value")
+.then(snapshot=>{
+
+hideLoader();
+
+let html=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+margin-bottom:20px;
+">
+📝 Examens
+</h2>
+
+<button
+onclick="ouvrirCalendrier()"
+style="
+width:100%;
+padding:12px;
+margin-bottom:15px;
+background:#1f4cff;
+color:white;
+border:none;
+border-radius:12px;
+font-weight:bold;
+">
+⬅ Retour
+</button>
+
+`;
+
+if(!snapshot.exists()){
+
+html+=`
+<div style="
+background:white;
+padding:20px;
+border-radius:15px;
+text-align:center;
+color:#777;
+box-shadow:0 3px 8px rgba(0,0,0,.08);
+">
+📭 Aucun examen enregistré.
+</div>
+`;
+
+}else{
+
+snapshot.forEach(item=>{
+
+let e=item.val();
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+margin-bottom:12px;
+border-radius:15px;
+box-shadow:0 3px 8px rgba(0,0,0,.08);
+">
+
+<h3 style="
+margin:0;
+color:#1f4cff;
+">
+📝 ${e.titre||"Examen"}
+</h3>
+
+<p>
+📚 <b>Matière :</b> ${e.matiere||"-"}
+</p>
+
+<p>
+🏫 <b>Classe :</b> ${e.classe||"-"}
+</p>
+
+<p>
+📅 <b>Date :</b> ${e.date||"-"}
+</p>
+
+<p>
+⏰ <b>Heure :</b> ${e.heure||"-"}
+</p>
+
+</div>
+
+`;
+
+});
+
+}
+
+document.querySelector(".login-box").innerHTML=html;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function voirConges(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+margin-bottom:20px;
+">
+🏖️ Congés scolaires
+</h2>
+
+<div style="
+background:#fff;
+padding:18px;
+border-radius:16px;
+box-shadow:0 4px 10px rgba(0,0,0,.08);
+text-align:center;
+margin-bottom:20px;
+">
+
+<div style="font-size:55px;">
+🏖️
+</div>
+
+<h3 style="
+color:#1f4cff;
+margin:10px 0;
+">
+Fonction bientôt disponible
+</h3>
+
+<p style="
+color:#666;
+line-height:1.6;
+margin:0;
+">
+Vous pourrez bientôt gérer les périodes de congés scolaires, vacances, jours fériés et autres interruptions des cours.
+</p>
+
+</div>
+
+<button
+onclick="ouvrirCalendrier()"
+style="
+width:100%;
+padding:14px;
+background:#1f4cff;
+color:white;
+border:none;
+border-radius:12px;
+font-weight:bold;
+">
+⬅ Retour au calendrier
+</button>
+
+`;
+
+}
+
+function voirReunions(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+margin-bottom:20px;
+">
+🤝 Réunions
+</h2>
+
+<div style="
+background:#fff;
+padding:20px;
+border-radius:18px;
+text-align:center;
+box-shadow:0 4px 10px rgba(0,0,0,.08);
+">
+
+<div style="font-size:60px;margin-bottom:15px;">
+🤝
+</div>
+
+<h3 style="color:#1f4cff;margin-bottom:10px;">
+Module en préparation
+</h3>
+
+<p style="
+color:#666;
+line-height:1.6;
+margin-bottom:20px;
+">
+Vous pourrez bientôt organiser les réunions des enseignants, des parents et de la direction, avec des rappels automatiques.
+</p>
+
+<button
+onclick="ouvrirCalendrier()"
+style="
+width:100%;
+padding:14px;
+border:none;
+border-radius:12px;
+background:#1f4cff;
+color:#fff;
+font-weight:bold;
+cursor:pointer;
+">
+⬅ Retour au calendrier
+</button>
+
+</div>
+
+`;
+
+}
+
+
+function proposerExamen(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+margin-bottom:20px;
+">
+📝 Proposer un examen
+</h2>
+
+<input
+id="titreExamen"
+placeholder="Titre de l'examen">
+
+<input
+id="matiereExamen"
+placeholder="Matière">
+
+<select id="classeExamen">
+
+<option value="">
+Choisir une classe
+</option>
+
+</select>
+
+<input
+id="dateExamen"
+type="date">
+
+<input
+id="heureExamen"
+type="time">
+
+<input
+id="dureeExamen"
+placeholder="Durée (Ex : 2 heures)">
+
+<textarea
+id="observationExamen"
+placeholder="Observation"
+style="
+width:100%;
+height:90px;
+padding:12px;
+border-radius:12px;
+margin-top:10px;
+"></textarea>
+
+<button
+onclick="envoyerExamen()"
+style="
+width:100%;
+margin-top:15px;
+background:#1f4cff;
+color:white;
+padding:14px;
+border:none;
+border-radius:12px;
+font-weight:bold;
+">
+📤 Envoyer à l'administration
+</button>
+
+<button
+onclick="openTeacher()"
+style="
+width:100%;
+margin-top:10px;
+background:#888;
+color:white;
+padding:14px;
+border:none;
+border-radius:12px;
+">
+⬅ Retour
+</button>
+
+`;
+
+setTimeout(()=>{
+
+let select=document.getElementById("classeExamen");
+
+db.ref(
+"schools/"+window.currentSchoolId+"/classes"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+snapshot.forEach(item=>{
+
+let classe=item.val();
+
+select.innerHTML+=`
+
+<option value="${classe}">
+${classe}
+</option>
+
+`;
+
+});
+
+});
+
+},100);
+
+}
+
+
+function envoyerExamen(){
+
+showLoader();
+
+let titre=document.getElementById("titreExamen").value.trim();
+let matiere=document.getElementById("matiereExamen").value.trim();
+let classe=document.getElementById("classeExamen").value;
+let date=document.getElementById("dateExamen").value;
+let heure=document.getElementById("heureExamen").value;
+let duree=document.getElementById("dureeExamen").value.trim();
+let observation=document.getElementById("observationExamen").value.trim();
+
+if(!titre || !matiere || !classe || !date || !heure){
+
+hideLoader();
+
+alert("Veuillez remplir tous les champs obligatoires.");
+
+return;
+
+}
+
+let id="EXAM-"+Date.now();
+
+db.ref(
+"schools/"+window.currentSchoolId+"/members"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+let enseignant={
+name:"Enseignant",
+matricule:"",
+phone:window.currentPhone
+};
+
+snapshot.forEach(item=>{
+
+let m=item.val();
+
+if(
+m.role=="teacher" &&
+normalizePhone(m.phone)==normalizePhone(window.currentPhone)
+){
+
+enseignant=m;
+
+}
+
+});
+
+let examen={
+
+id:id,
+
+titre:titre,
+
+matiere:matiere,
+
+classe:classe,
+
+date:date,
+
+heure:heure,
+
+duree:duree,
+
+observation:observation,
+
+teacherName:enseignant.name,
+
+teacherMatricule:enseignant.matricule,
+
+teacherPhone:window.currentPhone,
+
+schoolId:window.currentSchoolId,
+
+statut:"en_attente",
+
+createdAt:Date.now()
+
+};
+
+return db.ref(
+"schools/"+window.currentSchoolId+"/examensEnAttente/"+id
+).set(examen);
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("✅ Examen envoyé à l'administration.");
+
+proposerExamen();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+function examensEnAttente(){
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+"/examensEnAttente"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+let html=`
+
+<h2 style="
+text-align:center;
+color:#1f4cff;
+margin-bottom:20px;
+">
+
+📝 Examens proposés
+
+</h2>
+
+<button
+onclick="openAdmin()"
+style="
+width:100%;
+padding:14px;
+margin-bottom:20px;
+border:none;
+border-radius:12px;
+background:#666;
+color:white;
+font-weight:bold;
+">
+
+⬅ Retour
+
+</button>
+
+`;
+
+if(!snapshot.exists()){
+
+html+=`
+
+<div style="
+background:#fff;
+padding:20px;
+border-radius:15px;
+text-align:center;
+color:#888;
+box-shadow:0 2px 8px rgba(0,0,0,.08);
+">
+
+Aucun examen proposé.
+
+</div>
+
+`;
+
+}else{
+
+snapshot.forEach(item=>{
+
+let e=item.val();
+
+html+=`
+
+<div style="
+background:#fff;
+padding:15px;
+margin-bottom:15px;
+border-radius:15px;
+box-shadow:0 2px 8px rgba(0,0,0,.08);
+">
+
+<h3 style="margin:0;color:#1f4cff;">
+${e.titre}
+</h3>
+
+<p>
+👨‍🏫 ${e.teacherName||"-"}
+</p>
+
+<p>
+📚 ${e.matiere}
+</p>
+
+<p>
+🎓 ${e.classe}
+</p>
+
+<p>
+📅 ${e.date} à ${e.heure}
+</p>
+
+<p>
+⏱ ${e.duree||"-"}
+</p>
+
+<p>
+📝 ${e.observation||"-"}
+</p>
+
+<div style="
+display:flex;
+gap:10px;
+margin-top:15px;
+">
+
+<button
+onclick="accepterExamen('${item.key}')"
+style="
+flex:1;
+background:#2E7D32;
+color:white;
+border:none;
+padding:12px;
+border-radius:10px;
+">
+
+✅ Accepter
+
+</button>
+
+<button
+onclick="refuserExamen('${item.key}')"
+style="
+flex:1;
+background:#C62828;
+color:white;
+border:none;
+padding:12px;
+border-radius:10px;
+">
+
+❌ Refuser
+
+</button>
+
+</div>
+
+</div>
+
+`;
+
+});
+
+}
+
+document.querySelector(".login-box").innerHTML=html;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function accepterExamen(id){
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+"/examensEnAttente/"+id
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+if(!snapshot.exists()){
+throw new Error("Examen introuvable.");
+}
+
+let examen=snapshot.val();
+
+examen.statut="accepte";
+examen.validatedAt=Date.now();
+
+return Promise.all([
+
+db.ref(
+"schools/"+window.currentSchoolId+"/calendrierExamens/"+id
+).set(examen),
+
+db.ref(
+"schools/"+window.currentSchoolId+"/examensEnAttente/"+id
+).remove()
+
+]);
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("✅ Examen accepté et ajouté au calendrier.");
+
+examensEnAttente();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+function refuserExamen(id){
+
+if(!confirm("Refuser cet examen ?")){
+return;
+}
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+"/examensEnAttente/"+id
+)
+
+.update({
+
+statut:"refuse",
+
+validatedAt:Date.now()
+
+})
+
+.then(()=>{
+
+hideLoader();
+
+alert("❌ Examen refusé.");
+
+examensEnAttente();
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+function mesExamens(){
+
+showLoader();
+
+db.ref(
+"schools/"+window.currentSchoolId+"/examensEnAttente"
+)
+
+.once("value")
+
+.then(snapshot=>{
+
+hideLoader();
+
+let html=`
+
+<h2 style="text-align:center;color:#1f4cff;">
+📋 Mes examens
+</h2>
+
+<button
+onclick="openTeacher()"
+style="
+width:100%;
+padding:12px;
+margin-bottom:15px;
+background:#666;
+color:white;
+border:none;
+border-radius:10px;
+">
+⬅ Retour
+</button>
+
+`;
+
+let vide=true;
+
+snapshot.forEach(item=>{
+
+let e=item.val();
+
+if(normalizePhone(e.teacherPhone)!=normalizePhone(window.currentPhone)){
+return;
+}
+
+vide=false;
+
+let couleur="#F9A825";
+let texte="🟡 En attente";
+
+if(e.statut=="accepte"){
+couleur="#2E7D32";
+texte="🟢 Accepté";
+}
+
+if(e.statut=="refuse"){
+couleur="#C62828";
+texte="🔴 Refusé";
+}
+
+html+=`
+
+<div style="
+background:white;
+padding:15px;
+border-radius:15px;
+margin-bottom:15px;
+box-shadow:0 2px 8px rgba(0,0,0,.08);
+">
+
+<b style="font-size:18px;">
+${e.titre}
+</b>
+
+<br><br>
+
+📚 ${e.matiere}
+
+<br>
+
+🎓 ${e.classe}
+
+<br>
+
+📅 ${e.date}
+
+${e.heure}
+
+<br><br>
+
+<span style="
+background:${couleur};
+color:white;
+padding:6px 12px;
+border-radius:20px;
+font-weight:bold;
+">
+
+${texte}
+
+</span>
+
+</div>
+
+`;
+
+});
+
+if(vide){
+
+html+=`
+
+<div style="
+background:white;
+padding:20px;
+border-radius:15px;
+text-align:center;
+color:gray;
+">
+
+Vous n'avez proposé aucun examen.
+
+</div>
+
+`;
+
+}
+
+document.querySelector(".login-box").innerHTML=html;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
+function chargerClassesCalendrier(){
+
+let select=document.getElementById("classeCalendrier");
+
+if(!select) return;
+
+select.innerHTML='<option value="">Choisir une classe</option>';
+
+if(!window.currentSchoolId){
+alert("École introuvable.");
+return;
+}
+
+db.ref("schools/"+window.currentSchoolId+"/classes")
+
+.once("value")
+
+.then(snapshot=>{
+
+if(!snapshot.exists()) return;
+
+snapshot.forEach(child=>{
+
+let data=child.val();
+
+let option=document.createElement("option");
+
+/* On enregistre le nom de la classe
+   et non la clé Firebase */
+
+if(typeof data==="string"){
+
+option.value=data;
+option.textContent=data;
+
+}else{
+
+let nom=data.nom || data.nomClasse || child.key;
+
+option.value=nom;
+option.textContent=nom;
+
+}
+
+select.appendChild(option);
+
+});
+
+})
+
+.catch(error=>{
+
+alert(error.message);
+
+});
+
+}
+
+function envoieCommentaire(){
+
+document.querySelector(".login-box").innerHTML=`
+
+<div class="page">
+
+<h2 style="text-align:center;">
+💬 Envoyer un commentaire
+</h2>
+
+<div class="card">
+
+<label>Votre commentaire</label>
+
+<textarea
+id="messageCommentaire"
+rows="8"
+placeholder="Écrivez votre commentaire ici..."
+style="width:100%;padding:12px;border-radius:10px;"></textarea>
+
+<br><br>
+
+<button
+class="btn"
+style="width:100%;"
+onclick="envoyerCommentaireWhatsApp()">
+
+📤 Envoyer
+
+</button>
+
+<br><br>
+
+<button
+class="btn btn-secondary"
+style="width:100%;"
+onclick="openAdmin()">
+
+⬅ Retour
+
+</button>
+
+</div>
+
+</div>
+
+`;
+
+}
+
+function envoyerCommentaireWhatsApp(){
+
+let commentaire=document.getElementById("messageCommentaire").value.trim();
+
+if(commentaire==""){
+
+alert("Veuillez écrire un commentaire.");
+
+return;
+
+}
+
+let nomAdmin=window.adminCache?.adminNom || window.adminCache?.nomAdmin || "Administrateur";
+
+let nomEcole=window.adminCache?.nom || "École";
+
+let numero="243994044329";
+
+let message=
+"Bonjour,\n\n"+
+"Monsieur/Madame "+nomAdmin+
+", administrateur du "+nomEcole+".\n\n"+
+commentaire;
+
+window.open(
+"https://wa.me/"+numero+"?text="+encodeURIComponent(message),
+"_blank"
+);
+
+}
+
 function modifierProfilEnseignant(){
 
 alert("La modification du profil sera disponible dans une prochaine mise à jour.");
 
 }
+
+
+
+
 
 
 
