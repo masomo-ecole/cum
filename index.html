@@ -3,6 +3,9 @@
 <head>
     
     <link rel="manifest" href="./manifest.json">
+    
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3355234566666399"
+     crossorigin="anonymous"></script>
 
 <meta charset="UTF-8">
 <meta name="viewport"
@@ -12192,6 +12195,44 @@ onchange="autreProvince()">
 
 </select>
 
+<input
+id="studentPhone"
+type="tel"
+maxlength="10"
+inputmode="numeric"
+oninput="this.value=this.value.replace(/\D/g,'').substring(0,10)"
+value="${(e.phone||'').replace(/^243/,'0')}"
+placeholder="Téléphone élève">
+
+<input
+id="nationalite"
+value="${e.nationalite||'Congolaise'}"
+placeholder="Nationalité">
+
+<select id="studentLevel">
+<option value="Primaire" ${e.level=="Primaire"?"selected":""}>Primaire</option>
+<option value="Secondaire" ${e.level=="Secondaire"?"selected":""}>Secondaire</option>
+</select>
+
+<div id="optionBloc" style="display:${e.level=="Secondaire"?"block":"none"}">
+
+<select id="studentOption">
+
+${
+(data.school.options||[])
+.map(o=>`
+<option value="${o}" ${e.option==o?"selected":""}>
+${o}
+</option>
+`)
+.join("")
+}
+
+</select>
+
+</div>
+
+
 <div
 id="autreProvinceBloc"
 style="display:${!["Bas-Uele","Équateur","Haut-Katanga","Haut-Lomami","Haut-Uele","Ituri","Kasaï","Kasaï-Central","Kasaï-Oriental","Kinshasa","Kongo-Central","Kwango","Kwilu","Lomami","Lualaba","Maï-Ndombe","Maniema","Mongala","Nord-Kivu","Nord-Ubangi","Sankuru","Sud-Kivu","Sud-Ubangi","Tanganyika","Tshopo","Tshuapa"].includes(e.province)?"block":"none"};">
@@ -12274,7 +12315,32 @@ motherPhone:normalizePhone(
 document.getElementById("motherPhone").value
 ),
 
-province:document.getElementById("province").value.trim(),
+phone:
+normalizePhone(
+document.getElementById("studentPhone").value
+),
+
+nationalite:
+document.getElementById("nationalite").value.trim(),
+
+level:
+document.getElementById("studentLevel").value,
+
+option:
+document.getElementById("studentOption").value,
+
+province:
+
+document.getElementById("province").value==="Autre"
+
+?
+
+document.getElementById("autreProvince").value.trim()
+
+:
+
+document.getElementById("province").value,
+
 
 territoire:document.getElementById("territoire").value.trim(),
 
@@ -12314,6 +12380,7 @@ db.ref(
 
 }
 
+
 if(
 ancienneMere &&
 ancienneMere!=data.motherPhone
@@ -12334,6 +12401,14 @@ promises.push(
 db.ref(
 "schools/"+window.currentSchoolId+
 "/students/"+matricule
+).update(data)
+
+);
+
+promises.push(
+
+db.ref(
+"eleves/"+matricule
 ).update(data)
 
 );
@@ -14020,7 +14095,7 @@ width:auto;
 padding:10px 18px;
 margin:0;
 "
-onclick="ouvrirFormulairePaiement('${e.matricule}')">
+onclick="fichePaiementEleve('${e.matricule}')">
 
 💰
 
@@ -14061,19 +14136,358 @@ document.getElementById("resultatPaiement").innerHTML=html;
 }
 
 
+function fichePaiementEleve(matricule){
+
+showLoader();
+
+let schoolId=window.currentSchoolId;
+
+Promise.all([
+
+db.ref(
+"schools/"+schoolId+"/students/"+matricule
+).once("value"),
+
+db.ref(
+"schools/"+schoolId+
+"/finances/paiementsEleves"
+)
+.orderByChild("matricule")
+.equalTo(matricule)
+.once("value")
+
+])
+
+.then(([eleveSnap,paySnap])=>{
+
+hideLoader();
+
+if(!eleveSnap.exists()){
+
+alert("Élève introuvable.");
+
+return;
+
+}
+
+let e=eleveSnap.val();
+
+let paiements=[];
+
+let totalPaye=0;
+
+let htmlHistorique="";
+
+paySnap.forEach(item=>{
+
+let p=item.val();
+
+paiements.push(p);
+
+totalPaye+=Number(p.montant)||0;
+
+htmlHistorique+=`
+
+<tr>
+
+<td>${p.date}</td>
+
+<td>${p.type}</td>
+
+<td>${p.mois||"-"}</td>
+
+<td>${p.montant} FC</td>
+
+</tr>
+
+`;
+
+});
+
+let moisAnnee=[
+
+"Septembre",
+"Octobre",
+"Novembre",
+"Décembre",
+"Janvier",
+"Février",
+"Mars",
+"Avril",
+"Mai",
+"Juin"
+
+];
+
+let moisPayes=[];
+
+paiements.forEach(p=>{
+
+if(
+p.type==="Minerval" &&
+p.mois
+){
+
+moisPayes.push(p.mois);
+
+}
+
+});
+
+let htmlMois="";
+
+let moisManquants=[];
+
+moisAnnee.forEach(m=>{
+
+let ok=moisPayes.includes(m);
+
+if(!ok){
+
+moisManquants.push(m);
+
+}
+
+htmlMois+=`
+
+<tr>
+
+<td style="padding:10px;border-bottom:1px solid #eee;">
+
+${m}
+
+</td>
+
+<td style="
+padding:10px;
+text-align:center;
+font-size:18px;
+color:${ok?"green":"#bbb"};
+border-bottom:1px solid #eee;
+">
+
+${ok?"✅ Payé":"⬜"}
+
+</td>
+
+</tr>
+
+`;
+
+});
+
+document.querySelector(".login-box").innerHTML=`
+
+<button
+class="back-btn"
+onclick="paiementEleves()">
+
+⬅ Retour
+
+</button>
+
+<div class="pay-box">
+
+<h2>
+
+📋 Fiche de paiement
+
+</h2>
+
+<div class="info">
+
+<b>👨‍🎓 Nom :</b> ${e.name}<br>
+
+<b>🆔 Matricule :</b> ${e.matricule}<br>
+
+<b>🎓 Classe :</b> ${e.className}<br>
+
+<b>💰 Total payé :</b> ${totalPaye} FC
+
+</div>
+
+<h3 style="margin-top:20px;color:#1f4cff;">
+
+📅 Situation du minerval
+
+</h3>
+
+<table
+style="
+width:100%;
+border-collapse:collapse;
+margin-top:10px;
+">
+
+<tr style="
+background:#1f4cff;
+color:white;
+">
+
+<th style="padding:10px;">
+
+Mois
+
+</th>
+
+<th style="padding:10px;">
+
+État
+
+</th>
+
+</tr>
+
+${htmlMois}
+
+</table>
+
+<h3 style="
+margin-top:25px;
+color:#1f4cff;
+">
+
+🧾 Historique des paiements
+
+</h3>
+
+<table
+style="
+width:100%;
+border-collapse:collapse;
+margin-top:10px;
+">
+
+<tr style="
+background:#1f4cff;
+color:white;
+">
+
+<th style="padding:8px;">
+
+Date
+
+</th>
+
+<th style="padding:8px;">
+
+Type
+
+</th>
+
+<th style="padding:8px;">
+
+Mois
+
+</th>
+
+<th style="padding:8px;">
+
+Montant
+
+</th>
+
+</tr>
+
+${htmlHistorique}
+
+</table>
+
+${
+moisManquants.length?
+
+`
+
+<div style="
+margin-top:20px;
+padding:15px;
+border-radius:15px;
+background:#fff3cd;
+color:#856404;
+">
+
+<b>
+
+⚠ Mois non payés
+
+</b>
+
+<br><br>
+
+${moisManquants.join(", ")}
+
+</div>
+
+<br> <ne> 
+
+<button
+class="pay-btn"
+onclick="ouvrirFormulairePaiement('${e.matricule}')">
+
+➕ Ajouter un paiement
+
+</button>
+`
+
+:
+
+`
+
+<div style="
+margin-top:20px;
+padding:15px;
+border-radius:15px;
+background:#d4edda;
+color:#155724;
+font-weight:bold;
+">
+
+✅ Tous les mois de minerval sont payés.
+
+</div>
+
+`
+
+}
+
+</div>
+
+`;
+
+})
+
+.catch(error=>{
+
+hideLoader();
+
+alert(error.message);
+
+});
+
+}
+
+
 function ouvrirFormulairePaiement(matricule){
 
 showLoader();
 
-db.ref("schools/"+window.currentSchoolId+"/students/"+matricule)
+db.ref(
+"schools/"+window.currentSchoolId+
+"/students/"+matricule
+)
+
 .once("value")
+
 .then(snapshot=>{
 
 hideLoader();
 
 if(!snapshot.exists()){
+
 alert("Élève introuvable.");
+
 return;
+
 }
 
 let e=snapshot.val();
@@ -14175,7 +14589,9 @@ onclick="paiementEleves()">
 
 </div>
 
-<select id="typePaiement">
+<select
+id="typePaiement"
+onchange="changerTypePaiement()">
 
 <option value="Minerval">
 Minerval
@@ -14196,6 +14612,31 @@ Inscription
 <option value="Autre">
 Autre
 </option>
+
+</select>
+
+<label
+id="moisLabel"
+style="display:block;">
+
+Mois concerné
+
+</label>
+
+<select
+id="moisPaiement"
+style="display:block;">
+
+<option value="Septembre">Septembre</option>
+<option value="Octobre">Octobre</option>
+<option value="Novembre">Novembre</option>
+<option value="Décembre">Décembre</option>
+<option value="Janvier">Janvier</option>
+<option value="Février">Février</option>
+<option value="Mars">Mars</option>
+<option value="Avril">Avril</option>
+<option value="Mai">Mai</option>
+<option value="Juin">Juin</option>
 
 </select>
 
@@ -14228,7 +14669,26 @@ onclick="enregistrerPaiement('${matricule}')">
 document.getElementById("datePaiement").value=
 new Date().toISOString().split("T")[0];
 
+changerTypePaiement();
+
 });
+
+}
+
+
+function changerTypePaiement(){
+
+let type=
+document.getElementById("typePaiement").value;
+
+let visible=
+(type==="Minerval");
+
+document.getElementById("moisLabel").style.display=
+visible?"block":"none";
+
+document.getElementById("moisPaiement").style.display=
+visible?"block":"none";
 
 }
 
@@ -14247,6 +14707,15 @@ let date=document.getElementById("datePaiement").value;
 let observation=document
 .getElementById("observationPaiement")
 .value.trim();
+
+let mois="";
+
+if(type==="Minerval"){
+
+mois=
+document.getElementById("moisPaiement").value;
+
+}
 
 if(isNaN(montant)||montant<=0){
 alert("Montant invalide.");
@@ -14339,6 +14808,8 @@ recu:numeroRecu,
 
 matricule:matricule,
 
+mois:mois,
+
 nom:eleve.name||"",
 
 classe:eleve.className||"",
@@ -14383,6 +14854,8 @@ observation:observation,
 eleve:eleve.name||"",
 
 matricule:matricule,
+
+mois:mois,
 
 classe:eleve.className||"",
 
