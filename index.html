@@ -468,22 +468,23 @@ overflow:hidden;
 
 .phone-box select{
 
-width:95px;
+    width:110px;
+    min-width:110px;
 
-min-width:95px;
+    flex:0 0 110px;
 
-padding:14px;
+    padding:14px 8px;
 
-border-radius:12px;
+    border-radius:12px;
+    border:1px solid #ccc;
 
-border:1px solid #ccc;
+    font-size:15px;
 
-font-size:16px;
+    background:white;
 
-background:white;
+    outline:none;
 
-outline:none;
-
+    box-sizing:border-box;
 }
 
 /* Champ numéro */
@@ -754,46 +755,23 @@ Connectez-vous avec votre numéro
 
 <div class="phone-box">
 
-<select id="countryCode">
+    <select
+        id="countryCode"
+        onchange="validatePhone()"
+    >
+        <option value="+243">🇨🇩 +243</option>
+    </select>
 
-<option value="+243">🇨🇩 +243</option>
-<!-- <option value="+244">🇦🇴 +244</option>
-<option value="+257">🇧🇮 +257</option>
-<option value="+250">🇷🇼 +250</option>
-<option value="+254">🇰🇪 +254</option>
-<option value="+255">🇹🇿 +255</option>
-<option value="+256">🇺🇬 +256</option>
-<option value="+242">🇨🇬 +242</option>
-<option value="+234">🇳🇬 +234</option>
-<option value="+27">🇿🇦 +27</option>
-<option value="+212">🇲🇦 +212</option>
-<option value="+213">🇩🇿 +213</option>
-<option value="+216">🇹🇳 +216</option>
-<option value="+20">🇪🇬 +20</option>
-<option value="+33">🇫🇷 +33</option>
-<option value="+32">🇧🇪 +32</option>
-<option value="+1">🇺🇸 +1</option>
-<option value="+44">🇬🇧 +44</option>
-<option value="+49">🇩🇪 +49</option>
-<option value="+39">🇮🇹 +39</option>
-<option value="+34">🇪🇸 +34</option>
-<option value="+91">🇮🇳 +91</option>
-<option value="+86">🇨🇳 +86</option>
-<option value="+81">🇯🇵 +81</option>
-<option value="+55">🇧🇷 +55</option>. -->
-
-</select>
-
-
-<input
-type="tel"
-id="phone"
-placeholder="Numéro téléphone"
-inputmode="numeric"
-autocomplete="tel"
-maxlength="9"
-oninput="validatePhone()"
->
+    <input
+        type="tel"
+        id="phone"
+        placeholder="Numéro téléphone"
+        inputmode="numeric"
+        autocomplete="tel"
+        maxlength="9"
+        oninput="validatePhone()"
+        onkeyup="validatePhone()"
+    >
 
 </div>
 
@@ -7579,53 +7557,81 @@ function validatePhone(){
     }
 
     // Garder uniquement les chiffres
-    let number = input.value.replace(/\D/g,"");
+    let number = input.value.replace(/\D/g, "");
 
-    // RDC : accepter aussi 0XXXXXXXXX
-    if(
-        country.value === "+243" &&
-        number.startsWith("0")
-    ){
-        number = number.substring(1);
+    // =========================
+    // RDC : +243
+    // =========================
+
+    if(country.value === "+243"){
+
+        // Si l'utilisateur écrit 0XXXXXXXXX
+        // on retire automatiquement le 0
+        if(number.startsWith("0")){
+            number = number.substring(1);
+        }
+
+        // Maximum 9 chiffres
+        number = number.substring(0, 9);
+
+        input.value = number;
+
+        // Exactement 9 chiffres
+        if(number.length === 9){
+
+            btn.disabled = false;
+
+            btn.style.opacity = "1";
+            btn.style.cursor = "pointer";
+            btn.style.background = "#1f4cff";
+
+            status.innerHTML = "✓ Numéro valide";
+            status.style.color = "green";
+
+        }else{
+
+            btn.disabled = true;
+
+            btn.style.opacity = "0.5";
+            btn.style.cursor = "not-allowed";
+            btn.style.background = "#9bb5ff";
+
+            status.innerHTML =
+                "Entrez votre numéro (" +
+                number.length +
+                "/9)";
+
+            status.style.color = "#777";
+        }
+
+        return;
     }
 
-    // Pour la RDC : exactement 9 chiffres
-    const maxLength =
-        country.value === "+243"
-        ? 9
-        : 15;
+    // =========================
+    // Autres pays
+    // =========================
 
-    // Ne jamais dépasser la longueur autorisée
-    number = number.substring(0,maxLength);
+    number = number.substring(0, 15);
 
     input.value = number;
 
-    // Validation
-    const isValid =
-        country.value === "+243"
-        ? number.length === 9
-        : number.length >= 6;
+    const valid = number.length >= 6;
 
-    // Bouton
-    btn.disabled = !isValid;
+    btn.disabled = !valid;
 
-    btn.classList.toggle(
-        "active",
-        isValid
-    );
+    btn.style.opacity = valid ? "1" : "0.5";
+    btn.style.cursor = valid ? "pointer" : "not-allowed";
+    btn.style.background =
+        valid ? "#1f4cff" : "#9bb5ff";
 
-    // Message
     status.innerHTML =
-        isValid
+        valid
         ? "✓ Numéro valide"
         : "Numéro incomplet";
 
     status.style.color =
-        isValid
-        ? "green"
-        : "#777";
+        valid ? "green" : "#777";
 }
-
 
 
 // ================= ENREGISTRER ECOLE =================
