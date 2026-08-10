@@ -3199,12 +3199,36 @@ box-shadow:0 4px 10px rgba(0,0,0,.08);
 
 <br><br>
 
+<div style="
+position:relative;
+display:inline-block;
+">
+
 <button
-onclick="chargerDevoirsParent('${child.matricule}')">
+onclick="chargerDevoirsParent('${child.matricule}')"
+style="position:relative;"
+>
 
 📘 Voir devoirs
 
+<span
+id="devoirBadge_${child.matricule}"
+style="
+display:none;
+position:absolute;
+top:-6px;
+right:-6px;
+width:14px;
+height:14px;
+background:#00c853;
+border-radius:50%;
+border:2px solid white;
+">
+</span>
+
 </button>
+
+</div>
 
 <br><br>
 
@@ -3289,6 +3313,20 @@ ${htmlChildren}
 
 `;
 
+if(childrenSnap.exists()){
+
+    childrenSnap.forEach(item=>{
+
+        let child = item.val();
+
+        verifierBadgeDevoirsParent(
+            child.matricule
+        );
+
+    });
+
+}
+
 hideLoader();
 
 /* Vérifie les nouvelles notifications */
@@ -3306,6 +3344,115 @@ alert(error.message);
 
 }
 
+function verifierBadgeDevoirsParent(matricule){
+
+    let phone = normalizePhone(window.currentPhone);
+
+    let badge = document.getElementById(
+        "devoirBadge_" + matricule
+    );
+
+    if(!badge) return;
+
+    // Par défaut : cacher le point vert
+    badge.style.display = "none";
+
+    Promise.all([
+
+        // Dernière consultation des devoirs
+        db.ref(
+            "parents/" +
+            phone +
+            "/children/" +
+            matricule +
+            "/lastDevoirsSeen"
+        ).once("value"),
+
+        // Informations de l'enfant
+        db.ref(
+            "parents/" +
+            phone +
+            "/children/" +
+            matricule
+        ).once("value"),
+
+        // Tous les devoirs
+        db.ref("devoirs").once("value")
+
+    ])
+
+    .then(([seenSnap, childSnap, devoirsSnap]) => {
+
+        let enfant = childSnap.val();
+
+        if(!enfant){
+            return;
+        }
+
+        // Dernière fois que le parent a consulté
+        let lastSeen = Number(
+            seenSnap.val() || 0
+        );
+
+        let nouveau = false;
+
+        if(devoirsSnap.exists()){
+
+            devoirsSnap.forEach(item => {
+
+                let d = item.val();
+
+                // Date de création du devoir
+                let dateCreation = new Date(
+                    d.dateCreation || 0
+                ).getTime();
+
+                // Vérifier que le devoir appartient
+                // à l'école et à la classe de l'enfant
+                if(
+
+                    d.classe === enfant.className &&
+
+                    d.idEcole === enfant.schoolId &&
+
+                    dateCreation > lastSeen
+
+                ){
+
+                    nouveau = true;
+
+                }
+
+            });
+
+        }
+
+        // Afficher le point vert seulement
+        // s'il existe un nouveau devoir
+        if(nouveau){
+
+            badge.style.display = "block";
+
+        }else{
+
+            badge.style.display = "none";
+
+        }
+
+    })
+
+    .catch(error => {
+
+        console.error(
+            "Erreur badge devoirs :",
+            error
+        );
+
+        badge.style.display = "none";
+
+    });
+
+}
 
 
 function createSchool(){
@@ -3884,41 +4031,40 @@ createdAt:Date.now()
 
 await Promise.all([
 
-db.ref("users/"+phone).set(parent),
+    db.ref("users/"+phone).set(parent),
 
-db.ref("loginIndex/"+phone).set({
+    db.ref("loginIndex/"+phone).set({
+        email:authEmail
+    }),
 
-email:authEmail
+    db.ref(
+        "schools/"+schoolId+"/members/"+phone
+    ).set({
+        phone:phone,
+        role:"parent",
+        name:parent.name,
+        studentMatricule:matricule,
+        createdAt:Date.now()
+    }),
 
-}),
+    // 🔴 AJOUT IMPORTANT :
+    db.ref(
+        "parents/"+phone+"/children/"+matricule
+    ).set({
+        matricule:matricule,
+        name:eleve.name,
+        className:eleve.className,
+        schoolId:schoolId,
+        role:"student"
+    }),
 
-db.ref(
-"schools/"+schoolId+"/members/"+phone
-).set({
-
-phone:phone,
-
-role:"parent",
-
-name:parent.name,
-
-studentMatricule:matricule,
-
-createdAt:Date.now()
-
-}),
-
-db.ref(
-"invitations/"+invite.code
-).update({
-
-used:true,
-
-usedBy:phone,
-
-usedAt:Date.now()
-
-})
+    db.ref(
+        "invitations/"+invite.code
+    ).update({
+        used:true,
+        usedBy:phone,
+        usedAt:Date.now()
+    })
 
 ]);
 
@@ -7922,11 +8068,11 @@ numero="0994044329";
 break;
 
 case "Orange Money":
-numero="0894044329";
+numero="089xxxxxxx";
 break;
 
 case "M-Pesa":
-numero="0824044329";
+numero="0863281191";
 break;
 
 case "Paiement direct":
@@ -8318,51 +8464,101 @@ db.ref(
 
 let school=snapshot.val();
 
-let codeEcole=(
+let codeEcole = (
 
-school.schoolName ||
+    school.schoolName ||
 
-"ECOLE"
+    "ECOLE"
 
 )
 
 .toUpperCase()
 
-.replace(/[^A-Z0-9 ]/g,"")
+.normalize("NFD")
 
-.split(" ")
+.replace(/[\u0300-\u036f]/g,"")
 
-.map(m=>m.substring(0,3))
+.replace(/[^A-Z0-9]/g,"")
 
-.join("")
+.substring(0,3);
 
-.substring(0,10);
 
-return db.ref(
-"schools/"
-+
-window.currentSchoolId+
-"/lastStudentNumber"
+// ================= CODE ELEVE =================
+
+// 2 premières lettres du NOM
+let codeNom = (
+
+    nom || ""
+
 )
 
-.transaction(current=>(current||0)+1)
+.toUpperCase()
 
-.then(result=>{
+.normalize("NFD")
 
-let numero=result.snapshot.val();
+.replace(/[\u0300-\u036f]/g,"")
 
-let classe=codeClasse(
-document.getElementById("studentClass").value
-);
+.replace(/[^A-Z]/g,"")
 
-matricule=
+.substring(0,2);
 
-"CS-"+
-codeEcole+
-"-MAS-"+
-classe+
-"-"+
-String(numero).padStart(4,"0");
+
+// 2 premières lettres du POSTNOM
+let codePostnom = (
+
+    postnom || ""
+
+)
+
+.toUpperCase()
+
+.normalize("NFD")
+
+.replace(/[\u0300-\u036f]/g,"")
+
+.replace(/[^A-Z]/g,"")
+
+.substring(0,2);
+
+
+// Exemple :
+// Numbi + Kasongo
+// NU + KA = NUKA
+
+let codeEleve =
+    codeNom +
+    codePostnom;
+
+
+// ================= NUMERO =================
+
+return db.ref(
+    "schools/"
+    +
+    window.currentSchoolId
+    +
+    "/lastStudentNumber"
+)
+
+.transaction(
+    current => (current || 0) + 1
+)
+
+.then(result => {
+
+    let numero =
+        result.snapshot.val();
+
+
+    // ================= MATRICULE FINAL =================
+
+    matricule =
+
+        codeEcole +
+        "-" +
+        codeEleve +
+        "-" +
+        String(numero).padStart(4,"0");
 
 // ================= DONNEES ELEVE =================
 
@@ -9009,6 +9205,7 @@ db.ref("devoirs").once("value")
 })
 
 .then(([eleve,devoirsSnap])=>{
+    
 
 let html=`
 
@@ -9132,46 +9329,49 @@ alert(error.message);
 
 function chargerDevoirsParent(matricule){
 
-showLoader();
+    showLoader();
 
-let parentPhone = window.currentPhone.replace(/\D/g,"");
+    let parentPhone = normalizePhone(window.currentPhone);
 
-// 1. récupérer enfants du parent
-db.ref("parents/" + parentPhone + "/children")
-.once("value")
+    db.ref("parents/"+parentPhone+"/children/"+matricule)
+    .once("value")
 
-.then(snapshot => {
+    .then(childSnap=>{
 
-if(!snapshot.exists()){
-throw new Error("Aucun enfant lié à ce parent");
-}
+        let enfant = childSnap.val();
 
-let enfant = null;
+        if(!enfant){
+            throw new Error("Élève introuvable");
+        }
 
-// si matricule donné → choisir enfant précis
-snapshot.forEach(child => {
+        // 🟢 Marquer les devoirs comme vus
+        db.ref(
+            "parents/" +
+            parentPhone +
+            "/children/" +
+            matricule +
+            "/lastDevoirsSeen"
+        ).set(Date.now());
 
-let c = child.val();
+        // 🔴 Faire disparaître immédiatement le point vert
+        let badge = document.getElementById(
+            "devoirBadge_" + matricule
+        );
 
-if(!matricule || c.matricule === matricule){
-enfant = c;
-}
-});
+        if(badge){
+            badge.style.display = "none";
+        }
 
-if(!enfant){
-throw new Error("Enfant introuvable");
-}
+        return Promise.all([
+            Promise.resolve(enfant),
+            db.ref("devoirs").once("value")
+        ]);
 
-// 2. récupérer devoirs
-return db.ref("devoirs").once("value")
-.then(devoirsSnap => {
-return [enfant, devoirsSnap];
-});
+    })
 
-})
+    .then(([enfant,devoirsSnap])=>{
 
-.then(([enfant, devoirsSnap]) => {
-
+        // suite de ton code...
 let html = `
 <h2 style="text-align:center;color:#1f4cff;">
 👨‍👩‍👦 ${enfant.name}
@@ -12027,11 +12227,7 @@ ${message}
 
 <p>
 
-WhatsApp : <b>+243994044329</b><br>
-
-Téléphone : <b>+243994044329</b><br>
-
-E-mail : <b>support@masomo.cd</b>
+E-mail : <b>masomo.ecole@gmail.com</b>
 
 </p>
 
@@ -12118,7 +12314,7 @@ function contacterWhatsapp(){
 
 let numero="243994044329";
 
-let message="Bonjour MASOMO, mon école est en attente de validation.";
+let message="Bonjour Service MASOMO, mon école est en attente de validation.";
 
 window.open(
 "https://wa.me/"+numero+
