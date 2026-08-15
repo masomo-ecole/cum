@@ -2652,8 +2652,8 @@ border:2px solid white;
 📘 Mes devoirs
 </button>
 
-<button onclick="ouvrirEmploiTemps()">
-📅 Emploi du temps
+<button onclick="ouvrirMonHoraireEnseignant()">
+    📅 MON HORAIRE DES COURS
 </button>
 
 
@@ -2725,6 +2725,8 @@ surveillerEmploiTemps();
 });
 
 }
+
+
 
 
 function ouvrirNotes(){
@@ -5195,20 +5197,7 @@ Fiches de préparation
   
 </button>  
   
-<button class="card-btn"  
-onclick="ouvrirAjouterEmploiTemps()">  
-  
-<div class="card-icon">  
-➕  
-</div>  
-  
-<div class="card-text">  
-Ajouter un emploi du temps  
-</div>  
-  
-   
-</button>  
-  
+
 <button class="card-btn"  
 onclick="ouvrirEmploiTemps()">  
   
@@ -14000,409 +13989,2395 @@ function ouvrirListeEnseignants(){
 }
 
 
-function dessinerListeEnseignants(
-enseignants
-){
+// ============================================================
+// LISTE DES ENSEIGNANTS
+// ============================================================
 
-let html=`
+function dessinerListeEnseignants(enseignants) {
 
-<h2 style="
-text-align:center;
-color:#1f4cff;
-">
+    window.enseignantsCache =
+        enseignants || [];
 
-📚 Liste enseignants
+    window.enseignantsAffiches =
+        enseignants || [];
 
-</h2>
 
-<input
-id="rechercheEns"
-placeholder="Rechercher..."
-oninput="
-filtrerEnseignants()
-">
+    let html = `
 
-<div style="
-overflow:auto;
-margin-top:15px;
-">
+    <h2 style="
+        text-align:center;
+        color:#1f4cff;
+        margin:0 0 15px 0;
+    ">
+        📚 Liste des enseignants
+    </h2>
 
-<table style="
-width:100%;
-border-collapse:collapse;
-font-size:13px;
-">
 
-<thead>
+    <!-- RECHERCHE -->
 
-<tr style="
-background:#1f4cff;
-color:white;
-">
+    <input
+        id="rechercheEns"
+        type="text"
+        placeholder="🔎 Rechercher un enseignant..."
+        oninput="filtrerEnseignants()"
+        style="
+            width:100%;
+            box-sizing:border-box;
+            padding:11px 12px;
+            border:1px solid #ddd;
+            border-radius:10px;
+            margin-bottom:8px;
+            font-size:14px;
+            outline:none;
+        "
+    >
 
-<th>Nom</th>
-<th>Sexe</th>
-<th>Matière</th>
 
-</tr>
+    <!-- FILTRE CLASSE -->
 
-</thead>
+    <select
+        id="filtreClasseEns"
+        onchange="filtrerEnseignants()"
+        style="
+            width:100%;
+            box-sizing:border-box;
+            padding:11px 12px;
+            border:1px solid #ddd;
+            border-radius:10px;
+            margin-bottom:8px;
+            background:white;
+            font-size:14px;
+        "
+    >
 
-<tbody id="tableEns">
+        <option value="">
+            🎓 Toutes les classes
+        </option>
 
-</tbody>
+    </select>
 
-</table>
 
-</div>
+    <!-- TRI -->
 
-<button
-onclick="openAdmin()"
-style="
-margin-top:15px;
-">
+    <select
+        id="triEnseignants"
+        onchange="filtrerEnseignants()"
+        style="
+            width:100%;
+            box-sizing:border-box;
+            padding:11px 12px;
+            border:1px solid #ddd;
+            border-radius:10px;
+            margin-bottom:12px;
+            background:white;
+            font-size:14px;
+        "
+    >
 
-⬅ Retour
+        <option value="nom">
+            ↕️ Trier par nom
+        </option>
 
-</button>
+        <option value="postnom">
+            ↕️ Trier par postnom
+        </option>
 
-`;
+        <option value="prenom">
+            ↕️ Trier par prénom
+        </option>
 
-document.querySelector(
-".login-box"
-).innerHTML=
-html;
+        <option value="matricule">
+            ↕️ Trier par matricule
+        </option>
 
-afficherTableEnseignants(
-enseignants
-);
+        <option value="sexe">
+            ↕️ Trier par sexe
+        </option>
 
-}
+        <option value="dateNaissance">
+            ↕️ Trier par date de naissance
+        </option>
 
-function afficherTableEnseignants(
-    enseignants
-){
+        <option value="lieuNaissance">
+            ↕️ Trier par lieu de naissance
+        </option>
 
-    let tbody =
-    document.getElementById(
-        "tableEns"
-    );
+        <option value="dateEngagement">
+            ↕️ Trier par date d'engagement
+        </option>
 
-    tbody.innerHTML = "";
+        <option value="matiere">
+            ↕️ Trier par matière
+        </option>
 
-    if (!enseignants.length) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="3"
-                    style="
-                    text-align:center;
-                    padding:20px;
-                    color:gray;
-                    ">
-                    Aucun enseignant enregistré
-                </td>
-            </tr>
-        `;
+        <option value="classe">
+            ↕️ Trier par classe
+        </option>
+
+        <option value="telephone">
+            ↕️ Trier par téléphone
+        </option>
+
+        <option value="adresse">
+            ↕️ Trier par adresse
+        </option>
+
+        <option value="alphabetique">
+            🔤 Ordre alphabétique
+        </option>
+
+    </select>
+
+
+    <!-- ================= OUTILS ================= -->
+
+    <div style="
+        width:100%;
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        gap:10px;
+        flex-wrap:wrap;
+        margin:8px 0 15px 0;
+    ">
+
+
+        <button
+            onclick="telechargerPDFTeacher()"
+            title="PDF"
+            style="
+                width:42px;
+                height:42px;
+                border-radius:50%;
+                border:1px solid #ddd;
+                background:white;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                padding:0;
+            "
+        >
+            📄
+        </button>
+
+
+        <button
+            onclick="telechargerWordTeacher()"
+            title="Word"
+            style="
+                width:42px;
+                height:42px;
+                border-radius:50%;
+                border:1px solid #ddd;
+                background:white;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                padding:0;
+            "
+        >
+            📝
+        </button>
+
+
+        <button
+            onclick="telechargerExcelTeacher()"
+            title="Excel"
+            style="
+                width:42px;
+                height:42px;
+                border-radius:50%;
+                border:1px solid #ddd;
+                background:white;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                padding:0;
+            "
+        >
+            📊
+        </button>
+
+
+        <button
+            onclick="imprimerListeEnseignants()"
+            title="Imprimer"
+            style="
+                width:42px;
+                height:42px;
+                border-radius:50%;
+                border:1px solid #ddd;
+                background:white;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                padding:0;
+            "
+        >
+            🖨️
+        </button>
+
+
+        <!-- COMPTEUR -->
+
+        <button
+            id="nombreEnseignantsAffiches"
+            onclick="afficherNombreEnseignants()"
+            title="Nombre d'enseignants affichés"
+            style="
+                width:42px;
+                height:42px;
+                border-radius:50%;
+                border:1px solid #ddd;
+                background:#f1f4ff;
+                color:#1f4cff;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-size:13px;
+                font-weight:bold;
+                cursor:pointer;
+                padding:0;
+            "
+        >
+            0
+        </button>
+
+    </div>
+
+
+    <!-- ================= TABLEAU ================= -->
+
+    <div style="
+        width:100%;
+        max-width:100%;
+        height:50vh;
+        min-height:220px;
+        overflow-x:auto;
+        overflow-y:auto;
+        -webkit-overflow-scrolling:touch;
+        border:1px solid #ddd;
+        border-radius:10px;
+        background:white;
+        box-sizing:border-box;
+        position:relative;
+    ">
+
+        <table
+            id="tableauEnseignants"
+            style="
+                width:max-content;
+                min-width:1200px;
+                border-collapse:collapse;
+                font-size:12px;
+                background:white;
+                text-align:center;
+            "
+        >
+
+            <thead>
+
+                <tr style="
+                    background:#1f4cff;
+                    color:white;
+                ">
+
+                    <th>N°</th>
+                    <th>Matricule</th>
+                    <th>Nom</th>
+                    <th>Postnom</th>
+                    <th>Prénom</th>
+                    <th>Sexe</th>
+                    <th>Date naissance</th>
+                    <th>Lieu naissance</th>
+                    <th>Date engagement</th>
+                    <th>Matière</th>
+                    <th>Classe</th>
+                    <th>Téléphone</th>
+                    <th>Adresse</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody id="tableEns">
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+
+    <!-- ================= RETOUR ================= -->
+
+    <button
+        onclick="openAdmin()"
+        style="
+            width:100%;
+            margin-top:15px;
+            padding:12px;
+            border:none;
+            border-radius:10px;
+            background:#f1f3f5;
+            color:#333;
+            font-size:14px;
+            font-weight:bold;
+            cursor:pointer;
+        "
+    >
+        ⬅ Retour
+    </button>
+
+    `;
+
+
+    const zone =
+        document.querySelector(
+            ".login-box"
+        );
+
+
+    if (!zone) {
+
+        alert(
+            "Zone d'affichage introuvable."
+        );
+
         return;
     }
 
-    enseignants.forEach(e => {
 
-        tbody.innerHTML += `
+    zone.innerHTML =
+        html;
 
-        <tr
-            onclick="
-            voirFicheEnseignant(
-            '${e.matricule}'
-            )
-            "
-            style="
+
+    /*
+     * REMPLIR LES CLASSES
+     */
+
+    const classes = [
+
+        ...new Set(
+
+            (enseignants || [])
+                .map(e =>
+                    e.classe || ""
+                )
+                .filter(Boolean)
+
+        )
+
+    ].sort((a,b) =>
+
+        String(a).localeCompare(
+            String(b),
+            "fr",
+            {
+                numeric:true,
+                sensitivity:"base"
+            }
+        )
+
+    );
+
+
+    const select =
+        document.getElementById(
+            "filtreClasseEns"
+        );
+
+
+    classes.forEach(classe => {
+
+        const option =
+            document.createElement(
+                "option"
+            );
+
+        option.value =
+            classe;
+
+        option.textContent =
+            classe;
+
+        select.appendChild(
+            option
+        );
+
+    });
+
+
+    afficherTableEnseignants(
+        enseignants || []
+    );
+
+}
+
+
+// ============================================================
+// AFFICHER LE TABLEAU
+// ============================================================
+
+function afficherTableEnseignants(
+    enseignants
+) {
+
+    const tbody =
+        document.getElementById(
+            "tableEns"
+        );
+
+
+    if (!tbody) {
+        return;
+    }
+
+
+    tbody.innerHTML = "";
+
+
+    window.enseignantsAffiches =
+        enseignants || [];
+
+
+    /*
+     * COMPTEUR
+     */
+
+    const compteur =
+        document.getElementById(
+            "nombreEnseignantsAffiches"
+        );
+
+
+    if (compteur) {
+
+        compteur.textContent =
+            enseignants.length;
+
+        compteur.title =
+            enseignants.length +
+            " enseignant(s) affiché(s)";
+
+    }
+
+
+    /*
+     * AUCUN ENSEIGNANT
+     */
+
+    if (!enseignants.length) {
+
+        tbody.innerHTML = `
+
+            <tr>
+
+                <td
+                    colspan="13"
+                    style="
+                        padding:25px;
+                        text-align:center;
+                        color:#777;
+                    "
+                >
+                    👨‍🏫 Aucun enseignant trouvé.
+                </td>
+
+            </tr>
+
+        `;
+
+        return;
+    }
+
+
+    /*
+     * LIGNES
+     */
+
+    enseignants.forEach(
+        (e,index) => {
+
+            const tr =
+                document.createElement(
+                    "tr"
+                );
+
+
+            tr.style.cursor =
+                "pointer";
+
+
+            tr.style.borderBottom =
+                "1px solid #ddd";
+
+
+            tr.onclick =
+                function() {
+
+                    if (
+                        e.matricule &&
+                        typeof voirFicheEnseignant ===
+                        "function"
+                    ) {
+
+                        voirFicheEnseignant(
+                            e.matricule
+                        );
+
+                    }
+
+                };
+
+
+            tr.innerHTML = `
+
+                <td style="
+                    padding:8px;
+                    border:1px solid #ddd;
+                    white-space:nowrap;
+                ">
+                    ${index + 1}
+                </td>
+
+
+                <td style="
+                    padding:8px;
+                    border:1px solid #ddd;
+                    white-space:nowrap;
+                    font-weight:bold;
+                ">
+                    ${escapeHtmlListe(
+                        e.matricule || "-"
+                    )}
+                </td>
+
+
+                <td style="
+                    padding:8px;
+                    border:1px solid #ddd;
+                    white-space:nowrap;
+                ">
+                    ${escapeHtmlListe(
+                        e.nom || ""
+                    )}
+                </td>
+
+
+                <td style="
+                    padding:8px;
+                    border:1px solid #ddd;
+                    white-space:nowrap;
+                ">
+                    ${escapeHtmlListe(
+                        e.postnom || ""
+                    )}
+                </td>
+
+
+                <td style="
+                    padding:8px;
+                    border:1px solid #ddd;
+                    white-space:nowrap;
+                ">
+                    ${escapeHtmlListe(
+                        e.prenom || ""
+                    )}
+                </td>
+
+
+                <td style="
+                    padding:8px;
+                    border:1px solid #ddd;
+                    white-space:nowrap;
+                ">
+                    ${escapeHtmlListe(
+                        e.sexe || "-"
+                    )}
+                </td>
+
+
+                <td style="
+                    padding:8px;
+                    border:1px solid #ddd;
+                    white-space:nowrap;
+                ">
+                    ${escapeHtmlListe(
+                        formaterDateFR(e.dateNaissance) || "-"
+                    )}
+                </td>
+
+
+                <td style="
+                    padding:8px;
+                    border:1px solid #ddd;
+                    white-space:nowrap;
+                ">
+                    ${escapeHtmlListe(
+                        e.lieuNaissance || "-"
+                    )}
+                </td>
+
+
+                <td style="
+                    padding:8px;
+                    border:1px solid #ddd;
+                    white-space:nowrap;
+                ">
+                    ${escapeHtmlListe(
+                        e.dateEngagement || "-"
+                    )}
+                </td>
+
+
+                <td style="
+                    padding:8px;
+                    border:1px solid #ddd;
+                    white-space:nowrap;
+                ">
+                    ${escapeHtmlListe(
+                        e.matiere || "-"
+                    )}
+                </td>
+
+
+                <td style="
+                    padding:8px;
+                    border:1px solid #ddd;
+                    white-space:nowrap;
+                ">
+                    ${escapeHtmlListe(
+                        e.classe || "-"
+                    )}
+                </td>
+
+
+                <td style="
+                    padding:8px;
+                    border:1px solid #ddd;
+                    white-space:nowrap;
+                ">
+                    ${escapeHtmlListe(
+                        e.telephone || "-"
+                    )}
+                </td>
+
+
+                <td style="
+                    padding:8px;
+                    border:1px solid #ddd;
+                    white-space:nowrap;
+                ">
+                    ${escapeHtmlListe(
+                        e.adresse || "-"
+                    )}
+                </td>
+
+            `;
+
+
+            tbody.appendChild(
+                tr
+            );
+
+        }
+    );
+
+}
+
+
+// ============================================================
+// FILTRER + TRIER
+// ============================================================
+
+function filtrerEnseignants() {
+
+    const texte =
+        (
+            document.getElementById(
+                "rechercheEns"
+            )?.value || ""
+        )
+        .toLowerCase()
+        .trim();
+
+
+    const classe =
+        document.getElementById(
+            "filtreClasseEns"
+        )?.value || "";
+
+
+    const tri =
+        document.getElementById(
+            "triEnseignants"
+        )?.value || "nom";
+
+
+    let resultat =
+        (
+            window.enseignantsCache ||
+            []
+        ).filter(e => {
+
+            const recherche = [
+
+                e.matricule,
+                e.nom,
+                e.postnom,
+                e.prenom,
+                e.name,
+                e.sexe,
+                e.dateNaissance,
+                e.lieuNaissance,
+                e.dateEngagement,
+                e.matiere,
+                e.classe,
+                e.telephone,
+                e.adresse
+
+            ]
+            .join(" ")
+            .toLowerCase();
+
+
+            const correspondRecherche =
+                !texte ||
+                recherche.includes(
+                    texte
+                );
+
+
+            const correspondClasse =
+                !classe ||
+                e.classe === classe;
+
+
+            return (
+                correspondRecherche &&
+                correspondClasse
+            );
+
+        });
+
+
+    /*
+     * TRI
+     */
+
+    if (tri === "alphabetique") {
+
+        resultat.sort(
+            (a,b) => {
+
+                const nomA =
+                    (
+                        a.nom ||
+                        a.name ||
+                        ""
+                    ).toLowerCase();
+
+                const nomB =
+                    (
+                        b.nom ||
+                        b.name ||
+                        ""
+                    ).toLowerCase();
+
+                return nomA.localeCompare(
+                    nomB,
+                    "fr",
+                    {
+                        sensitivity:"base"
+                    }
+                );
+
+            }
+        );
+
+    }
+    else {
+
+        resultat.sort(
+            (a,b) => {
+
+                let valeurA =
+                    a[tri] || "";
+
+                let valeurB =
+                    b[tri] || "";
+
+
+                return String(
+                    valeurA
+                ).localeCompare(
+                    String(valeurB),
+                    "fr",
+                    {
+                        numeric:true,
+                        sensitivity:"base"
+                    }
+                );
+
+            }
+        );
+
+    }
+
+
+    afficherTableEnseignants(
+        resultat
+    );
+
+}
+
+
+// ============================================================
+// NOMBRE D'ENSEIGNANTS
+// ============================================================
+
+function afficherNombreEnseignants() {
+
+    const nombre =
+        (
+            window.enseignantsAffiches ||
+            []
+        ).length;
+
+
+    alert(
+        "👨‍🏫 Nombre d'enseignants affichés : " +
+        nombre
+    );
+
+}
+
+
+// ================= AFFICHER TABLEAU =================
+
+function dessinerListeEleves(eleves) {
+
+    /*
+     * ==========================================
+     * LISTE ACTUELLE
+     * ==========================================
+     */
+
+    window.listeElevesActuelle =
+        eleves || [];
+
+    window.listeElevesAffichee =
+        eleves || [];
+
+
+    /*
+     * ==========================================
+     * INTERFACE
+     * ==========================================
+     */
+
+    let html = `
+
+    <h2 style="
+        text-align:center;
+        color:#1f4cff;
+        margin:0 0 15px 0;
+    ">
+        📋 Liste des élèves
+    </h2>
+
+
+    <!-- ================= RECHERCHE ================= -->
+
+    <input
+        id="rechercheEleve"
+        type="text"
+        placeholder="🔎 Rechercher un élève..."
+        oninput="filtrerEleves()"
+        style="
+            width:100%;
+            box-sizing:border-box;
+            padding:11px 12px;
+            border:1px solid #ddd;
+            border-radius:10px;
+            margin-bottom:8px;
+            outline:none;
+            background:white;
+            font-size:14px;
+        "
+    >
+
+
+    <!-- ================= FILTRE CLASSE ================= -->
+
+    <select
+        id="filtreClasse"
+        onchange="filtrerEleves()"
+        style="
+            width:100%;
+            box-sizing:border-box;
+            padding:11px 12px;
+            border:1px solid #ddd;
+            border-radius:10px;
+            margin-bottom:8px;
+            background:white;
+            font-size:14px;
+        "
+    >
+
+        <option value="">
+            🎓 Toutes les classes
+        </option>
+
+    </select>
+
+
+    <!-- ================= FILTRE OPTION ================= -->
+
+    <select
+        id="filtreOption"
+        onchange="filtrerEleves()"
+        style="
+            width:100%;
+            box-sizing:border-box;
+            padding:11px 12px;
+            border:1px solid #ddd;
+            border-radius:10px;
+            margin-bottom:8px;
+            background:white;
+            font-size:14px;
+            display:none;
+        "
+    >
+
+        <option value="">
+            📚 Toutes les options
+        </option>
+
+    </select>
+
+
+    <!-- ================= TRI ================= -->
+
+    <select
+        id="triEleves"
+        onchange="filtrerEleves()"
+        style="
+            width:100%;
+            box-sizing:border-box;
+            padding:11px 12px;
+            border:1px solid #ddd;
+            border-radius:10px;
+            margin-bottom:12px;
+            background:white;
+            font-size:14px;
+        "
+    >
+
+        <option value="nom">
+            ↕️ Trier par nom
+        </option>
+
+        <option value="postnom">
+            ↕️ Trier par postnom
+        </option>
+
+        <option value="prenom">
+            ↕️ Trier par prénom
+        </option>
+
+        <option value="matricule">
+            ↕️ Trier par matricule
+        </option>
+
+        <option value="dateNaissance">
+            ↕️ Trier par date de naissance
+        </option>
+
+        <option value="lieuNaissance">
+            ↕️ Trier par lieu de naissance
+        </option>
+
+        <option value="sexe">
+            ↕️ Trier par sexe
+        </option>
+
+        <option value="classe">
+            ↕️ Trier par classe
+        </option>
+
+        <option value="niveau">
+            ↕️ Trier par niveau
+        </option>
+
+        <option value="option">
+            ↕️ Trier par option
+        </option>
+
+        <option value="fatherName">
+            ↕️ Trier par père
+        </option>
+
+        <option value="motherName">
+            ↕️ Trier par mère
+        </option>
+
+        <option value="nationalite">
+            ↕️ Trier par nationalité
+        </option>
+
+        <option value="province">
+            ↕️ Trier par province
+        </option>
+
+        <option value="territoire">
+            ↕️ Trier par territoire
+        </option>
+
+        <option value="secteur">
+            ↕️ Trier par secteur
+        </option>
+
+        <option value="alphabetique">
+            🔤 Ordre alphabétique
+        </option>
+
+    </select>
+
+
+    <!-- ================= OUTILS ================= -->
+
+<div style="
+    width:100%;
+    margin:8px 0 15px 0;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+">
+
+
+    <!-- PDF -->
+
+    <button
+        onclick="telechargerListeElevesPDF()"
+        title="Télécharger PDF"
+        style="
+            width:42px;
+            height:42px;
+            border-radius:50%;
+            border:1px solid #ddd;
+            background:white;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:18px;
             cursor:pointer;
-            border-bottom:
-            1px solid #ddd;
-            ">
+            padding:0;
+        "
+    >
+        📄
+    </button>
 
-            <td>
-                ${e.name || (
-                    (e.nom || "") + " " +
-                    (e.postnom || "") + " " +
-                    (e.prenom || "")
+
+    <!-- WORD -->
+
+    <button
+        onclick="telechargerListeElevesWord()"
+        title="Télécharger Word"
+        style="
+            width:42px;
+            height:42px;
+            border-radius:50%;
+            border:1px solid #ddd;
+            background:white;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:18px;
+            cursor:pointer;
+            padding:0;
+        "
+    >
+        📝
+    </button>
+
+
+    <!-- EXCEL -->
+
+    <button
+        onclick="telechargerListeElevesExcel()"
+        title="Télécharger Excel"
+        style="
+            width:42px;
+            height:42px;
+            border-radius:50%;
+            border:1px solid #ddd;
+            background:white;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:18px;
+            cursor:pointer;
+            padding:0;
+        "
+    >
+        📊
+    </button>
+
+
+    <!-- IMPRIMER -->
+
+    <button
+        onclick="imprimerListeEleves()"
+        title="Imprimer"
+        style="
+            width:42px;
+            height:42px;
+            border-radius:50%;
+            border:1px solid #ddd;
+            background:white;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:18px;
+            cursor:pointer;
+            padding:0;
+        "
+    >
+        🖨️
+    </button>
+
+
+    <!-- NOMBRE D'ÉLÈVES -->
+
+    <button
+        id="nombreElevesAffiches"
+        onclick="afficherNombreElevesListe()"
+        title="Nombre d'élèves affichés"
+        style="
+            width:42px;
+            height:42px;
+            border-radius:50%;
+            border:1px solid #ddd;
+            background:#f1f4ff;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:13px;
+            font-weight:bold;
+            color:#1f4cff;
+            cursor:pointer;
+            padding:0;
+        "
+    >
+        0
+    </button>
+
+</div>
+
+
+<!-- ================= RETOUR ================= -->
+
+<button
+    onclick="retourListeElevesSelonRole()"
+    style="
+        width:100%;
+        margin-top:5px;
+        padding:12px;
+        border:none;
+        border-radius:10px;
+        background:#f1f3f5;
+        color:#333;
+        font-size:14px;
+        font-weight:bold;
+        cursor:pointer;
+    "
+>
+    ⬅ Retour
+</button>
+
+
+    <!-- ================= TABLEAU ================= -->
+
+    <div style="
+    width:100%;
+    max-width:100%;
+    height:50vh;
+    min-height:220px;
+    overflow-x:auto;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    border:1px solid #ddd;
+    border-radius:10px;
+    background:white;
+    box-sizing:border-box;
+    position:relative;
+">
+
+        <table
+    id="tableauListeEleves"
+    style="
+        width:max-content;
+        min-width:1800px;
+        border-collapse:collapse;
+        font-size:12px;
+        background:white;
+        text-align:center;
+    "
+>
+
+            <thead>
+
+                <tr style="
+                    background:#1f4cff;
+                    color:white;
+                ">
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        N°
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Matricule
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Nom
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Postnom
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Prénom
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Date naissance
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Lieu naissance
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Sexe
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Classe
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Niveau
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Option
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Père
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Tél. père
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Mère
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Tél. mère
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Nationalité
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Province
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Territoire
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Secteur
+                    </th>
+
+
+                    <th style="
+                        padding:9px;
+                        border:1px solid #ddd;
+                        white-space:nowrap;
+                    ">
+                        Tél. élève
+                    </th>
+
+
+                </tr>
+
+            </thead>
+
+
+            <tbody id="tableEleves">
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+
+    <!-- ================= RETOUR ================= -->
+
+ <!--   <button
+        onclick="${getRoleRetour()}"
+        style="
+            width:100%;
+            margin-top:15px;
+            padding:11px;
+            border:none;
+            border-radius:10px;
+            background:#f1f3f5;
+            cursor:pointer;
+            font-size:14px;
+        "
+    >
+        ⬅ Retour
+    </button>   -->
+
+    `;
+
+
+    /*
+     * ==========================================
+     * AFFICHER
+     * ==========================================
+     */
+
+    const zone =
+        document.querySelector(
+            ".login-box"
+        );
+
+
+    if (!zone) {
+
+        alert(
+            "Zone d'affichage introuvable."
+        );
+
+        return;
+    }
+
+
+    zone.innerHTML =
+        html;
+
+
+    /*
+     * ==========================================
+     * REMPLIR LES CLASSES
+     * ==========================================
+     */
+
+    const classes = [
+
+        ...new Set(
+
+            (eleves || [])
+                .map(e =>
+                    e.className || ""
+                )
+                .filter(Boolean)
+
+        )
+
+    ].sort((a, b) =>
+
+        String(a).localeCompare(
+            String(b),
+            "fr",
+            {
+                numeric:true,
+                sensitivity:"base"
+            }
+        )
+
+    );
+
+
+    const selectClasse =
+        document.getElementById(
+            "filtreClasse"
+        );
+
+
+    classes.forEach(classe => {
+
+        const option =
+            document.createElement(
+                "option"
+            );
+
+        option.value =
+            classe;
+
+        option.textContent =
+            classe;
+
+        selectClasse.appendChild(
+            option
+        );
+
+    });
+
+
+    /*
+     * ==========================================
+     * REMPLIR LES OPTIONS
+     * ==========================================
+     */
+
+    const options = [
+
+        ...new Set(
+
+            (eleves || [])
+                .map(e =>
+                    e.option ||
+                    e.optionEtude ||
+                    e.options ||
+                    ""
+                )
+                .filter(Boolean)
+
+        )
+
+    ].sort((a, b) =>
+
+        String(a).localeCompare(
+            String(b),
+            "fr",
+            {
+                sensitivity:"base"
+            }
+        )
+
+    );
+
+
+    const selectOption =
+        document.getElementById(
+            "filtreOption"
+        );
+
+
+    /*
+     * Afficher le filtre option
+     * uniquement s'il existe
+     * des options dans les élèves.
+     */
+
+    if (options.length > 0) {
+
+        selectOption.style.display =
+            "block";
+
+
+        options.forEach(optionValue => {
+
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+            option.value =
+                optionValue;
+
+            option.textContent =
+                optionValue;
+
+            selectOption.appendChild(
+                option
+            );
+
+        });
+
+    }
+
+
+    /*
+     * ==========================================
+     * PREMIER AFFICHAGE
+     * ==========================================
+     */
+
+    afficherElevesTable(
+        eleves || []
+    );
+
+}
+
+// ============================================================
+// AFFICHER LE NOMBRE D'ÉLÈVES
+// ============================================================
+
+function afficherNombreElevesListe() {
+
+    const eleves =
+        window.listeElevesAffichee || [];
+
+    const nombre =
+        eleves.length;
+
+    alert(
+        "👥 Nombre d'élèves affichés : " +
+        nombre
+    );
+
+}
+
+
+// ============================================================
+// RETOUR SELON LE RÔLE
+// ============================================================
+
+function retourListeElevesSelonRole() {
+
+    /*
+     * Vérifier le rôle actuel
+     */
+
+    const role =
+        window.currentUserRole ||
+        window.userRole ||
+        "";
+
+
+    /*
+     * ADMINISTRATEUR
+     */
+
+    if (
+        role === "admin" ||
+        role === "administrateur" ||
+        role === "schoolAdmin"
+    ) {
+
+        if (
+            typeof ouvrirEspaceAdmin ===
+            "function"
+        ) {
+
+            ouvrirEspaceAdmin();
+            return;
+
+        }
+
+    }
+
+
+    /*
+     * ENSEIGNANT
+     */
+
+    if (
+        role === "teacher" ||
+        role === "enseignant"
+    ) {
+
+        if (
+            typeof ouvrirEspaceEnseignant ===
+            "function"
+        ) {
+
+            ouvrirEspaceEnseignant();
+            return;
+
+        }
+
+    }
+
+
+    /*
+     * Si ton application utilise
+     * getRoleRetour(), on l'utilise
+     * comme solution de secours.
+     */
+
+    try {
+
+        const retour =
+            getRoleRetour();
+
+        if (retour) {
+
+            eval(retour);
+            return;
+
+        }
+
+    }
+    catch(error) {
+
+        console.error(
+            "Erreur retour liste élèves :",
+            error
+        );
+
+    }
+
+
+    /*
+     * Dernier recours
+     */
+
+    alert(
+        "Impossible de déterminer l'espace à ouvrir."
+    );
+
+}
+
+function afficherElevesTable(eleves) {
+
+    const tbody =
+        document.getElementById("tableEleves");
+
+    if (!tbody) {
+        return;
+    }
+
+    tbody.innerHTML = "";
+
+    window.listeElevesAffichee =
+        eleves || [];
+
+const compteur =
+    document.getElementById(
+        "nombreElevesAffiches"
+    );
+
+if (compteur) {
+
+    compteur.textContent =
+        eleves.length;
+
+    compteur.title =
+        eleves.length +
+        " élève(s) affiché(s)";
+
+}
+    /*
+     * ==========================================
+     * AUCUN ÉLÈVE
+     * ==========================================
+     */
+
+    if (!eleves || eleves.length === 0) {
+
+        tbody.innerHTML = `
+
+            <tr>
+
+                <td
+                    colspan="20"
+                    style="
+                        padding:25px;
+                        text-align:center;
+                        color:#777;
+                        border:1px solid #ddd;
+                    "
+                >
+                    👤 Aucun élève trouvé.
+                </td>
+
+            </tr>
+
+        `;
+
+        return;
+    }
+
+
+    /*
+     * ==========================================
+     * AFFICHER LES ÉLÈVES
+     * ==========================================
+     */
+
+    eleves.forEach((e, index) => {
+
+        /*
+         * Option
+         */
+
+        const option =
+            e.option ||
+            e.optionEtude ||
+            e.options ||
+            "-";
+
+
+        /*
+         * Téléphone élève
+         *
+         * Dans saveStudent() :
+         * phone: studentPhone
+         */
+
+        const telephoneEleve =
+            e.phone ||
+            "-";
+
+
+        /*
+         * ======================================
+         * LIGNE
+         * ======================================
+         */
+
+        const tr =
+            document.createElement("tr");
+
+
+        tr.style.cursor =
+            "pointer";
+
+        tr.style.borderBottom =
+            "1px solid #ddd";
+
+
+        /*
+         * Cliquer sur l'élève
+         * ouvre sa fiche
+         */
+
+        tr.onclick = function() {
+
+            if (e.matricule) {
+
+                voirFicheEleve(
+                    e.matricule
+                );
+
+            }
+
+        };
+
+
+        /*
+         * ======================================
+         * N°
+         * ======================================
+         */
+
+        tr.innerHTML = `
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${index + 1}
+            </td>
+
+
+            <!-- MATRICULE -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+                font-weight:bold;
+            ">
+                ${escapeHtmlListe(
+                    e.matricule || "-"
                 )}
             </td>
 
-            <td>
-                ${e.sexe || "-"}
+
+            <!-- NOM -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    e.nom || ""
+                )}
             </td>
 
-            <td>
-                ${e.matiere || "-"}
+
+            <!-- POSTNOM -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    e.postnom || ""
+                )}
             </td>
 
-        </tr>
+
+            <!-- PRÉNOM -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    e.prenom || ""
+                )}
+            </td>
+
+
+            <!-- DATE NAISSANCE -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    formaterDateFR(e.dateNaissance) || "-"
+                )}
+            </td>
+
+
+            <!-- LIEU NAISSANCE -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    e.lieuNaissance || "-"
+                )}
+            </td>
+
+
+            <!-- SEXE -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    e.sexe || "-"
+                )}
+            </td>
+
+
+            <!-- CLASSE -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    e.className || "-"
+                )}
+            </td>
+
+
+            <!-- NIVEAU -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    e.level || "-"
+                )}
+            </td>
+
+
+            <!-- OPTION -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    option
+                )}
+            </td>
+
+
+            <!-- PÈRE -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    e.fatherName || "-"
+                )}
+            </td>
+
+
+            <!-- TÉLÉPHONE PÈRE -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    e.fatherPhone || "-"
+                )}
+            </td>
+
+
+            <!-- MÈRE -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    e.motherName || "-"
+                )}
+            </td>
+
+
+            <!-- TÉLÉPHONE MÈRE -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    e.motherPhone || "-"
+                )}
+            </td>
+
+
+            <!-- NATIONALITÉ -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    e.nationalite || "-"
+                )}
+            </td>
+
+
+            <!-- PROVINCE -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    e.province || "-"
+                )}
+            </td>
+
+
+            <!-- TERRITOIRE -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    e.territoire || "-"
+                )}
+            </td>
+
+
+            <!-- SECTEUR -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    e.secteur || "-"
+                )}
+            </td>
+
+
+            <!-- TÉLÉPHONE ÉLÈVE -->
+
+            <td style="
+                padding:8px;
+                border:1px solid #ddd;
+                white-space:nowrap;
+            ">
+                ${escapeHtmlListe(
+                    telephoneEleve
+                )}
+            </td>
 
         `;
+
+
+        tbody.appendChild(tr);
+
     });
 
 }
 
-function filtrerEnseignants(){
 
-let texte=
-
-document
-.getElementById(
-"rechercheEns"
-)
-
-.value
-
-.toLowerCase();
-
-
-let resultat=
-
-window.enseignantsCache.filter(
-e=>{
-
-return (
-
-e.name||""
-
-)
-
-.toLowerCase()
-
-.includes(
-texte
-);
-
-});
-
-afficherTableEnseignants(
-resultat
-);
-
-}
-
-// ================= AFFICHER TABLEAU =================
-
-function dessinerListeEleves(eleves){
-
-let html=`
-
-<h2 style="
-text-align:center;
-color:#1f4cff;
-">
-
-📋 Liste élèves
-
-</h2>
-
-<input
-id="rechercheEleve"
-placeholder="Rechercher..."
-oninput="filtrerEleves()"
->
-
-<select
-id="filtreClasse"
-onchange="filtrerEleves()"
->
-
-<option value="">
-Toutes classes
-</option>
-
-</select>
-
-
-<div style="
-overflow:auto;
-margin-top:15px;
-">
-
-<table
-style="
-width:100%;
-border-collapse:collapse;
-font-size:13px;
-">
-
-<thead>
-
-<tr style="
-background:#1f4cff;
-color:white;
-">
-
-<th>Nom</th>
-<th>Postnom</th>
-<th>Prénom</th>
-<th>Sexe</th>
-<th>Classe</th>
-
-</tr>
-
-</thead>
-
-<tbody id="tableEleves">
-
-</tbody>
-
-</table>
-
-</div>
-
-
-<button
-onclick="
-${getRoleRetour()}
-"
-style="
-margin-top:15px;
-"
->
-
-⬅ Retour
-
-</button>
-
-`;
-
-document.querySelector(
-".login-box"
-).innerHTML=html;
-
-
-// remplir classes
-
-let classes=[
-...new Set(
-eleves.map(
-e=>e.className||"-"
-)
-)
-];
-
-let select=
-document.getElementById(
-"filtreClasse"
-);
-
-classes.forEach(c=>{
-
-select.innerHTML+=`
-<option value="${c}">
-${c}
-</option>
-`;
-
-});
-
-afficherElevesTable(
-eleves
-);
-
-}
-
-
-// ================= TABLEAU =================
-
-function afficherElevesTable(eleves){
-
-let tbody =
-document.getElementById("tableEleves");
-
-tbody.innerHTML="";
-
-eleves.forEach(e=>{
-
-tbody.innerHTML += `
-
-<tr
-onclick="voirFicheEleve('${e.matricule}')"
-style="
-cursor:pointer;
-border-bottom:1px solid #ddd;
-">
-
-<td>${e.nom || ""}</td>
-<td>${e.postnom || ""}</td>
-<td>${e.prenom || ""}</td>
-<td>${e.sexe || "-"}</td>
-<td>${e.className || "-"}</td>
-
-</tr>
-
-`;
-
-});
-
-}
 
 
 // ================= FILTRE =================
 
-function filtrerEleves(){
+function filtrerEleves() {
 
-let texte=
-document
-.getElementById(
-"rechercheEleve"
-)
-.value
-.toLowerCase();
-
-let classe=
-document
-.getElementById(
-"filtreClasse"
-)
-.value;
+    const eleves =
+        window.listeElevesActuelle || [];
 
 
-let resultat=
-
-window.elevesCache.filter(e=>{
-
-let nom=`
-
-${e.nom||""}
-${e.postnom||""}
-${e.prenom||e.name||""}
-
-`
-.toLowerCase();
-
-let okNom=
-nom.includes(
-texte
-);
-
-let okClasse=
-
-classe===""
-
-||
-
-e.className===
-classe;
-
-return(
-okNom &&
-okClasse
-);
-
-});
+    const recherche =
+        (
+            document.getElementById(
+                "rechercheEleve"
+            )?.value || ""
+        )
+        .trim()
+        .toLowerCase();
 
 
-afficherElevesTable(
-resultat
-);
+    const classe =
+        document.getElementById(
+            "filtreClasse"
+        )?.value || "";
+
+
+    const option =
+        document.getElementById(
+            "filtreOption"
+        )?.value || "";
+
+
+    const tri =
+        document.getElementById(
+            "triEleves"
+        )?.value || "nom";
+
+
+    /*
+     * ==========================================
+     * FILTRER
+     * ==========================================
+     */
+
+    let resultat =
+        eleves.filter(e => {
+
+            const texte = [
+
+                e.nom,
+                e.postnom,
+                e.prenom,
+                e.sexe,
+                e.className,
+                e.option,
+                e.optionEtude,
+                e.province,
+                e.studentPhone,
+                e.telephone,
+                e.phone,
+                e.matricule
+
+            ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+
+
+            if (
+                recherche &&
+                !texte.includes(recherche)
+            ) {
+                return false;
+            }
+
+
+            if (
+                classe &&
+                String(e.className || "") !==
+                String(classe)
+            ) {
+                return false;
+            }
+
+
+            const optionEleve =
+                e.option ||
+                e.optionEtude ||
+                e.options ||
+                "";
+
+
+            if (
+                option &&
+                String(optionEleve) !==
+                String(option)
+            ) {
+                return false;
+            }
+
+
+            return true;
+
+        });
+
+
+    /*
+     * ==========================================
+     * TRI
+     * ==========================================
+     */
+
+    resultat.sort((a, b) => {
+
+        let valeurA = "";
+        let valeurB = "";
+
+
+        if (tri === "nom") {
+
+            valeurA = a.nom || "";
+            valeurB = b.nom || "";
+
+        }
+
+        else if (tri === "postnom") {
+
+            valeurA = a.postnom || "";
+            valeurB = b.postnom || "";
+
+        }
+
+        else if (tri === "prenom") {
+
+            valeurA = a.prenom || "";
+            valeurB = b.prenom || "";
+
+        }
+
+        else if (tri === "classe") {
+
+            valeurA = a.className || "";
+            valeurB = b.className || "";
+
+        }
+
+        else if (tri === "province") {
+
+            valeurA = a.province || "";
+            valeurB = b.province || "";
+
+        }
+
+        else if (tri === "option") {
+
+            valeurA =
+                a.option ||
+                a.optionEtude ||
+                a.options ||
+                "";
+
+            valeurB =
+                b.option ||
+                b.optionEtude ||
+                b.options ||
+                "";
+
+        }
+
+        else if (tri === "sexe") {
+
+            valeurA = a.sexe || "";
+            valeurB = b.sexe || "";
+
+        }
+
+        else if (tri === "alphabetique") {
+
+            valeurA =
+                (
+                    (a.nom || "") +
+                    " " +
+                    (a.postnom || "") +
+                    " " +
+                    (a.prenom || "")
+                );
+
+            valeurB =
+                (
+                    (b.nom || "") +
+                    " " +
+                    (b.postnom || "") +
+                    " " +
+                    (b.prenom || "")
+                );
+
+        }
+
+
+        return String(valeurA).localeCompare(
+            String(valeurB),
+            "fr",
+            {
+                sensitivity:"base",
+                numeric:true
+            }
+        );
+
+    });
+
+
+    afficherElevesTable(
+        resultat
+    );
 
 }
 
+function escapeHtmlListe(value) {
+
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+}
 
 // ================= FICHE =================
 
@@ -27712,100 +29687,803 @@ alert(error.message);
 
 }
 
-function telechargerExcelTeacher(){
+// ============================================================
+// DONNÉES COMMUNES POUR LES EXPORTS ENSEIGNANTS
+// ============================================================
 
-let table=document.getElementById("tableEns");
+function obtenirEnseignantsPourExport() {
 
-if(!table){
-
-alert("Tableau des enseignants introuvable.");
-
-return;
+    return window.enseignantsAffiches || [];
 
 }
 
-let wb=XLSX.utils.table_to_book(table,{sheet:"Enseignants"});
 
-XLSX.writeFile(wb,"Enseignants.xlsx");
+// ============================================================
+// 1. TÉLÉCHARGER EN EXCEL
+// ============================================================
+
+function telechargerExcelTeacher() {
+
+    const enseignants =
+        obtenirEnseignantsPourExport();
+
+
+    if (!enseignants.length) {
+
+        alert(
+            "Aucun enseignant à télécharger."
+        );
+
+        return;
+    }
+
+
+    let html = `
+
+    <html>
+
+    <head>
+
+        <meta charset="UTF-8">
+
+        <style>
+
+            table {
+                border-collapse: collapse;
+                width: 100%;
+            }
+
+            th {
+                background: #1f4cff;
+                color: white;
+                font-weight: bold;
+            }
+
+            th, td {
+                border: 1px solid #999;
+                padding: 6px;
+                text-align: center;
+            }
+
+        </style>
+
+    </head>
+
+    <body>
+
+        <h2>Liste des enseignants</h2>
+
+        <table>
+
+            <thead>
+
+                <tr>
+
+                    <th>N°</th>
+                    <th>Matricule</th>
+                    <th>Nom</th>
+                    <th>Postnom</th>
+                    <th>Prénom</th>
+                    <th>Sexe</th>
+                    <th>Date naissance</th>
+                    <th>Lieu naissance</th>
+                    <th>Date engagement</th>
+                    <th>Matière</th>
+                    <th>Classe</th>
+                    <th>Téléphone</th>
+                    <th>Adresse</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+    `;
+
+
+    enseignants.forEach((e, index) => {
+
+        html += `
+
+            <tr>
+
+                <td>${index + 1}</td>
+
+                <td>${e.matricule || ""}</td>
+
+                <td>${e.nom || ""}</td>
+
+                <td>${e.postnom || ""}</td>
+
+                <td>${e.prenom || ""}</td>
+
+                <td>${e.sexe || ""}</td>
+
+                <td>${e.dateNaissance || ""}</td>
+
+                <td>${e.lieuNaissance || ""}</td>
+
+                <td>${e.dateEngagement || ""}</td>
+
+                <td>${e.matiere || ""}</td>
+
+                <td>${e.classe || ""}</td>
+
+                <td>${e.telephone || ""}</td>
+
+                <td>${e.adresse || ""}</td>
+
+            </tr>
+
+        `;
+
+    });
+
+
+    html += `
+
+            </tbody>
+
+        </table>
+
+    </body>
+
+    </html>
+
+    `;
+
+
+    const blob =
+        new Blob(
+            [html],
+            {
+                type:
+                    "application/vnd.ms-excel;charset=utf-8;"
+            }
+        );
+
+
+    const url =
+        URL.createObjectURL(blob);
+
+
+    const a =
+        document.createElement("a");
+
+
+    a.href = url;
+
+    a.download =
+        "Liste_enseignants.xls";
+
+
+    document.body.appendChild(a);
+
+    a.click();
+
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
 
 }
 
-function telechargerPDFTeacher(){
 
-let table=document.getElementById("tableEns");
+// ============================================================
+// 2. TÉLÉCHARGER WORD
+// ============================================================
 
-if(!table){
+function telechargerWordTeacher() {
 
-alert("Tableau des enseignants introuvable.");
+    const enseignants =
+        obtenirEnseignantsPourExport();
 
-return;
+
+    if (!enseignants.length) {
+
+        alert(
+            "Aucun enseignant à télécharger."
+        );
+
+        return;
+    }
+
+
+    let html = `
+
+    <!DOCTYPE html>
+
+    <html>
+
+    <head>
+
+        <meta charset="UTF-8">
+
+        <style>
+
+            body {
+                font-family: Arial, sans-serif;
+            }
+
+            h2 {
+                text-align: center;
+            }
+
+            table {
+                border-collapse: collapse;
+                width: 100%;
+            }
+
+            th {
+                background: #1f4cff;
+                color: white;
+            }
+
+            th, td {
+                border: 1px solid #777;
+                padding: 6px;
+                text-align: center;
+                font-size: 10px;
+            }
+
+        </style>
+
+    </head>
+
+    <body>
+
+        <h2>Liste des enseignants</h2>
+
+        <table>
+
+            <thead>
+
+                <tr>
+
+                    <th>N°</th>
+                    <th>Matricule</th>
+                    <th>Nom</th>
+                    <th>Postnom</th>
+                    <th>Prénom</th>
+                    <th>Sexe</th>
+                    <th>Date naissance</th>
+                    <th>Lieu naissance</th>
+                    <th>Date engagement</th>
+                    <th>Matière</th>
+                    <th>Classe</th>
+                    <th>Téléphone</th>
+                    <th>Adresse</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+    `;
+
+
+    enseignants.forEach((e, index) => {
+
+        html += `
+
+            <tr>
+
+                <td>${index + 1}</td>
+
+                <td>${e.matricule || ""}</td>
+
+                <td>${e.nom || ""}</td>
+
+                <td>${e.postnom || ""}</td>
+
+                <td>${e.prenom || ""}</td>
+
+                <td>${e.sexe || ""}</td>
+
+                <td>${e.dateNaissance || ""}</td>
+
+                <td>${e.lieuNaissance || ""}</td>
+
+                <td>${e.dateEngagement || ""}</td>
+
+                <td>${e.matiere || ""}</td>
+
+                <td>${e.classe || ""}</td>
+
+                <td>${e.telephone || ""}</td>
+
+                <td>${e.adresse || ""}</td>
+
+            </tr>
+
+        `;
+
+    });
+
+
+    html += `
+
+            </tbody>
+
+        </table>
+
+    </body>
+
+    </html>
+
+    `;
+
+
+    const blob =
+        new Blob(
+            ["\ufeff" + html],
+            {
+                type:
+                    "application/msword;charset=utf-8"
+            }
+        );
+
+
+    const url =
+        URL.createObjectURL(blob);
+
+
+    const a =
+        document.createElement("a");
+
+
+    a.href = url;
+
+    a.download =
+        "Liste_enseignants.doc";
+
+
+    document.body.appendChild(a);
+
+    a.click();
+
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
 
 }
 
-html2canvas(table).then(canvas=>{
 
-const pdf=new jspdf.jsPDF("p","mm","a4");
+// ============================================================
+// 3. IMPRIMER LA LISTE DES ENSEIGNANTS
+// ============================================================
 
-let img=canvas.toDataURL("image/png");
+function imprimerListeEnseignants() {
 
-let largeur=190;
+    const enseignants =
+        obtenirEnseignantsPourExport();
 
-let hauteur=canvas.height*largeur/canvas.width;
 
-pdf.addImage(img,"PNG",10,10,largeur,hauteur);
+    if (!enseignants.length) {
 
-pdf.save("Enseignants.pdf");
+        alert(
+            "Aucun enseignant à imprimer."
+        );
 
-});
+        return;
+    }
+
+
+    let lignes = "";
+
+
+    enseignants.forEach((e, index) => {
+
+        lignes += `
+
+            <tr>
+
+                <td>${index + 1}</td>
+
+                <td>${e.matricule || ""}</td>
+
+                <td>${e.nom || ""}</td>
+
+                <td>${e.postnom || ""}</td>
+
+                <td>${e.prenom || ""}</td>
+
+                <td>${e.sexe || ""}</td>
+
+                <td>${e.dateNaissance || ""}</td>
+
+                <td>${e.lieuNaissance || ""}</td>
+
+                <td>${e.dateEngagement || ""}</td>
+
+                <td>${e.matiere || ""}</td>
+
+                <td>${e.classe || ""}</td>
+
+                <td>${e.telephone || ""}</td>
+
+                <td>${e.adresse || ""}</td>
+
+            </tr>
+
+        `;
+
+    });
+
+
+    const fenetre =
+        window.open(
+            "",
+            "_blank"
+        );
+
+
+    if (!fenetre) {
+
+        alert(
+            "Impossible d'ouvrir la fenêtre d'impression. Autorisez les fenêtres pop-up."
+        );
+
+        return;
+    }
+
+
+    fenetre.document.write(`
+
+        <!DOCTYPE html>
+
+        <html>
+
+        <head>
+
+            <meta charset="UTF-8">
+
+            <title>
+                Liste des enseignants
+            </title>
+
+            <style>
+
+                @page {
+                    size: landscape;
+                    margin: 10mm;
+                }
+
+                body {
+                    font-family: Arial, sans-serif;
+                }
+
+                h2 {
+                    text-align: center;
+                    margin-bottom: 15px;
+                }
+
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+
+                th {
+                    background: #1f4cff;
+                    color: white;
+                }
+
+                th, td {
+                    border: 1px solid #555;
+                    padding: 5px;
+                    font-size: 8px;
+                    text-align: center;
+                }
+
+                tr {
+                    page-break-inside: avoid;
+                }
+
+            </style>
+
+        </head>
+
+        <body>
+
+            <h2>
+                📚 Liste des enseignants
+            </h2>
+
+            <table>
+
+                <thead>
+
+                    <tr>
+
+                        <th>N°</th>
+                        <th>Matricule</th>
+                        <th>Nom</th>
+                        <th>Postnom</th>
+                        <th>Prénom</th>
+                        <th>Sexe</th>
+                        <th>Date naissance</th>
+                        <th>Lieu naissance</th>
+                        <th>Date engagement</th>
+                        <th>Matière</th>
+                        <th>Classe</th>
+                        <th>Téléphone</th>
+                        <th>Adresse</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    ${lignes}
+
+                </tbody>
+
+            </table>
+
+        </body>
+
+        </html>
+
+    `);
+
+
+    fenetre.document.close();
+
+
+    setTimeout(() => {
+
+        fenetre.focus();
+
+        fenetre.print();
+
+    }, 500);
 
 }
 
-function telechargerWordTeacher(){
 
-let table=document.getElementById("tableEns");
+// ============================================================
+// 4. TÉLÉCHARGER PDF
+// ============================================================
 
-if(!table){
+function telechargerPDFTeacher() {
 
-alert("Tableau des enseignants introuvable.");
+    const enseignants =
+        obtenirEnseignantsPourExport();
 
-return;
+
+    if (!enseignants.length) {
+
+        alert(
+            "Aucun enseignant à télécharger."
+        );
+
+        return;
+    }
+
+
+    /*
+     * Vérifier jsPDF
+     */
+
+    if (
+        typeof window.jspdf ===
+        "undefined"
+    ) {
+
+        alert(
+            "La bibliothèque PDF (jsPDF) n'est pas chargée."
+        );
+
+        return;
+    }
+
+
+    const {
+        jsPDF
+    } = window.jspdf;
+
+
+    const doc =
+        new jsPDF({
+            orientation: "landscape",
+            unit: "mm",
+            format: "a4"
+        });
+
+
+    doc.setFontSize(14);
+
+    doc.text(
+        "Liste des enseignants",
+        148,
+        12,
+        {
+            align: "center"
+        }
+    );
+
+
+    /*
+     * Vérifier AutoTable
+     */
+
+    if (
+        typeof doc.autoTable !==
+        "function"
+    ) {
+
+        alert(
+            "Le module AutoTable de jsPDF n'est pas chargé."
+        );
+
+        return;
+    }
+
+
+    const lignes =
+        enseignants.map(
+            (e,index) => [
+
+                index + 1,
+
+                e.matricule || "",
+
+                e.nom || "",
+
+                e.postnom || "",
+
+                e.prenom || "",
+
+                e.sexe || "",
+
+                e.dateNaissance || "",
+
+                e.lieuNaissance || "",
+
+                e.dateEngagement || "",
+
+                e.matiere || "",
+
+                e.classe || "",
+
+                e.telephone || "",
+
+                e.adresse || ""
+
+            ]
+        );
+
+
+    doc.autoTable({
+
+        startY: 18,
+
+        head: [[
+
+            "N°",
+            "Matricule",
+            "Nom",
+            "Postnom",
+            "Prénom",
+            "Sexe",
+            "Date naissance",
+            "Lieu naissance",
+            "Date engagement",
+            "Matière",
+            "Classe",
+            "Téléphone",
+            "Adresse"
+
+        ]],
+
+        body: lignes,
+
+        theme: "grid",
+
+        styles: {
+
+            fontSize: 6,
+
+            cellPadding: 2,
+
+            halign: "center",
+
+            valign: "middle"
+
+        },
+
+        headStyles: {
+
+            fontSize: 6,
+
+            halign: "center"
+
+        },
+
+        margin: {
+
+            left: 5,
+
+            right: 5
+
+        },
+
+        tableWidth: "auto"
+
+    });
+
+
+    doc.save(
+        "Liste_enseignants.pdf"
+    );
 
 }
 
-let html=`
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Enseignants</title>
-</head>
-<body>
-<h2>Liste des enseignants</h2>
-${table.outerHTML}
-</body>
-</html>
-`;
+// ============================================================
+// FORMAT DATE : YYYY-MM-DD  →  DD-MM-YYYY
+// ============================================================
 
-let blob=new Blob(
-["\ufeff",html],
-{
-type:"application/msword"
+function formaterDateFR(date) {
+
+    if (!date) {
+        return "";
+    }
+
+    const valeur = String(date).trim();
+
+    // Déjà au format DD-MM-YYYY
+    if (
+        /^\d{2}-\d{2}-\d{4}$/.test(valeur)
+    ) {
+        return valeur;
+    }
+
+    // Format YYYY-MM-DD
+    if (
+        /^\d{4}-\d{2}-\d{2}$/.test(valeur)
+    ) {
+
+        const parties =
+            valeur.split("-");
+
+        return (
+            parties[2] +
+            "-" +
+            parties[1] +
+            "-" +
+            parties[0]
+        );
+    }
+
+    // Autre format : on essaie avec Date
+    const d = new Date(valeur);
+
+    if (!isNaN(d.getTime())) {
+
+        const jour =
+            String(
+                d.getDate()
+            ).padStart(2, "0");
+
+        const mois =
+            String(
+                d.getMonth() + 1
+            ).padStart(2, "0");
+
+        const annee =
+            d.getFullYear();
+
+        return (
+            jour +
+            "-" +
+            mois +
+            "-" +
+            annee
+        );
+    }
+
+    return valeur;
 }
-);
-
-let lien=document.createElement("a");
-
-lien.href=URL.createObjectURL(blob);
-
-lien.download="Enseignants.doc";
-
-document.body.appendChild(lien);
-
-lien.click();
-
-document.body.removeChild(lien);
-
-}
-
 
 function ouvrirAbsences(){
 
@@ -32568,6 +35246,757 @@ async function enregistrerAffectationsPrimaire() {
 
 }
 
+async function ouvrirMonHoraireEnseignant() {
+
+    const schoolId =
+        window.currentSchoolId;
+
+    if (!schoolId) {
+
+        alert(
+            "École introuvable."
+        );
+
+        return;
+    }
+
+
+    /*
+     * ==========================================
+     * IDENTIFIER L'ENSEIGNANT CONNECTÉ
+     * ==========================================
+     */
+
+    const telephone =
+        window.currentPhone ||
+        window.currentTeacherPhone ||
+        "";
+
+
+    if (!telephone) {
+
+        alert(
+            "Impossible d'identifier l'enseignant connecté."
+        );
+
+        return;
+    }
+
+
+    showLoader();
+
+
+    try {
+
+        /*
+         * ==========================================
+         * RÉCUPÉRER LES AFFECTATIONS
+         * ==========================================
+         */
+
+        const snap =
+            await db.ref(
+                "schools/" +
+                schoolId +
+                "/affectationsPrimaire"
+            ).once("value");
+
+
+        const affectations =
+            snap.val() || {};
+
+
+        let maClasse = null;
+
+
+        /*
+         * ==========================================
+         * CHERCHER LA CLASSE DE L'ENSEIGNANT
+         * ==========================================
+         */
+
+        Object.keys(
+            affectations
+        ).forEach(classe => {
+
+            const affectation =
+                affectations[classe];
+
+
+            if (!affectation) {
+                return;
+            }
+
+
+            /*
+             * Dans ton système :
+             *
+             * enseignant = select.value
+             *
+             * On compare donc directement
+             * avec l'identifiant du compte.
+             */
+
+            if (
+                String(
+                    affectation.enseignant
+                ) === String(telephone)
+            ) {
+
+                maClasse =
+                    classe;
+
+            }
+
+        });
+
+
+        hideLoader();
+
+
+        /*
+         * ==========================================
+         * AUCUNE CLASSE TROUVÉE
+         * ==========================================
+         */
+
+        if (!maClasse) {
+
+            alert(
+                "⚠️ Aucune classe ne vous est attribuée."
+            );
+
+            return;
+        }
+
+
+        /*
+         * ==========================================
+         * MÉMORISER LA CLASSE
+         * ==========================================
+         */
+
+        window.classeHoraireEnseignant =
+            maClasse;
+
+
+        /*
+         * ==========================================
+         * OUVRIR L'HORAIRE EN MODE ENSEIGNANT
+         * ==========================================
+         */
+
+        await afficherMonHoraireEnseignantPrimaire(
+            maClasse
+        );
+
+
+    }
+    catch(error) {
+
+        hideLoader();
+
+        console.error(
+            "Erreur horaire enseignant :",
+            error
+        );
+
+        alert(
+            "Erreur lors du chargement de votre horaire."
+        );
+
+    }
+
+}
+
+async function afficherMonHoraireEnseignantPrimaire(classe) {
+
+    const schoolId =
+        window.currentSchoolId;
+
+    if (!schoolId) {
+        alert("École introuvable.");
+        return;
+    }
+
+    showLoader();
+
+    try {
+
+        /*
+         * ==========================================
+         * CHARGER LES HORAIRES COMMUNS
+         * ==========================================
+         */
+
+        const heuresSnap =
+            await db.ref(
+                "schools/" +
+                schoolId +
+                "/horairesCommuns/heures"
+            ).once("value");
+
+
+        /*
+         * ==========================================
+         * CHARGER LES COURS DE LA CLASSE
+         * ==========================================
+         */
+
+        const coursSnap =
+            await db.ref(
+                "schools/" +
+                schoolId +
+                "/emploisTempsPrimaire/" +
+                encodeURIComponent(classe) +
+                "/cours"
+            ).once("value");
+
+
+        hideLoader();
+
+
+        const heures =
+            heuresSnap.val() || {};
+
+        const cours =
+            coursSnap.val() || {};
+
+
+        /*
+         * ==========================================
+         * TRIER LES HEURES
+         * ==========================================
+         */
+
+        const ordreHeures =
+            Object.keys(heures).sort(
+                (a, b) => {
+
+                    const heureA =
+                        convertirHeureEnMinutes(
+                            heures[a].heureDebut
+                        );
+
+                    const heureB =
+                        convertirHeureEnMinutes(
+                            heures[b].heureDebut
+                        );
+
+                    return heureA - heureB;
+
+                }
+            );
+
+
+        const jours = [
+            "Lundi",
+            "Mardi",
+            "Mercredi",
+            "Jeudi",
+            "Vendredi",
+            "Samedi"
+        ];
+
+
+        /*
+         * ==========================================
+         * CONSTRUIRE L'INTERFACE
+         * ==========================================
+         */
+
+        let html = `
+
+        <button
+            class="back-btn"
+            onclick="openTeacher()"
+        >
+            ⬅ Retour
+        </button>
+
+
+        <div style="
+            text-align:center;
+            margin:12px 0 4px 0;
+        ">
+
+            <div style="
+                font-size:24px;
+                font-weight:bold;
+                color:#1f4cff;
+            ">
+                📅
+            </div>
+
+            <h2 style="
+                margin:4px 0;
+                color:#1f4cff;
+                font-size:20px;
+            ">
+                MON HORAIRE DES COURS
+            </h2>
+
+            <div style="
+                color:#666;
+                font-size:13px;
+            ">
+                ${escapeHtmlHoraire(classe)}
+            </div>
+
+        </div>
+
+
+        <div style="
+            margin:12px 0;
+            padding:10px;
+            border-radius:10px;
+            background:#f1f6ff;
+            color:#315b9d;
+            text-align:center;
+            font-size:12px;
+        ">
+            👨‍🏫 Horaire de votre classe
+        </div>
+
+
+        <div style="
+            overflow-x:auto;
+            width:100%;
+            -webkit-overflow-scrolling:touch;
+        ">
+
+            <table
+                style="
+                    width:100%;
+                    min-width:760px;
+                    border-collapse:collapse;
+                    text-align:center;
+                    background:white;
+                "
+            >
+
+                <thead>
+
+                    <tr>
+
+                        <th style="
+                            border:1px solid #ccc;
+                            padding:9px;
+                            background:#f1f4ff;
+                            white-space:nowrap;
+                        ">
+                            Heure
+                        </th>
+
+        `;
+
+
+        /*
+         * ==========================================
+         * JOURS
+         * ==========================================
+         */
+
+        jours.forEach(jour => {
+
+            html += `
+
+                <th style="
+                    border:1px solid #ccc;
+                    padding:9px;
+                    background:#f1f4ff;
+                    min-width:105px;
+                ">
+                    ${jour}
+                </th>
+
+            `;
+
+        });
+
+
+        html += `
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+        `;
+
+
+        /*
+         * ==========================================
+         * AUCUNE HEURE
+         * ==========================================
+         */
+
+        if (ordreHeures.length === 0) {
+
+            html += `
+
+                <tr>
+
+                    <td
+                        colspan="7"
+                        style="
+                            border:1px solid #ccc;
+                            padding:25px;
+                            color:#777;
+                        "
+                    >
+                        ⏰ Aucun horaire configuré.
+                    </td>
+
+                </tr>
+
+            `;
+
+        }
+
+
+        /*
+         * ==========================================
+         * LIGNES DE L'HORAIRE
+         * ==========================================
+         */
+
+        ordreHeures.forEach(id => {
+
+            const ligne =
+                heures[id] || {};
+
+
+            const heureAffichee =
+                ligne.heure ||
+                (
+                    (ligne.heureDebut || "") +
+                    "-" +
+                    (ligne.heureFin || "")
+                );
+
+
+            /*
+             * ======================================
+             * RÉCRÉATION
+             * ======================================
+             */
+
+            if (ligne.type === "pause") {
+
+                html += `
+
+                    <tr>
+
+                        <td style="
+                            border:1px solid #b9d9f5;
+                            padding:9px;
+                            font-weight:bold;
+                            background:#e8f5ff;
+                            color:#1769aa;
+                            white-space:nowrap;
+                        ">
+                            ${escapeHtmlHoraire(
+                                heureAffichee
+                            )}
+                        </td>
+
+
+                        <td
+                            colspan="6"
+                            style="
+                                border:1px solid #b9d9f5;
+                                padding:11px;
+                                background:#dff1ff;
+                                font-weight:bold;
+                                color:#1769aa;
+                            "
+                        >
+                            ☕ RÉCRÉATION
+                        </td>
+
+                    </tr>
+
+                `;
+
+                return;
+            }
+
+
+            /*
+             * ======================================
+             * LIGNE DE COURS
+             * ======================================
+             */
+
+            html += `
+
+                <tr>
+
+                    <td style="
+                        border:1px solid #ccc;
+                        padding:9px;
+                        font-weight:bold;
+                        background:#fafafa;
+                        white-space:nowrap;
+                    ">
+                        ${escapeHtmlHoraire(
+                            heureAffichee
+                        )}
+                    </td>
+
+            `;
+
+
+            jours.forEach(jour => {
+
+                const coursJour =
+                    cours[id] &&
+                    cours[id].jours &&
+                    cours[id].jours[jour]
+                    ? cours[id].jours[jour]
+                    : null;
+
+
+                if (coursJour) {
+
+                    html += `
+
+                        <td style="
+                            border:1px solid #ccc;
+                            padding:9px;
+                            min-width:105px;
+                            background:white;
+                            vertical-align:middle;
+                        ">
+
+                            <div style="
+                                font-weight:bold;
+                                font-size:13px;
+                            ">
+                                ${escapeHtmlHoraire(
+                                    coursJour.matiere || ""
+                                )}
+                            </div>
+
+                            ${
+                                coursJour.salle
+                                ? `
+                                <div style="
+                                    margin-top:4px;
+                                    font-size:10px;
+                                    color:#777;
+                                ">
+                                    🚪 ${escapeHtmlHoraire(
+                                        coursJour.salle
+                                    )}
+                                </div>
+                                `
+                                : ""
+                            }
+
+                        </td>
+
+                    `;
+
+                } else {
+
+                    html += `
+
+                        <td style="
+                            border:1px solid #eee;
+                            padding:9px;
+                            min-width:105px;
+                            color:#ccc;
+                        ">
+                            —
+                        </td>
+
+                    `;
+
+                }
+
+            });
+
+
+            html += `
+
+                </tr>
+
+            `;
+
+        });
+
+
+        html += `
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+        <!-- OUTILS -->
+
+        <div style="
+            width:100%;
+            margin-top:14px;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            gap:10px;
+            flex-wrap:wrap;
+        ">
+
+            <button
+                onclick="telechargerHorairePDFPrimaire()"
+                title="PDF"
+                style="
+                    width:42px;
+                    height:42px;
+                    border-radius:50%;
+                    border:1px solid #ddd;
+                    background:white;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:18px;
+                    padding:0;
+                "
+            >
+                📄
+            </button>
+
+
+            <button
+                onclick="telechargerHoraireWordPrimaire()"
+                title="Word"
+                style="
+                    width:42px;
+                    height:42px;
+                    border-radius:50%;
+                    border:1px solid #ddd;
+                    background:white;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:18px;
+                    padding:0;
+                "
+            >
+                📝
+            </button>
+
+
+            <button
+                onclick="telechargerHoraireExcelPrimaire()"
+                title="Excel"
+                style="
+                    width:42px;
+                    height:42px;
+                    border-radius:50%;
+                    border:1px solid #ddd;
+                    background:white;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:18px;
+                    padding:0;
+                "
+            >
+                📊
+            </button>
+
+
+            <button
+                onclick="imprimerHorairePrimaire()"
+                title="Imprimer"
+                style="
+                    width:42px;
+                    height:42px;
+                    border-radius:50%;
+                    border:1px solid #ddd;
+                    background:white;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:18px;
+                    padding:0;
+                "
+            >
+                🖨️
+            </button>
+
+
+            <button
+                onclick="partagerHorairePrimaire()"
+                title="Partager"
+                style="
+                    width:42px;
+                    height:42px;
+                    border-radius:50%;
+                    border:1px solid #ddd;
+                    background:white;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:18px;
+                    padding:0;
+                "
+            >
+                🔗
+            </button>
+
+        </div>
+
+        `;
+
+
+        /*
+         * ==========================================
+         * AFFICHER
+         * ==========================================
+         */
+
+        const zone =
+            document.querySelector(
+                ".login-box"
+            );
+
+
+        if (!zone) {
+
+            alert(
+                "Zone d'affichage introuvable."
+            );
+
+            return;
+        }
+
+
+        zone.innerHTML = html;
+
+
+    }
+    catch(error) {
+
+        hideLoader();
+
+        console.error(
+            "Erreur affichage horaire enseignant :",
+            error
+        );
+
+        alert(
+            "Erreur lors de l'affichage de votre horaire."
+        );
+
+    }
+
+}
+
 function modifierProfilEnseignant(){
 
 alert("La modification du profil sera disponible dans une prochaine mise à jour.");
@@ -33315,6 +36744,854 @@ async function partagerHorairePrimaire() {
         );
 
     }
+
+}
+
+// ============================================================
+// DONNÉES COMMUNES POUR LES 4 EXPORTS
+// ============================================================
+
+function obtenirDonneesListeElevesExport() {
+
+    const eleves =
+        window.listeElevesAffichee ||
+        window.listeElevesActuelle ||
+        [];
+
+    const colonnes = [
+        "N°",
+        "Matricule",
+        "Nom",
+        "Postnom",
+        "Prénom",
+        "Date naissance",
+        "Lieu naissance",
+        "Sexe",
+        "Classe",
+        "Niveau",
+        "Option",
+        "Père",
+        "Tél. père",
+        "Mère",
+        "Tél. mère",
+        "Nationalité",
+        "Province",
+        "Territoire",
+        "Secteur",
+        "Tél. élève"
+    ];
+
+    const lignes = eleves.map((e, index) => {
+
+        const option =
+            e.option ||
+            e.optionEtude ||
+            e.options ||
+            "-";
+
+        return [
+
+            index + 1,
+
+            e.matricule || "-",
+
+            e.nom || "",
+
+            e.postnom || "",
+
+            e.prenom || "",
+
+            formaterDateFR(e.dateNaissance) || "-",
+
+            e.lieuNaissance || "-",
+
+            e.sexe || "-",
+
+            e.className || "-",
+
+            e.level || "-",
+
+            option,
+
+            e.fatherName || "-",
+
+            e.fatherPhone || "-",
+
+            e.motherName || "-",
+
+            e.motherPhone || "-",
+
+            e.nationalite || "-",
+
+            e.province || "-",
+
+            e.territoire || "-",
+
+            e.secteur || "-",
+
+            e.phone || "-"
+
+        ];
+
+    });
+
+    return {
+        colonnes,
+        lignes
+    };
+}
+
+
+// ============================================================
+// 1. EXCEL
+// ============================================================
+
+function telechargerListeElevesExcel() {
+
+    const donnees =
+        obtenirDonneesListeElevesExport();
+
+    if (!donnees.lignes.length) {
+
+        alert(
+            "Aucun élève à exporter."
+        );
+
+        return;
+    }
+
+
+    if (
+        typeof XLSX === "undefined"
+    ) {
+
+        alert(
+            "La fonction Excel n'est pas disponible. " +
+            "Ajoutez la bibliothèque XLSX à votre fichier."
+        );
+
+        return;
+    }
+
+
+    const tableau = [
+
+        donnees.colonnes,
+
+        ...donnees.lignes
+
+    ];
+
+
+    const feuille =
+        XLSX.utils.aoa_to_sheet(
+            tableau
+        );
+
+
+    /*
+     * Largeur des colonnes
+     */
+
+    feuille["!cols"] = [
+
+        { wch: 5 },
+        { wch: 16 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 16 },
+        { wch: 20 },
+        { wch: 10 },
+        { wch: 15 },
+        { wch: 12 },
+        { wch: 20 },
+        { wch: 22 },
+        { wch: 18 },
+        { wch: 22 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 18 }
+
+    ];
+
+
+    const classe =
+        document.getElementById(
+            "filtreClasse"
+        )?.value || "";
+
+
+    const nomFichier =
+        classe
+        ? "Liste_eleves_" +
+          classe.replace(/\s+/g, "_") +
+          ".xlsx"
+        : "Liste_complete_eleves.xlsx";
+
+
+    const classeur =
+        XLSX.utils.book_new();
+
+
+    XLSX.utils.book_append_sheet(
+        classeur,
+        feuille,
+        "Élèves"
+    );
+
+
+    XLSX.writeFile(
+        classeur,
+        nomFichier
+    );
+
+}
+
+
+// ============================================================
+// 2. WORD
+// ============================================================
+
+function telechargerListeElevesWord() {
+
+    const donnees =
+        obtenirDonneesListeElevesExport();
+
+    if (!donnees.lignes.length) {
+
+        alert(
+            "Aucun élève à exporter."
+        );
+
+        return;
+    }
+
+
+    /*
+     * Création du tableau HTML
+     */
+
+    let tableauHTML = `
+
+        <table
+            border="1"
+            cellspacing="0"
+            cellpadding="5"
+            style="
+                border-collapse:collapse;
+                width:100%;
+                font-size:9px;
+            "
+        >
+
+            <thead>
+
+                <tr style="
+                    background:#1f4cff;
+                    color:white;
+                    font-weight:bold;
+                ">
+    `;
+
+
+    donnees.colonnes.forEach(colonne => {
+
+        tableauHTML += `
+
+            <th>
+                ${escapeHtmlListe(colonne)}
+            </th>
+
+        `;
+
+    });
+
+
+    tableauHTML += `
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+    `;
+
+
+    donnees.lignes.forEach(ligne => {
+
+        tableauHTML += `<tr>`;
+
+
+        ligne.forEach(cellule => {
+
+            tableauHTML += `
+
+                <td>
+                    ${escapeHtmlListe(
+                        String(cellule)
+                    )}
+                </td>
+
+            `;
+
+        });
+
+
+        tableauHTML += `</tr>`;
+
+    });
+
+
+    tableauHTML += `
+
+            </tbody>
+
+        </table>
+
+    `;
+
+
+    const classe =
+        document.getElementById(
+            "filtreClasse"
+        )?.value || "";
+
+
+    const titre =
+        classe
+        ? "Liste des élèves - " + classe
+        : "Liste complète des élèves";
+
+
+    /*
+     * Document Word
+     */
+
+    const contenu = `
+
+        <!DOCTYPE html>
+
+        <html>
+
+        <head>
+
+            <meta charset="UTF-8">
+
+            <title>
+                ${titre}
+            </title>
+
+        </head>
+
+        <body>
+
+            <h2 style="
+                text-align:center;
+                color:#1f4cff;
+            ">
+                ${escapeHtmlListe(titre)}
+            </h2>
+
+            ${tableauHTML}
+
+        </body>
+
+        </html>
+
+    `;
+
+
+    const blob =
+        new Blob(
+            [
+                "\ufeff",
+                contenu
+            ],
+            {
+                type:
+                    "application/msword"
+            }
+        );
+
+
+    const url =
+        URL.createObjectURL(
+            blob
+        );
+
+
+    const lien =
+        document.createElement(
+            "a"
+        );
+
+
+    lien.href =
+        url;
+
+    lien.download =
+        classe
+        ? "Liste_eleves_" +
+          classe.replace(/\s+/g, "_") +
+          ".doc"
+        : "Liste_complete_eleves.doc";
+
+
+    document.body.appendChild(
+        lien
+    );
+
+
+    lien.click();
+
+
+    document.body.removeChild(
+        lien
+    );
+
+
+    URL.revokeObjectURL(
+        url
+    );
+
+}
+
+
+// ============================================================
+// 3. PDF
+// ============================================================
+
+function telechargerListeElevesPDF() {
+
+    const donnees =
+        obtenirDonneesListeElevesExport();
+
+    if (!donnees.lignes.length) {
+
+        alert(
+            "Aucun élève à exporter."
+        );
+
+        return;
+    }
+
+
+    if (
+        typeof window.jspdf === "undefined"
+    ) {
+
+        alert(
+            "La fonction PDF n'est pas disponible. " +
+            "Ajoutez jsPDF à votre fichier."
+        );
+
+        return;
+    }
+
+
+    if (
+        typeof window.jspdf.jsPDF === "undefined"
+    ) {
+
+        alert(
+            "La fonction PDF n'est pas disponible."
+        );
+
+        return;
+    }
+
+
+    const {
+        jsPDF
+    } = window.jspdf;
+
+
+    const pdf =
+        new jsPDF({
+            orientation:"landscape",
+            unit:"mm",
+            format:"a3"
+        });
+
+
+    /*
+     * Vérifier AutoTable
+     */
+
+    if (
+        typeof pdf.autoTable !== "function"
+    ) {
+
+        alert(
+            "Le module AutoTable de jsPDF " +
+            "n'est pas disponible."
+        );
+
+        return;
+    }
+
+
+    const classe =
+        document.getElementById(
+            "filtreClasse"
+        )?.value || "";
+
+
+    const option =
+        document.getElementById(
+            "filtreOption"
+        )?.value || "";
+
+
+    const titre =
+        classe
+        ? "LISTE DES ÉLÈVES - " + classe
+        : "LISTE COMPLÈTE DES ÉLÈVES";
+
+
+    /*
+     * Titre
+     */
+
+    pdf.setFontSize(16);
+
+    pdf.text(
+        titre,
+        20,
+        15
+    );
+
+
+    if (option) {
+
+        pdf.setFontSize(10);
+
+        pdf.text(
+            "Option : " + option,
+            20,
+            22
+        );
+
+    }
+
+
+    /*
+     * Tableau
+     */
+
+    pdf.autoTable({
+
+        head:[
+            donnees.colonnes
+        ],
+
+        body:
+            donnees.lignes,
+
+        startY:
+            option ? 27 : 22,
+
+        theme:
+            "grid",
+
+        styles:{
+            fontSize:6,
+            cellPadding:2,
+            overflow:"linebreak",
+            valign:"middle"
+        },
+
+        headStyles:{
+            fontSize:6,
+            fontStyle:"bold"
+        },
+
+        margin:{
+            top:10,
+            right:8,
+            bottom:10,
+            left:8
+        },
+
+        tableWidth:
+            "auto"
+
+    });
+
+
+    pdf.save(
+
+        classe
+        ? "Liste_eleves_" +
+          classe.replace(/\s+/g, "_") +
+          ".pdf"
+        : "Liste_complete_eleves.pdf"
+
+    );
+
+}
+
+
+// ============================================================
+// 4. IMPRIMER
+// ============================================================
+
+function imprimerListeEleves() {
+
+    const donnees =
+        obtenirDonneesListeElevesExport();
+
+    if (!donnees.lignes.length) {
+
+        alert(
+            "Aucun élève à imprimer."
+        );
+
+        return;
+    }
+
+
+    const classe =
+        document.getElementById(
+            "filtreClasse"
+        )?.value || "";
+
+
+    const option =
+        document.getElementById(
+            "filtreOption"
+        )?.value || "";
+
+
+    const titre =
+        classe
+        ? "LISTE DES ÉLÈVES - " + classe
+        : "LISTE COMPLÈTE DES ÉLÈVES";
+
+
+    /*
+     * Construire le tableau
+     */
+
+    let tableau = `
+
+        <table>
+
+            <thead>
+
+                <tr>
+
+    `;
+
+
+    donnees.colonnes.forEach(
+        colonne => {
+
+            tableau += `
+
+                <th>
+                    ${escapeHtmlListe(
+                        colonne
+                    )}
+                </th>
+
+            `;
+
+        }
+    );
+
+
+    tableau += `
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+    `;
+
+
+    donnees.lignes.forEach(
+        ligne => {
+
+            tableau += `<tr>`;
+
+
+            ligne.forEach(
+                cellule => {
+
+                    tableau += `
+
+                        <td>
+                            ${escapeHtmlListe(
+                                String(cellule)
+                            )}
+                        </td>
+
+                    `;
+
+                }
+            );
+
+
+            tableau += `</tr>`;
+
+        }
+    );
+
+
+    tableau += `
+
+            </tbody>
+
+        </table>
+
+    `;
+
+
+    /*
+     * Fenêtre d'impression
+     */
+
+    const fenetre =
+        window.open(
+            "",
+            "_blank",
+            "width=1200,height=800"
+        );
+
+
+    if (!fenetre) {
+
+        alert(
+            "Impossible d'ouvrir la fenêtre d'impression. " +
+            "Autorisez les fenêtres popup."
+        );
+
+        return;
+    }
+
+
+    fenetre.document.write(`
+
+        <!DOCTYPE html>
+
+        <html>
+
+        <head>
+
+            <meta charset="UTF-8">
+
+            <title>
+                ${escapeHtmlListe(titre)}
+            </title>
+
+            <style>
+
+                @page {
+                    size: A3 landscape;
+                    margin: 8mm;
+                }
+
+
+                body {
+                    font-family: Arial, sans-serif;
+                    margin:0;
+                    padding:0;
+                }
+
+
+                h2 {
+                    text-align:center;
+                    margin-bottom:5px;
+                }
+
+
+                .info {
+                    text-align:center;
+                    font-size:11px;
+                    margin-bottom:12px;
+                }
+
+
+                table {
+                    width:100%;
+                    border-collapse:collapse;
+                    font-size:7px;
+                }
+
+
+                th {
+                    background:#1f4cff;
+                    color:white;
+                    border:1px solid #777;
+                    padding:4px;
+                    white-space:nowrap;
+                }
+
+
+                td {
+                    border:1px solid #999;
+                    padding:4px;
+                    text-align:center;
+                    vertical-align:middle;
+                }
+
+
+                tr {
+                    page-break-inside:avoid;
+                }
+
+            </style>
+
+        </head>
+
+
+        <body>
+
+            <h2>
+                ${escapeHtmlListe(titre)}
+            </h2>
+
+
+            ${
+                option
+                ? `
+                    <div class="info">
+                        Option : ${escapeHtmlListe(option)}
+                    </div>
+                  `
+                : ""
+            }
+
+
+            ${tableau}
+
+
+            <script>
+
+                window.onload = function() {
+
+                    window.print();
+
+                };
+
+            <\/script>
+
+        </body>
+
+        </html>
+
+    `);
+
+
+    fenetre.document.close();
 
 }
 
