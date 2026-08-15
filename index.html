@@ -5541,87 +5541,594 @@ alert(error.message);
 }
 
 
-function ouvrirAjouterEmploiTemps(){
+function selectionnerEnseignantHoraire(){
 
-document.querySelector(".login-box").innerHTML=`
+    const select =
+        document.getElementById(
+            "nouvelHoraireEnseignant"
+        );
 
-<h2 style="
-text-align:center;
-color:#1f4cff;
-">
+    if(!select) return;
 
-📅 Nouvel emploi du temps
+    const option =
+        select.options[select.selectedIndex];
 
-</h2>
+    window.nouvelEmploiTemps.enseignant =
+        select.value || "";
 
-<select id="enseignant">
-
-<option value="">
-Choisir un enseignant
-</option>
-
-</select>
-
-<select id="classe">
-
-<option value="">
-Choisir une classe
-</option>
-
-</select>
-
-<input
-id="matiere"
-placeholder="Matière">
-
-<select id="jour">
-
-<option>Lundi</option>
-<option>Mardi</option>
-<option>Mercredi</option>
-<option>Jeudi</option>
-<option>Vendredi</option>
-<option>Samedi</option>
-
-</select>
-
-<label>Heure début</label>
-
-<input
-type="time"
-id="heureDebut">
-
-<label>Heure fin</label>
-
-<input
-type="time"
-id="heureFin">
-
-<input
-id="salle"
-placeholder="Salle">
-
-<button
-onclick="enregistrerEmploiTemps()">
-
-💾 Enregistrer
-
-</button>
-
-<button
-onclick="ouvrirGestionEmploiTemps()">
-
-⬅ Retour
-
-</button>
-
-`;
-
-chargerListeEnseignants();
-
-chargerListeClasses();
+    window.nouvelEmploiTemps.enseignantNom =
+        option
+        ? option.textContent.trim()
+        : "";
 
 }
+
+function selectionnerSalleHoraire(){
+
+    const input =
+        document.getElementById(
+            "nouvelHoraireSalle"
+        );
+
+    if(!input) return;
+
+    window.nouvelEmploiTemps.salle =
+        input.value.trim();
+
+}
+
+async function chargerEnseignantsNouvelHoraire(){
+
+    const select =
+        document.getElementById(
+            "nouvelHoraireEnseignant"
+        );
+
+    if(!select) return;
+
+    try {
+
+        const snapshot = await db.ref(
+            "schools/" +
+            window.currentSchoolId +
+            "/teachers"
+        ).once("value");
+
+
+        select.innerHTML = `
+            <option value="">
+                Choisir un enseignant
+            </option>
+        `;
+
+
+        if(!snapshot.exists()){
+
+            select.innerHTML = `
+                <option value="">
+                    Aucun enseignant enregistré
+                </option>
+            `;
+
+            return;
+        }
+
+
+        snapshot.forEach(item => {
+
+            const t = item.val() || {};
+
+            const telephone =
+                t.telephone || item.key;
+
+            const nomComplet = [
+
+                t.nom || "",
+                t.postnom || "",
+                t.prenom || ""
+
+            ]
+            .filter(x => x)
+            .join(" ");
+
+
+            select.innerHTML += `
+
+                <option value="${escapeHtmlHoraire(
+                    telephone
+                )}">
+                    ${escapeHtmlHoraire(
+                        nomComplet || telephone
+                    )}
+                </option>
+
+            `;
+
+        });
+
+
+    }
+    catch(error){
+
+        console.error(
+            "Erreur chargement enseignants :",
+            error
+        );
+
+        select.innerHTML = `
+            <option value="">
+                Erreur de chargement
+            </option>
+        `;
+
+    }
+
+}
+
+
+function ouvrirJourHoraire(jour){
+
+    if(!window.nouvelEmploiTemps){
+        return;
+    }
+
+
+    window.nouvelEmploiTemps.jourActuel =
+        jour;
+
+
+    /*
+     * Mettre à jour les boutons des jours
+     */
+
+    const jours = [
+        "Lundi",
+        "Mardi",
+        "Mercredi",
+        "Jeudi",
+        "Vendredi",
+        "Samedi"
+    ];
+
+
+    jours.forEach(j => {
+
+        const bouton =
+            document.getElementById(
+                "boutonJour_" + j
+            );
+
+        if(!bouton) return;
+
+
+        if(j === jour){
+
+            bouton.style.background =
+                "#1f4cff";
+
+            bouton.style.color =
+                "white";
+
+        }
+        else{
+
+            bouton.style.background =
+                "";
+
+            bouton.style.color =
+                "";
+
+        }
+
+    });
+
+
+    afficherContenuJourHoraire(jour);
+
+}
+
+function afficherContenuJourHoraire(jour){
+
+    const zone =
+        document.getElementById(
+            "contenuJourHoraire"
+        );
+
+    if(!zone) return;
+
+
+    const cours =
+        window.nouvelEmploiTemps
+        .jours[jour] || [];
+
+
+    let html = `
+
+        <h3 style="
+            text-align:center;
+            color:#1f4cff;
+            margin:10px 0;
+        ">
+            📅 ${jour}
+        </h3>
+
+    `;
+
+
+    if(cours.length === 0){
+
+        html += `
+
+            <div style="
+                text-align:center;
+                color:#888;
+                padding:15px;
+            ">
+                Aucun cours ajouté pour ${jour}.
+            </div>
+
+        `;
+
+    }
+
+
+    cours.forEach((cours,index) => {
+
+        html += `
+
+        <div style="
+            border:1px solid #ddd;
+            border-radius:12px;
+            padding:10px;
+            margin-bottom:8px;
+            background:#f8f9ff;
+        ">
+
+            <div style="
+                display:flex;
+                justify-content:space-between;
+                align-items:center;
+            ">
+
+                <b>
+                    🕐
+                    ${cours.heureDebut}
+                    -
+                    ${cours.heureFin}
+                </b>
+
+                <button
+                    onclick="supprimerCoursJourHoraire(${index})"
+                    style="
+                        padding:5px 7px;
+                        font-size:11px;
+                        background:#e53935;
+                        color:white;
+                        min-width:auto;
+                    "
+                >
+                    🗑️
+                </button>
+
+            </div>
+
+
+            <div style="
+                margin-top:6px;
+                font-weight:bold;
+            ">
+                📖 ${escapeHtmlHoraire(
+                    cours.matiere
+                )}
+            </div>
+
+        </div>
+
+        `;
+
+    });
+
+
+    html += `
+
+        <button
+            onclick="ajouterCoursJourHoraire()"
+            style="
+                width:100%;
+                margin-top:8px;
+            "
+        >
+            ➕ Ajouter une matière
+        </button>
+
+    `;
+
+
+    zone.innerHTML = html;
+
+}
+
+
+function ajouterCoursJourHoraire(){
+
+    const jour =
+        window.nouvelEmploiTemps.jourActuel;
+
+
+    if(!jour) return;
+
+
+    const heureDebut =
+        prompt(
+            "Heure de début :",
+            "07:30"
+        );
+
+    if(heureDebut === null) return;
+
+
+    const heureFin =
+        prompt(
+            "Heure de fin :",
+            "08:20"
+        );
+
+    if(heureFin === null) return;
+
+
+    const matiere =
+        prompt(
+            "Matière :"
+        );
+
+    if(matiere === null) return;
+
+
+    if(
+        !heureDebut.trim() ||
+        !heureFin.trim() ||
+        !matiere.trim()
+    ){
+
+        alert(
+            "Veuillez remplir toutes les informations."
+        );
+
+        return;
+
+    }
+
+
+    window.nouvelEmploiTemps
+        .jours[jour]
+        .push({
+
+            heureDebut:
+                heureDebut.trim(),
+
+            heureFin:
+                heureFin.trim(),
+
+            matiere:
+                matiere.trim()
+
+        });
+
+
+    afficherContenuJourHoraire(jour);
+
+}
+
+function supprimerCoursJourHoraire(index){
+
+    const jour =
+        window.nouvelEmploiTemps.jourActuel;
+
+
+    if(!jour) return;
+
+
+    if(
+        !confirm(
+            "Supprimer cette matière de " +
+            jour +
+            " ?"
+        )
+    ){
+
+        return;
+
+    }
+
+
+    window.nouvelEmploiTemps
+        .jours[jour]
+        .splice(index,1);
+
+
+    afficherContenuJourHoraire(jour);
+
+}
+
+async function enregistrerSemaineEmploiTemps(){
+
+    const data =
+        window.nouvelEmploiTemps;
+
+
+    if(!data){
+        alert("Aucune donnée à enregistrer.");
+        return;
+    }
+
+
+    if(!data.enseignant){
+
+        alert(
+            "Veuillez choisir un enseignant."
+        );
+
+        return;
+
+    }
+
+
+    if(!data.classe){
+
+        alert(
+            "Veuillez choisir une classe."
+        );
+
+        return;
+
+    }
+
+
+    if(!data.salle){
+
+        alert(
+            "Veuillez indiquer une salle."
+        );
+
+        return;
+
+    }
+
+
+    let totalCours = 0;
+
+
+    Object.values(data.jours)
+        .forEach(liste => {
+
+            totalCours += liste.length;
+
+        });
+
+
+    if(totalCours === 0){
+
+        alert(
+            "Ajoutez au moins une matière."
+        );
+
+        return;
+
+    }
+
+
+    if(
+        !confirm(
+            "Enregistrer les " +
+            totalCours +
+            " cours de cette semaine ?"
+        )
+    ){
+
+        return;
+
+    }
+
+
+    showLoader();
+
+
+    try {
+
+        const updates = {};
+
+
+        Object.entries(data.jours)
+        .forEach(([jour,liste]) => {
+
+            liste.forEach(cours => {
+
+                const key =
+                    db.ref().push().key;
+
+
+                updates[
+                    "schools/" +
+                    data.schoolId +
+                    "/emploisTemps/" +
+                    key
+                ] = {
+
+                    jour: jour,
+
+                    heureDebut:
+                        cours.heureDebut,
+
+                    heureFin:
+                        cours.heureFin,
+
+                    matiere:
+                        cours.matiere,
+
+                    enseignant:
+                        data.enseignant,
+
+                    enseignantNom:
+                        data.enseignantNom,
+
+                    classe:
+                        data.classe,
+
+                    salle:
+                        data.salle,
+
+                    section:
+                        data.section,
+
+                    createdAt:
+                        Date.now()
+
+                };
+
+            });
+
+        });
+
+
+        await db.ref().update(updates);
+
+
+        hideLoader();
+
+
+        alert(
+            "✅ Emploi du temps enregistré avec succès."
+        );
+
+
+        window.nouvelEmploiTemps = null;
+
+
+        ouvrirGestionEmploiTemps();
+
+
+    }
+    catch(error){
+
+        hideLoader();
+
+
+        console.error(
+            "Erreur enregistrement semaine :",
+            error
+        );
+
+
+        alert(
+            "Erreur lors de l'enregistrement."
+        );
+
+    }
+
+}
+
+
+
 
 
 function afficherTempsRestant(school){
@@ -5841,29 +6348,82 @@ ${t.nom} ${t.postnom} ${t.prenom}
 
 function chargerListeClasses(){
 
-let select=document.getElementById("classe");
+    const select = document.getElementById("classe");
 
-select.innerHTML="";
+    if(!select) return;
 
-db.ref("schools/"+window.currentSchoolId)
+    select.innerHTML = `
+        <option value="">
+            Chargement des classes...
+        </option>
+    `;
 
-.once("value")
+    db.ref(
+        "schools/" +
+        window.currentSchoolId
+    )
+    .once("value")
+    .then(snapshot => {
 
-.then(snapshot=>{
+        const school = snapshot.val();
 
-let school=snapshot.val();
+        if(!school){
 
-(school.classes||[]).forEach(classe=>{
+            select.innerHTML = `
+                <option value="">
+                    École introuvable
+                </option>
+            `;
 
-select.innerHTML+=`
-<option value="${classe}">
-${classe}
-</option>
-`;
+            return;
+        }
 
-});
+        const classes = school.classes || [];
 
-});
+        select.innerHTML = `
+            <option value="">
+                Choisir une classe
+            </option>
+        `;
+
+        if(classes.length === 0){
+
+            select.innerHTML = `
+                <option value="">
+                    Aucune classe configurée
+                </option>
+            `;
+
+            return;
+        }
+
+        classes.forEach(classe => {
+
+            if(!classe) return;
+
+            select.innerHTML += `
+                <option value="${classe}">
+                    ${classe}
+                </option>
+            `;
+
+        });
+
+    })
+    .catch(error => {
+
+        console.error(
+            "Erreur chargement classes :",
+            error
+        );
+
+        select.innerHTML = `
+            <option value="">
+                Erreur de chargement
+            </option>
+        `;
+
+    });
 
 }
 
@@ -9887,8 +10447,24 @@ alert(error.message);
 }
 
 async function modifierEmploiTemps(id) {
+
     try {
-        const snap = await db.ref("emploisTemps/" + id).once("value");
+
+        const schoolId = window.currentSchoolId;
+
+        if (!schoolId) {
+            alert("École introuvable.");
+            return;
+        }
+
+        const ref = db.ref(
+            "schools/" +
+            schoolId +
+            "/emploisTemps/" +
+            id
+        );
+
+        const snap = await ref.once("value");
 
         if (!snap.exists()) {
             alert("Emploi du temps introuvable.");
@@ -9897,60 +10473,206 @@ async function modifierEmploiTemps(id) {
 
         const e = snap.val();
 
-        const jour = prompt("Jour :", e.jour);
+        // Jour
+        const jour = prompt(
+            "Jour :",
+            e.jour || ""
+        );
+
         if (jour === null) return;
 
-        const heure = prompt("Heure :", e.heure);
-        if (heure === null) return;
+        // Heure début
+        const heureDebut = prompt(
+            "Heure de début :",
+            e.heureDebut || ""
+        );
 
-        const matiere = prompt("Matière :", e.matiere);
+        if (heureDebut === null) return;
+
+        // Heure fin
+        const heureFin = prompt(
+            "Heure de fin :",
+            e.heureFin || ""
+        );
+
+        if (heureFin === null) return;
+
+        // Matière
+        const matiere = prompt(
+            "Matière :",
+            e.matiere || ""
+        );
+
         if (matiere === null) return;
 
-        const enseignant = prompt("Enseignant :", e.enseignant);
+        // Enseignant
+        const enseignant = prompt(
+            "Enseignant :",
+            e.enseignantNom ||
+            e.enseignant ||
+            ""
+        );
+
         if (enseignant === null) return;
 
-        const salle = prompt("Salle :", e.salle || "");
+        // Salle
+        const salle = prompt(
+            "Salle :",
+            e.salle || ""
+        );
+
         if (salle === null) return;
 
-        await db.ref("emploisTemps/" + id).update({
-            jour,
-            heure,
-            matiere,
-            enseignant,
-            salle
-        });
 
-        alert("Emploi du temps modifié avec succès.");
+        // Vérification
+        if (
+            !jour.trim() ||
+            !heureDebut.trim() ||
+            !heureFin.trim() ||
+            !matiere.trim()
+        ) {
 
-        if (typeof chargerEmploiTemps === "function") {
-            chargerEmploiTemps();
+            alert(
+                "Veuillez remplir le jour, les heures et la matière."
+            );
+
+            return;
         }
 
-    } catch (err) {
-        console.error(err);
-        alert("Erreur lors de la modification.");
-    }
-}
 
+        await ref.update({
+
+            jour: jour.trim(),
+
+            heureDebut: heureDebut.trim(),
+
+            heureFin: heureFin.trim(),
+
+            matiere: matiere.trim(),
+
+            enseignantNom: enseignant.trim(),
+
+            // Garder également l'ancien champ
+            // pour éviter de casser d'autres parties
+            enseignant: enseignant.trim(),
+
+            salle: salle.trim()
+
+        });
+
+
+        alert(
+            "✅ Emploi du temps modifié avec succès."
+        );
+
+
+        // Recharger directement la grille
+        if (
+            typeof ouvrirGestionEmploiTemps ===
+            "function"
+        ) {
+
+            ouvrirGestionEmploiTemps();
+
+        }
+
+    }
+
+    catch (err) {
+
+        console.error(
+            "Erreur modification emploi du temps :",
+            err
+        );
+
+        alert(
+            "Erreur lors de la modification de l'emploi du temps."
+        );
+
+    }
+
+}
 
 async function supprimerEmploiTemps(id) {
 
-    if (!confirm("Supprimer cet emploi du temps ?")) return;
+    if (
+        !confirm(
+            "⚠️ Voulez-vous vraiment supprimer cet horaire ?"
+        )
+    ) {
+        return;
+    }
+
 
     try {
 
-        await db.ref("emploisTemps/" + id).remove();
+        const schoolId = window.currentSchoolId;
 
-        alert("Emploi du temps supprimé.");
+        if (!schoolId) {
 
-        if (typeof chargerEmploiTemps === "function") {
-            chargerEmploiTemps();
+            alert(
+                "École introuvable."
+            );
+
+            return;
         }
 
-    } catch (err) {
-        console.error(err);
-        alert("Erreur lors de la suppression.");
+
+        const ref = db.ref(
+            "schools/" +
+            schoolId +
+            "/emploisTemps/" +
+            id
+        );
+
+
+        const snap = await ref.once("value");
+
+
+        if (!snap.exists()) {
+
+            alert(
+                "Cet horaire n'existe plus."
+            );
+
+            return;
+
+        }
+
+
+        await ref.remove();
+
+
+        alert(
+            "🗑️ Horaire supprimé avec succès."
+        );
+
+
+        // Recharger la grille
+        if (
+            typeof ouvrirGestionEmploiTemps ===
+            "function"
+        ) {
+
+            ouvrirGestionEmploiTemps();
+
+        }
+
     }
+
+    catch (err) {
+
+        console.error(
+            "Erreur suppression emploi du temps :",
+            err
+        );
+
+        alert(
+            "Erreur lors de la suppression de l'horaire."
+        );
+
+    }
+
 }
 
 
@@ -10222,116 +10944,1675 @@ alert(err.message);
 
 function ouvrirEmploiTemps(){
 
-showLoader();
+    showLoader();
 
-let phone=normalizePhone(window.currentPhone);
+    const schoolId = window.currentSchoolId;
 
-db.ref("schools/"+window.currentSchoolId+"/emploisTemps")
-.once("value")
-.then(snapshot=>{
+    if(!schoolId){
+        hideLoader();
+        alert("École introuvable.");
+        return;
+    }
 
-hideLoader();
+    db.ref("schools/" + schoolId)
+    .once("value")
+    .then(snapshot => {
 
-const ordreJours={
-"Lundi":1,
-"Mardi":2,
-"Mercredi":3,
-"Jeudi":4,
-"Vendredi":5,
-"Samedi":6,
-"Dimanche":7
-};
+        hideLoader();
 
-let cours=[];
+        const school = snapshot.val();
 
-snapshot.forEach(s=>{
+        if(!school){
+            alert("Les informations de l'école sont introuvables.");
+            return;
+        }
 
-let e = s.val();
-e.id = s.key;
+        // Vérifier les sections de l'école
+        const levels = school.levels || {};
 
-if (e.enseignantPhone == phone) {
-    cours.push(e);
-}
+        const primaire = levels.primary === true;
+        const secondaire = levels.secondary === true;
 
-});
+        // Aucune section configurée
+        if(!primaire && !secondaire){
 
-cours.sort((a,b)=>{
+            document.querySelector(".login-box").innerHTML = `
 
-if(ordreJours[a.jour]!=ordreJours[b.jour]){
+                <button class="back-btn" onclick="openTeacher()">
+                    ⬅ Retour
+                </button>
 
-return ordreJours[a.jour]-ordreJours[b.jour];
+                <h2 style="
+                    text-align:center;
+                    color:#1f4cff;
+                    margin-top:20px;
+                ">
+                    📅 Horaires
+                </h2>
 
-}
+                <div class="empty-box" style="
+                    text-align:center;
+                    padding:25px;
+                    margin-top:20px;
+                ">
+                    ⚠️ Aucune section scolaire n'est configurée
+                    pour cette école.
+                    <br><br>
+                    Veuillez configurer la section
+                    <b>Primaire</b> ou <b>Secondaire</b>.
+                </div>
 
-return a.heureDebut.localeCompare(b.heureDebut);
+            `;
 
-});
+            return;
+        }
 
-let html=`
+        // Déterminer automatiquement la section
+        let sectionTexte = "";
 
-<button class="back-btn" onclick="openTeacher()">
-⬅ Retour
-</button>
+        if(primaire && secondaire){
+            sectionTexte = "Primaire et Secondaire";
+        }
+        else if(primaire){
+            sectionTexte = "Primaire";
+        }
+        else if(secondaire){
+            sectionTexte = "Secondaire";
+        }
 
-<h2 style="text-align:center;color:#1f4cff;">
-📅 Mon emploi du temps
-</h2>
+        // Interface principale des horaires
+        let html = `
 
-`;
+        <button class="back-btn" onclick="openTeacher()">
+            ⬅ Retour
+        </button>
 
-if(cours.length==0){
+        <h2 style="
+            text-align:center;
+            color:#1f4cff;
+            margin-top:15px;
+        ">
+            📅 Horaires
+        </h2>
 
-html+=`
-<div class="empty-box">
-Aucun cours programmé.
+        <div style="
+            text-align:center;
+            margin:10px 0 20px;
+            color:#555;
+        ">
+            🏫 <b>${school.schoolName || "Mon école"}</b>
+            <br>
+            📚 Section : <b>${sectionTexte}</b>
+        </div>
+
+        <div class="menu-grid">
+
+    <!-- Affectation des enseignants -->
+    <button
+        onclick="ouvrirAffectationEnseignantsPrimaire()"
+        style="
+            width:100%;
+            box-sizing:border-box;
+            margin:0;
+            padding:12px 14px;
+            border:none;
+            border-radius:12px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            font-size:14px;
+            font-weight:600;
+            cursor:pointer;
+        "
+    >
+        <span style="
+            font-size:18px;
+            line-height:1;
+        ">
+            👨‍🏫
+        </span>
+
+        <span>
+            Affecter les enseignants aux classes
+        </span>
+
+    </button>
+
+
+    <!-- Section de l'école -->
+    <div style="
+        width:100%;
+        box-sizing:border-box;
+        margin-top:12px;
+        padding:14px;
+        border-radius:15px;
+        background:#f5f7ff;
+        border:1px solid #dce3ff;
+    ">
+
+        <h3 style="
+            text-align:center;
+            margin:0 0 10px 0;
+            color:#1f4cff;
+            font-size:16px;
+        ">
+            📚 Section de l'école
+        </h3>
+
+
+        <div style="
+            display:flex;
+            flex-wrap:wrap;
+            justify-content:center;
+            align-items:center;
+            gap:8px;
+        ">
+
+            ${
+                primaire
+                ? `
+                    <div style="
+                        display:flex;
+                        align-items:center;
+                        gap:5px;
+                        padding:7px 10px;
+                        border-radius:20px;
+                        background:#e8f5e9;
+                        color:#2e7d32;
+                        font-size:12px;
+                        font-weight:600;
+                    ">
+                        🟢 Primaire activé
+                    </div>
+                `
+                : ""
+            }
+
+
+            ${
+                secondaire
+                ? `
+                    <div style="
+                        display:flex;
+                        align-items:center;
+                        gap:5px;
+                        padding:7px 10px;
+                        border-radius:20px;
+                        background:#e8f5e9;
+                        color:#2e7d32;
+                        font-size:12px;
+                        font-weight:600;
+                    ">
+                        🟢 Secondaire activé
+                    </div>
+                `
+                : ""
+            }
+
+
+            ${
+                !primaire && !secondaire
+                ? `
+                    <div style="
+                        color:#777;
+                        font-size:12px;
+                    ">
+                        Aucune section activée
+                    </div>
+                `
+                : ""
+            }
+
+        </div>
+
+    </div>
+
 </div>
-`;
+
+        `;
+
+        document.querySelector(".login-box").innerHTML = html;
+
+    })
+    .catch(error => {
+
+        hideLoader();
+
+        console.error("Erreur ouverture horaires :", error);
+
+        alert(
+            "Impossible de charger les informations de l'école."
+        );
+
+    });
 
 }
 
-cours.forEach(c=>{
+async function ouvrirHoraireClassePrimaire(classe) {
 
-html+=`
+    const schoolId = window.currentSchoolId;
 
-<div class="card">
+    if (!schoolId) {
+        alert("École introuvable.");
+        return;
+    }
 
-<h3>${c.matiere}</h3>
+    window.classeHorairePrimaireActuelle = classe;
 
-<p>📅 <b>${c.jour}</b></p>
+    showLoader();
 
-<p>🕒 ${c.heureDebut} - ${c.heureFin}</p>
+    try {
 
-<p>🏫 ${c.classe}</p>
+        /*
+         * ==========================================
+         * HORAIRES COMMUNS
+         * ==========================================
+         */
 
-<p>🚪 ${c.salle||"-"}</p>
+        const heuresSnap = await db.ref(
+            "schools/" +
+            schoolId +
+            "/horairesCommuns/heures"
+        ).once("value");
 
-<div class="menu-grid">
 
-<button onclick="ouvrirPresenceClasse('${c.classe}')">
-👥 Présence
-</button>
+        /*
+         * ==========================================
+         * COURS DE LA CLASSE
+         * ==========================================
+         */
 
-<button onclick="ouvrirNotesClasse('${c.classe}')">
-📝 Notes
-</button>
+        const coursSnap = await db.ref(
+            "schools/" +
+            schoolId +
+            "/emploisTempsPrimaire/" +
+            encodeURIComponent(classe) +
+            "/cours"
+        ).once("value");
 
-<button onclick="commencerCours('${c.id}')">
-▶ Commencer
-</button>
 
-</div>
+        hideLoader();
 
-</div>
 
-`;
+        const heures =
+            heuresSnap.val() || {};
 
-});
+        const cours =
+            coursSnap.val() || {};
 
-document.querySelector(".login-box").innerHTML = html;
 
-});
+        /*
+         * ==========================================
+         * TRIER LES HEURES
+         * ==========================================
+         */
+
+        const ordreHeures =
+            Object.keys(heures).sort(
+                (a, b) => {
+
+                    const heureA =
+                        convertirHeureEnMinutes(
+                            heures[a].heureDebut
+                        );
+
+                    const heureB =
+                        convertirHeureEnMinutes(
+                            heures[b].heureDebut
+                        );
+
+                    return heureA - heureB;
+                }
+            );
+
+
+        const jours = [
+            "Lundi",
+            "Mardi",
+            "Mercredi",
+            "Jeudi",
+            "Vendredi",
+            "Samedi"
+        ];
+
+
+        /*
+         * ==========================================
+         * INTERFACE
+         * ==========================================
+         */
+
+        let html = `
+
+        <button
+            class="back-btn"
+            onclick="ouvrirAffectationEnseignantsPrimaire()"
+        >
+            ⬅ Classes
+        </button>
+
+
+        <h2 style="
+            text-align:center;
+            color:#1f4cff;
+            margin:12px 0 4px 0;
+        ">
+            📅 ${escapeHtmlHoraire(classe)}
+        </h2>
+
+
+        <div style="
+            text-align:center;
+            color:#777;
+            font-size:12px;
+            margin-bottom:12px;
+        ">
+            Les heures sont communes à toutes les classes
+        </div>
+
+
+        <div style="
+            overflow-x:auto;
+            width:100%;
+            -webkit-overflow-scrolling:touch;
+        ">
+
+            <table
+                id="tableauHorairePrimaire"
+                style="
+                    width:100%;
+                    min-width:760px;
+                    border-collapse:collapse;
+                    text-align:center;
+                    background:white;
+                "
+            >
+
+                <thead>
+
+                    <tr>
+
+                        <th style="
+                            border:1px solid #ccc;
+                            padding:9px;
+                            background:#f1f4ff;
+                            white-space:nowrap;
+                        ">
+                            Heure
+                        </th>
+        `;
+
+
+        jours.forEach(jour => {
+
+            html += `
+
+                <th style="
+                    border:1px solid #ccc;
+                    padding:9px;
+                    background:#f1f4ff;
+                    min-width:105px;
+                ">
+                    ${jour}
+                </th>
+
+            `;
+
+        });
+
+
+        html += `
+
+                    </tr>
+
+                </thead>
+
+                <tbody id="corpsHorairePrimaire">
+
+        `;
+
+
+        /*
+         * ==========================================
+         * AUCUNE HEURE
+         * ==========================================
+         */
+
+        if (ordreHeures.length === 0) {
+
+            html += `
+
+                <tr>
+
+                    <td
+                        colspan="7"
+                        style="
+                            border:1px solid #ccc;
+                            padding:25px;
+                            color:#777;
+                        "
+                    >
+                        ⏰ Aucune plage horaire configurée.
+                    </td>
+
+                </tr>
+
+            `;
+
+        }
+
+
+        /*
+         * ==========================================
+         * CONSTRUIRE LES LIGNES
+         * ==========================================
+         */
+
+        ordreHeures.forEach(id => {
+
+            const ligne =
+                heures[id] || {};
+
+
+            const heureAffichee =
+                ligne.heure ||
+                (
+                    (ligne.heureDebut || "") +
+                    "-" +
+                    (ligne.heureFin || "")
+                );
+
+
+            /*
+             * ======================================
+             * PAUSE
+             * ======================================
+             */
+
+            if (ligne.type === "pause") {
+
+    html += `
+
+        <tr>
+
+            <td
+                onclick="modifierHoraireCommunPrimaire('${id}')"
+                style="
+                    border:1px solid #b9d9f5;
+                    padding:9px;
+                    font-weight:bold;
+                    white-space:nowrap;
+                    background:#e8f5ff;
+                    color:#1769aa;
+                    cursor:pointer;
+                "
+                title="Modifier cette plage pour toutes les classes"
+            >
+                ${escapeHtmlHoraire(
+                    heureAffichee
+                )}
+
+                <div style="
+                    font-size:9px;
+                    color:#5b8db8;
+                    margin-top:3px;
+                ">
+                    ✏️ Modifier
+                </div>
+
+            </td>
+
+
+            <td
+                colspan="6"
+                style="
+                    border:1px solid #b9d9f5;
+                    padding:11px;
+                    background:#dff1ff;
+                    font-weight:bold;
+                    color:#1769aa;
+                    text-align:center;
+                "
+            >
+                ☕ RÉCRÉATION
+            </td>
+
+        </tr>
+
+    `;
+
+    return;
+}
+
+            /*
+             * ======================================
+             * LIGNE NORMALE
+             * ======================================
+             */
+
+            html += `
+
+                <tr>
+
+                    <td
+                        onclick="modifierHoraireCommunPrimaire('${id}')"
+                        style="
+                            border:1px solid #ccc;
+                            padding:8px;
+                            font-weight:bold;
+                            white-space:nowrap;
+                            background:#fafafa;
+                            cursor:pointer;
+                        "
+                        title="Modifier cette plage pour toutes les classes"
+                    >
+
+                        ${escapeHtmlHoraire(
+                            heureAffichee
+                        )}
+
+                        <div style="
+                            font-size:9px;
+                            color:#777;
+                            margin-top:3px;
+                        ">
+                            ✏️ Modifier
+                        </div>
+
+                    </td>
+
+            `;
+
+
+            /*
+             * ======================================
+             * JOURS
+             * ======================================
+             */
+
+            jours.forEach(jour => {
+
+                const coursJour =
+                    cours[id] &&
+                    cours[id].jours &&
+                    cours[id].jours[jour]
+                    ? cours[id].jours[jour]
+                    : null;
+
+
+                if (coursJour) {
+
+                    html += `
+
+                        <td
+                            onclick="ouvrirCoursPrimaire(
+                                '${id}',
+                                '${jour}'
+                            )"
+                            style="
+                                border:1px solid #ccc;
+                                padding:8px;
+                                min-width:105px;
+                                cursor:pointer;
+                                background:#fff;
+                                vertical-align:middle;
+                            "
+                        >
+
+                            <div style="
+                                font-weight:bold;
+                                font-size:13px;
+                            ">
+                                ${escapeHtmlHoraire(
+                                    coursJour.matiere || ""
+                                )}
+                            </div>
+
+                            ${
+                                coursJour.salle
+                                ? `
+                                <div style="
+                                    margin-top:4px;
+                                    font-size:10px;
+                                    color:#777;
+                                ">
+                                    🚪 ${escapeHtmlHoraire(
+                                        coursJour.salle
+                                    )}
+                                </div>
+                                `
+                                : ""
+                            }
+
+                        </td>
+
+                    `;
+
+                } else {
+
+                    html += `
+
+                        <td
+                            onclick="ouvrirCoursPrimaire(
+                                '${id}',
+                                '${jour}'
+                            )"
+                            style="
+                                border:1px solid #ccc;
+                                padding:8px;
+                                min-width:105px;
+                                cursor:pointer;
+                                color:#aaa;
+                                font-size:20px;
+                                vertical-align:middle;
+                            "
+                            title="Ajouter un cours"
+                        >
+                            ＋
+                        </td>
+
+                    `;
+
+                }
+
+            });
+
+
+            html += `
+
+                </tr>
+
+            `;
+
+        });
+
+
+        html += `
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+        <button
+            onclick="ajouterPlageHorairePrimaire()"
+            style="
+                width:100%;
+                margin-top:12px;
+                padding:13px;
+                border-radius:12px;
+                background:#1f4cff;
+                color:white;
+                font-weight:bold;
+                border:none;
+                cursor:pointer;
+                box-sizing:border-box;
+            "
+        >
+            ➕ Ajouter une plage horaire
+        </button>
+
+
+        <div style="
+            width:100%;
+            margin-top:12px;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            gap:10px;
+            flex-wrap:wrap;
+        ">
+
+            <button
+                onclick="telechargerHorairePDFPrimaire()"
+                title="PDF"
+                style="
+                    width:42px;
+                    height:42px;
+                    border-radius:50%;
+                    border:1px solid #ddd;
+                    background:white;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:18px;
+                    cursor:pointer;
+                    padding:0;
+                "
+            >
+                📄
+            </button>
+
+
+            <button
+                onclick="telechargerHoraireWordPrimaire()"
+                title="Word"
+                style="
+                    width:42px;
+                    height:42px;
+                    border-radius:50%;
+                    border:1px solid #ddd;
+                    background:white;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:18px;
+                    cursor:pointer;
+                    padding:0;
+                "
+            >
+                📝
+            </button>
+
+
+            <button
+                onclick="telechargerHoraireExcelPrimaire()"
+                title="Excel"
+                style="
+                    width:42px;
+                    height:42px;
+                    border-radius:50%;
+                    border:1px solid #ddd;
+                    background:white;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:18px;
+                    cursor:pointer;
+                    padding:0;
+                "
+            >
+                📊
+            </button>
+
+
+            <button
+                onclick="imprimerHorairePrimaire()"
+                title="Imprimer"
+                style="
+                    width:42px;
+                    height:42px;
+                    border-radius:50%;
+                    border:1px solid #ddd;
+                    background:white;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:18px;
+                    cursor:pointer;
+                    padding:0;
+                "
+            >
+                🖨️
+            </button>
+
+
+            <button
+                onclick="partagerHorairePrimaire()"
+                title="Partager"
+                style="
+                    width:42px;
+                    height:42px;
+                    border-radius:50%;
+                    border:1px solid #ddd;
+                    background:white;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:18px;
+                    cursor:pointer;
+                    padding:0;
+                "
+            >
+                🔗
+            </button>
+
+        </div>
+
+        `;
+
+
+        const zone =
+            document.querySelector(
+                ".login-box"
+            );
+
+
+        if (!zone) {
+
+            alert(
+                "Zone d'affichage introuvable."
+            );
+
+            return;
+        }
+
+
+        zone.innerHTML = html;
+
+
+    }
+    catch (error) {
+
+        hideLoader();
+
+        console.error(
+            "Erreur horaire primaire :",
+            error
+        );
+
+        alert(
+            "Erreur lors du chargement de l'horaire."
+        );
+
+    }
 
 }
+
+async function modifierHoraireCommunPrimaire(id) {
+
+    const schoolId = window.currentSchoolId;
+
+    if (!schoolId) {
+        alert("École introuvable.");
+        return;
+    }
+
+    try {
+
+        const ref = db.ref(
+            "schools/" +
+            schoolId +
+            "/horairesCommuns/heures/" +
+            id
+        );
+
+        const snap = await ref.once("value");
+
+        if (!snap.exists()) {
+            alert("Plage horaire introuvable.");
+            return;
+        }
+
+        const ligne = snap.val() || {};
+
+        /*
+         * ================================
+         * HEURE DE DÉBUT
+         * ================================
+         */
+
+        const debut = prompt(
+            "Heure de début :\n\n" +
+            "Exemple : 0730",
+            (ligne.heureDebut || "")
+                .replace("h", "")
+        );
+
+        if (debut === null) {
+            return;
+        }
+
+
+        /*
+         * ================================
+         * HEURE DE FIN
+         * ================================
+         */
+
+        const fin = prompt(
+            "Heure de fin :\n\n" +
+            "Exemple : 0820",
+            (ligne.heureFin || "")
+                .replace("h", "")
+        );
+
+        if (fin === null) {
+            return;
+        }
+
+
+        /*
+         * ================================
+         * FORMATAGE
+         * ================================
+         */
+
+        const heureDebut =
+            formaterHeurePrimaire(debut);
+
+        const heureFin =
+            formaterHeurePrimaire(fin);
+
+
+        if (!heureDebut) {
+            alert(
+                "❌ Heure de début incorrecte.\n\n" +
+                "Exemple : 0730"
+            );
+            return;
+        }
+
+
+        if (!heureFin) {
+            alert(
+                "❌ Heure de fin incorrecte.\n\n" +
+                "Exemple : 0820"
+            );
+            return;
+        }
+
+
+        /*
+         * ================================
+         * VÉRIFIER L'ORDRE
+         * ================================
+         */
+
+        const debutMinutes =
+            convertirHeureEnMinutes(
+                heureDebut
+            );
+
+        const finMinutes =
+            convertirHeureEnMinutes(
+                heureFin
+            );
+
+
+        if (finMinutes <= debutMinutes) {
+
+            alert(
+                "❌ L'heure de fin doit être " +
+                "supérieure à l'heure de début."
+            );
+
+            return;
+        }
+
+
+        /*
+         * ================================
+         * DEMANDER SI C'EST UNE PAUSE
+         * ================================
+         */
+
+        const estPause = confirm(
+
+            "Cette plage horaire est-elle une PAUSE / RÉCRÉATION ?\n\n" +
+
+            "OK = Oui, c'est une pause\n\n" +
+
+            "Annuler = Non, c'est une heure de cours"
+
+        );
+
+
+        /*
+         * ================================
+         * VÉRIFIER LES CHEVAUCHEMENTS
+         * ================================
+         */
+
+        const toutes =
+            await db.ref(
+                "schools/" +
+                schoolId +
+                "/horairesCommuns/heures"
+            ).once("value");
+
+
+        const existantes =
+            toutes.val() || {};
+
+
+        let conflit = false;
+
+
+        Object.keys(existantes).forEach(
+            otherId => {
+
+                if (otherId === id) {
+                    return;
+                }
+
+
+                const autre =
+                    existantes[otherId];
+
+
+                if (
+                    !autre ||
+                    !autre.heureDebut ||
+                    !autre.heureFin
+                ) {
+                    return;
+                }
+
+
+                const autreDebut =
+                    convertirHeureEnMinutes(
+                        autre.heureDebut
+                    );
+
+
+                const autreFin =
+                    convertirHeureEnMinutes(
+                        autre.heureFin
+                    );
+
+
+                if (
+                    debutMinutes < autreFin &&
+                    finMinutes > autreDebut
+                ) {
+
+                    conflit = true;
+
+                }
+
+            }
+        );
+
+
+        if (conflit) {
+
+            alert(
+                "❌ Cette plage chevauche " +
+                "une autre plage horaire."
+            );
+
+            return;
+        }
+
+
+        /*
+         * ================================
+         * DONNÉES À MODIFIER
+         * ================================
+         */
+
+        const donnees = {
+
+            heureDebut:
+                heureDebut,
+
+            heureFin:
+                heureFin,
+
+            heure:
+                heureDebut +
+                "-" +
+                heureFin,
+
+            type:
+                estPause
+                ? "pause"
+                : "cours",
+
+            ordre:
+                debutMinutes,
+
+            updatedAt:
+                Date.now()
+
+        };
+
+
+        /*
+         * ================================
+         * RÉCRÉATION
+         * ================================
+         */
+
+        if (estPause) {
+
+            donnees.titre =
+                "RÉCRÉATION";
+
+        } else {
+
+            /*
+             * Si on transforme une ancienne pause
+             * en heure de cours, on retire le titre.
+             */
+
+            donnees.titre = null;
+
+        }
+
+
+        /*
+         * ================================
+         * ENREGISTRER
+         * ================================
+         */
+
+        await ref.update(donnees);
+
+
+        alert(
+            estPause
+
+            ? "✅ Plage transformée en RÉCRÉATION pour toutes les classes."
+
+            : "✅ Plage enregistrée comme heure de cours pour toutes les classes."
+        );
+
+
+        /*
+         * ================================
+         * RECHARGER
+         * ================================
+         */
+
+        const classe =
+            window.classeHorairePrimaireActuelle;
+
+
+        if (classe) {
+
+            await ouvrirHoraireClassePrimaire(
+                classe
+            );
+
+        }
+
+    }
+    catch (error) {
+
+        console.error(
+            "Erreur modification horaire commun :",
+            error
+        );
+
+        alert(
+            "❌ Erreur lors de la modification."
+        );
+
+    }
+
+}
+
+function convertirHeureEnMinutes(heure) {
+
+    if (!heure) {
+        return -1;
+    }
+
+    const morceaux = String(heure).split("h");
+
+    if (morceaux.length !== 2) {
+        return -1;
+    }
+
+    const heures = parseInt(
+        morceaux[0],
+        10
+    );
+
+    const minutes = parseInt(
+        morceaux[1],
+        10
+    );
+
+    if (
+        isNaN(heures) ||
+        isNaN(minutes)
+    ) {
+        return -1;
+    }
+
+    if (
+        heures < 0 ||
+        heures > 23 ||
+        minutes < 0 ||
+        minutes > 59
+    ) {
+        return -1;
+    }
+
+    return (
+        heures * 60 +
+        minutes
+    );
+}
+
+
+function formaterHeurePrimaire(valeur) {
+
+    const chiffres =
+        String(valeur)
+        .replace(/\D/g, "");
+
+    if (chiffres.length !== 4) {
+        return null;
+    }
+
+    const heures = parseInt(
+        chiffres.substring(0, 2),
+        10
+    );
+
+    const minutes = parseInt(
+        chiffres.substring(2, 4),
+        10
+    );
+
+    if (
+        heures < 0 ||
+        heures > 23 ||
+        minutes < 0 ||
+        minutes > 59
+    ) {
+        return null;
+    }
+
+    return (
+        String(heures).padStart(2, "0") +
+        "h" +
+        String(minutes).padStart(2, "0")
+    );
+}
+
+
+async function ajouterPlageHorairePrimaire() {
+
+    const schoolId = window.currentSchoolId;
+
+    if (!schoolId) {
+        alert("École introuvable.");
+        return;
+    }
+
+
+    /*
+     * ================================
+     * HEURE DE DÉBUT
+     * ================================
+     */
+
+    const debut = prompt(
+        "Heure de début :\n\n" +
+        "Entrez 4 chiffres.\n" +
+        "Exemple : 0730 pour 07h30"
+    );
+
+    if (debut === null) {
+        return;
+    }
+
+
+    /*
+     * ================================
+     * HEURE DE FIN
+     * ================================
+     */
+
+    const fin = prompt(
+        "Heure de fin :\n\n" +
+        "Entrez 4 chiffres.\n" +
+        "Exemple : 0820 pour 08h20"
+    );
+
+    if (fin === null) {
+        return;
+    }
+
+
+    /*
+     * ================================
+     * FORMATAGE
+     * ================================
+     */
+
+    const heureDebut =
+        formaterHeurePrimaire(debut);
+
+    const heureFin =
+        formaterHeurePrimaire(fin);
+
+
+    if (!heureDebut) {
+
+        alert(
+            "❌ Heure de début incorrecte.\n\n" +
+            "Utilisez 4 chiffres.\n" +
+            "Exemple : 0730"
+        );
+
+        return;
+    }
+
+
+    if (!heureFin) {
+
+        alert(
+            "❌ Heure de fin incorrecte.\n\n" +
+            "Utilisez 4 chiffres.\n" +
+            "Exemple : 0820"
+        );
+
+        return;
+    }
+
+
+    /*
+     * ================================
+     * VÉRIFIER QUE FIN > DÉBUT
+     * ================================
+     */
+
+    const debutMinutes =
+        convertirHeureEnMinutes(
+            heureDebut
+        );
+
+    const finMinutes =
+        convertirHeureEnMinutes(
+            heureFin
+        );
+
+
+    if (finMinutes <= debutMinutes) {
+
+        alert(
+            "❌ L'heure de fin doit être " +
+            "supérieure à l'heure de début."
+        );
+
+        return;
+    }
+
+
+    /*
+     * ================================
+     * CHOISIR LE TYPE
+     * ================================
+     */
+
+    const estPause = confirm(
+
+        "Quel type de plage voulez-vous créer ?\n\n" +
+
+        "OK = PAUSE / RÉCRÉATION\n\n" +
+
+        "Annuler = COURS"
+
+    );
+
+
+    const type =
+        estPause
+        ? "pause"
+        : "cours";
+
+
+    /*
+     * ================================
+     * RÉCUPÉRER LES HORAIRES COMMUNS
+     * ================================
+     */
+
+    const ref =
+        db.ref(
+            "schools/" +
+            schoolId +
+            "/horairesCommuns/heures"
+        );
+
+
+    const snap =
+        await ref.once("value");
+
+
+    const heuresExistantes =
+        snap.val() || {};
+
+
+    /*
+     * ================================
+     * EMPÊCHER LES DOUBLONS
+     * ================================
+     */
+
+    let conflit = false;
+
+
+    Object.keys(
+        heuresExistantes
+    ).forEach(id => {
+
+        const ancienne =
+            heuresExistantes[id];
+
+
+        if (
+            !ancienne ||
+            !ancienne.heureDebut ||
+            !ancienne.heureFin
+        ) {
+            return;
+        }
+
+
+        const ancienDebut =
+            convertirHeureEnMinutes(
+                ancienne.heureDebut
+            );
+
+
+        const ancienFin =
+            convertirHeureEnMinutes(
+                ancienne.heureFin
+            );
+
+
+        /*
+         * Vérification du chevauchement
+         */
+
+        if (
+            debutMinutes < ancienFin &&
+            finMinutes > ancienDebut
+        ) {
+
+            conflit = true;
+
+        }
+
+    });
+
+
+    if (conflit) {
+
+        alert(
+            "❌ Cette plage horaire chevauche " +
+            "une plage déjà enregistrée."
+        );
+
+        return;
+    }
+
+
+    /*
+     * ================================
+     * CRÉER L'ID
+     * ================================
+     */
+
+    const id =
+        ref.push().key;
+
+
+    /*
+     * ================================
+     * DONNÉES COMMUNES
+     * ================================
+     */
+
+    const donnees = {
+
+        heureDebut:
+            heureDebut,
+
+        heureFin:
+            heureFin,
+
+        heure:
+            heureDebut +
+            "-" +
+            heureFin,
+
+        type:
+            type,
+
+        ordre:
+            debutMinutes,
+
+        createdAt:
+            Date.now()
+
+    };
+
+
+    /*
+     * ================================
+     * SI C'EST UNE PAUSE
+     * ================================
+     */
+
+    if (type === "pause") {
+
+        donnees.titre =
+            "RÉCRÉATION";
+
+    }
+
+
+    /*
+     * ================================
+     * ENREGISTRER DANS HORAIRES COMMUNS
+     * ================================
+     */
+
+    try {
+
+        await ref
+            .child(id)
+            .set(donnees);
+
+
+        /*
+         * ================================
+         * MESSAGE
+         * ================================
+         */
+
+        alert(
+
+            type === "pause"
+
+            ? "✅ Pause / récréation ajoutée.\n\n" +
+              heureDebut +
+              " - " +
+              heureFin
+
+            : "✅ Plage horaire ajoutée.\n\n" +
+              heureDebut +
+              " - " +
+              heureFin
+
+        );
+
+
+        /*
+         * ================================
+         * ACTUALISER L'HORAIRE
+         * ================================
+         */
+
+        if (
+            typeof ouvrirHoraireClassePrimaire ===
+            "function"
+        ) {
+
+            const classe =
+                window.classeHorairePrimaireActuelle;
+
+
+            if (classe) {
+
+                ouvrirHoraireClassePrimaire(
+                    classe
+                );
+
+            }
+
+        }
+
+    }
+    catch (error) {
+
+        console.error(
+            "Erreur ajout horaire commun :",
+            error
+        );
+
+
+        alert(
+            "❌ Erreur lors de l'enregistrement " +
+            "de la plage horaire."
+        );
+
+    }
+
+}
+
+function formaterHeurePrimaire(valeur) {
+
+    let chiffres =
+        String(valeur)
+        .replace(/\D/g, "");
+
+
+    if (chiffres.length !== 4) {
+        return null;
+    }
+
+
+    const heures =
+        parseInt(
+            chiffres.substring(0, 2),
+            10
+        );
+
+    const minutes =
+        parseInt(
+            chiffres.substring(2, 4),
+            10
+        );
+
+
+    if (
+        heures > 23 ||
+        minutes > 59
+    ) {
+        return null;
+    }
+
+
+    return (
+        String(heures).padStart(2, "0") +
+        "h" +
+        String(minutes).padStart(2, "0")
+    );
+
+}
+
 
 
 function enregistrerEmploiTemps(){
@@ -10532,140 +12813,590 @@ alert(error.message);
 
 function ouvrirGestionEmploiTemps(){
 
-showLoader();
+    showLoader();
 
-db.ref(
-"schools/"+window.currentSchoolId+"/emploisTemps"
-)
+    const schoolId = window.currentSchoolId;
 
-.once("value")
+    if(!schoolId){
+        hideLoader();
+        alert("École introuvable.");
+        return;
+    }
 
-.then(snapshot=>{
+    Promise.all([
 
-hideLoader();
+        db.ref(
+            "schools/" + schoolId + "/emploisTemps"
+        ).once("value"),
 
-let html=`
+        db.ref(
+            "schools/" + schoolId
+        ).once("value")
 
-<button class="back-btn"
-onclick="openAdmin()">
+    ])
+    .then(results => {
 
-⬅ Retour
+        hideLoader();
 
-</button>
+        const horairesSnap = results[0];
+        const schoolSnap = results[1];
 
-<h2 style="
-text-align:center;
-color:#1f4cff;
+        const school = schoolSnap.val() || {};
+
+        window.horairesCache = [];
+
+        horairesSnap.forEach(item => {
+
+            let e = item.val();
+
+            if(e){
+                e.id = item.key;
+                window.horairesCache.push(e);
+            }
+
+        });
+
+        // Classes de l'école
+        let classes = school.classes || [];
+
+        if(!Array.isArray(classes)){
+
+            classes = Object.values(classes);
+
+        }
+
+        // Supprimer les doublons
+        classes = [...new Set(
+            classes
+            .filter(c => c)
+            .map(c => String(c))
+        )];
+
+        classes.sort((a,b) =>
+            a.localeCompare(b, undefined, {
+                numeric:true
+            })
+        );
+
+        let html = `
+
+        <button
+            class="back-btn"
+            onclick="ouvrirEmploiTemps()"
+        >
+            ⬅ Retour
+        </button>
+
+        <h2 style="
+            text-align:center;
+            color:#1f4cff;
+            margin-top:15px;
+        ">
+            📅 Emplois du temps
+        </h2>
+
+        <div style="
+            text-align:center;
+            color:#666;
+            margin-bottom:15px;
+        ">
+            🏫 ${school.schoolName || "Mon école"}
+        </div>
+
+
+        <div style="
+            background:#f5f7ff;
+            padding:15px;
+            border-radius:15px;
+            margin-bottom:15px;
+        ">
+
+            <label style="
+                display:block;
+                font-weight:bold;
+                margin-bottom:7px;
+            ">
+                📚 Choisir une classe
+            </label>
+
+            <select
+                id="selectClasseHoraire"
+                onchange="afficherGrilleEmploiTemps()"
+                style="
+                    width:100%;
+                    padding:12px;
+                    border-radius:10px;
+                    border:1px solid #ccc;
+                    font-size:15px;
+                "
+            >
+
+                <option value="">
+                    Toutes les classes
+                </option>
+
+        `;
+
+        classes.forEach(classe => {
+
+            html += `
+                <option value="${escapeHtmlHoraire(classe)}">
+                    ${escapeHtmlHoraire(classe)}
+                </option>
+            `;
+
+        });
+
+        html += `
+
+            </select>
+
+        </div>
+
+        
+        <div style="
+    display:flex;
+    justify-content:flex-end;
+    align-items:center;
+    gap:5px;
+    margin:8px 0;
+    overflow-x:auto;
 ">
 
-📅 Gestion des emplois du temps
+   
+        <div id="grilleEmploiTemps">
 
-</h2>
+        </div>
 
-<button
-class="save-btn"
-onclick="ouvrirAjouterEmploiTemps()">
+        `;
 
-➕ Ajouter un emploi du temps
+        document.querySelector(".login-box").innerHTML = html;
 
-</button>
+        afficherGrilleEmploiTemps();
 
-`;
+    })
+    .catch(error => {
 
-if(!snapshot.exists()){
+        hideLoader();
 
-html+=`
+        console.error(
+            "Erreur horaires :",
+            error
+        );
 
-<div class="empty-box">
+        alert(
+            "Impossible de charger les horaires."
+        );
 
-Aucun emploi du temps enregistré.
-
-</div>
-
-`;
-
-}else{
-
-snapshot.forEach(item=>{
-
-let e=item.val();
-
-html+=`
-
-<div class="card">
-
-<h3>
-
-${e.matiere}
-
-</h3>
-
-<p>
-
-👨‍🏫 ${e.enseignantNom}
-
-</p>
-
-<p>
-
-🏫 ${e.classe}
-
-</p>
-
-<p>
-
-📅 ${e.jour}
-
-</p>
-
-<p>
-
-🕒 ${e.heureDebut} - ${e.heureFin}
-
-</p>
-
-<p>
-
-🚪 ${e.salle||"-"}
-
-</p>
-
-<div style="
-display:flex;
-gap:10px;
-margin-top:10px;
-">
-
-<button
-onclick="modifierEmploiTemps('${e.id}')">
-
-✏ Modifier
-
-</button>
-
-<button
-style="background:#e53935;color:#fff;"
-onclick="supprimerEmploiTemps('${e.id}')">
-
-🗑 Supprimer
-
-</button>
-
-</div>
-
-</div>
-
-`;
-
-});
+    });
 
 }
 
-document.querySelector(".login-box").innerHTML=html;
 
-});
+
+function escapeHtmlHoraire(value){
+
+    return String(value)
+        .replace(/&/g,"&amp;")
+        .replace(/</g,"&lt;")
+        .replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;")
+        .replace(/'/g,"&#039;");
 
 }
+
+
+function afficherGrilleEmploiTemps(){
+
+    const zone =
+        document.getElementById(
+            "grilleEmploiTemps"
+        );
+
+    if(!zone) return;
+
+    const select =
+        document.getElementById(
+            "selectClasseHoraire"
+        );
+
+    const classeChoisie =
+        select ? select.value : "";
+
+    let horaires =
+        window.horairesCache || [];
+
+    // Filtrer par classe
+    if(classeChoisie){
+
+        horaires = horaires.filter(e =>
+            String(e.classe) ===
+            String(classeChoisie)
+        );
+
+    }
+
+    const jours = [
+        "Lundi",
+        "Mardi",
+        "Mercredi",
+        "Jeudi",
+        "Vendredi",
+        "Samedi"
+    ];
+
+    const numeros = {
+        "Lundi":1,
+        "Mardi":2,
+        "Mercredi":3,
+        "Jeudi":4,
+        "Vendredi":5,
+        "Samedi":6
+    };
+
+    horaires.sort((a,b) => {
+
+        const jourA =
+            a.jourNumero ||
+            numeros[a.jour] ||
+            99;
+
+        const jourB =
+            b.jourNumero ||
+            numeros[b.jour] ||
+            99;
+
+        if(jourA !== jourB){
+
+            return jourA - jourB;
+
+        }
+
+        return String(
+            a.heureDebut || ""
+        ).localeCompare(
+            String(
+                b.heureDebut || ""
+            )
+        );
+
+    });
+
+
+    if(horaires.length === 0){
+
+        zone.innerHTML = `
+
+        <div class="empty-box"
+            style="
+                text-align:center;
+                padding:25px;
+            "
+        >
+
+            📭 Aucun horaire enregistré
+            ${classeChoisie
+                ? "pour cette classe."
+                : "dans cette école."
+            }
+
+            <br><br>
+
+            <button
+                onclick="ouvrirAjouterEmploiTemps()"
+            >
+                ➕ Créer le premier horaire
+            </button>
+
+        </div>
+
+        `;
+
+        return;
+
+    }
+
+
+    /*
+       Récupérer toutes les heures
+       utilisées dans la semaine.
+    */
+
+    let heures = [];
+
+    horaires.forEach(e => {
+
+        if(
+            e.heureDebut &&
+            e.heureFin
+        ){
+
+            const cle =
+                e.heureDebut +
+                "|" +
+                e.heureFin;
+
+            if(!heures.includes(cle)){
+
+                heures.push(cle);
+
+            }
+
+        }
+
+    });
+
+
+    heures.sort();
+
+
+    /*
+       GRILLE
+    */
+
+    let html = `
+
+    <div style="
+        overflow-x:auto;
+        width:100%;
+        border-radius:12px;
+    ">
+
+    <table style="
+        width:100%;
+        min-width:850px;
+        border-collapse:collapse;
+        background:white;
+    ">
+
+    <thead>
+
+    <tr>
+
+        <th style="
+            padding:10px;
+            border:1px solid #ddd;
+            background:#eef2ff;
+            min-width:95px;
+        ">
+            🕐 Heure
+        </th>
+    `;
+
+
+    jours.forEach(jour => {
+
+        html += `
+
+        <th style="
+            padding:10px;
+            border:1px solid #ddd;
+            background:#eef2ff;
+            min-width:130px;
+            text-align:center;
+        ">
+            ${jour}
+        </th>
+
+        `;
+
+    });
+
+
+    html += `
+
+    </tr>
+
+    </thead>
+
+    <tbody>
+    `;
+
+
+    heures.forEach(heure => {
+
+        const parts =
+            heure.split("|");
+
+        const debut =
+            parts[0];
+
+        const fin =
+            parts[1];
+
+        html += `
+
+        <tr>
+
+            <td style="
+                border:1px solid #ddd;
+                padding:8px;
+                text-align:center;
+                font-weight:bold;
+                white-space:nowrap;
+            ">
+
+                ${escapeHtmlHoraire(debut)}
+                <br>
+                ↓
+                <br>
+                ${escapeHtmlHoraire(fin)}
+
+            </td>
+
+        `;
+
+
+        jours.forEach(jour => {
+
+            const cours =
+                horaires.filter(e =>
+
+                    e.jour === jour &&
+
+                    e.heureDebut === debut &&
+
+                    e.heureFin === fin
+
+                );
+
+
+            html += `
+
+            <td style="
+                border:1px solid #ddd;
+                padding:6px;
+                vertical-align:top;
+                min-height:80px;
+            ">
+
+            `;
+
+
+            if(cours.length === 0){
+
+                html += `
+                    <div style="
+                        text-align:center;
+                        color:#aaa;
+                        padding:15px 5px;
+                    ">
+                        —
+                    </div>
+                `;
+
+            }
+
+
+            cours.forEach(c => {
+
+                html += `
+
+                <div style="
+                    background:#f5f7ff;
+                    border-left:4px solid #1f4cff;
+                    border-radius:8px;
+                    padding:8px;
+                    margin-bottom:5px;
+                ">
+
+                    <div style="
+                        font-weight:bold;
+                        color:#1f4cff;
+                    ">
+                        📖 ${escapeHtmlHoraire(
+                            c.matiere || "-"
+                        )}
+                    </div>
+
+                    <div style="
+                        font-size:12px;
+                        margin-top:4px;
+                    ">
+                        👨‍🏫 ${escapeHtmlHoraire(
+                            c.enseignantNom || "-"
+                        )}
+                    </div>
+
+                    <div style="
+                        font-size:12px;
+                        margin-top:3px;
+                    ">
+                        🚪 ${escapeHtmlHoraire(
+                            c.salle || "-"
+                        )}
+                    </div>
+
+                    <div style="
+                        display:flex;
+                        gap:5px;
+                        margin-top:7px;
+                    ">
+
+                        <button
+                            onclick="modifierEmploiTemps('${c.id}')"
+                            style="
+                                font-size:11px;
+                                padding:5px 7px;
+                            "
+                        >
+                            ✏️
+                        </button>
+
+                        <button
+                            onclick="supprimerEmploiTemps('${c.id}')"
+                            style="
+                                font-size:11px;
+                                padding:5px 7px;
+                                background:#e53935;
+                                color:white;
+                            "
+                        >
+                            🗑️
+                        </button>
+
+                    </div>
+
+                </div>
+
+                `;
+
+            });
+
+
+            html += `
+
+            </td>
+
+            `;
+
+        });
+
+
+        html += `
+
+        </tr>
+
+        `;
+
+    });
+
+
+    html += `
+
+    </tbody>
+
+    </table>
+
+    </div>
+
+    `;
+
+
+    zone.innerHTML = html;
+
+}
+
 
 function verifierConflit(jour,heureDebut,heureFin,enseignantPhone){
 
@@ -12102,67 +14833,451 @@ window.currentRole==='teacher'
 
 function modifierProfil(){
 
-db.ref(
-"users/"+window.currentPhone
-)
+    const phone = normalizePhone(window.currentPhone);
 
-.once("value")
+    if(!phone){
+        alert("Utilisateur introuvable.");
+        return;
+    }
 
-.then(snapshot=>{
+    showLoader();
 
-let user=
-snapshot.val();
+    db.ref("users/" + phone)
+    .once("value")
+    .then(userSnap => {
 
-document.querySelector(
-".login-box"
-).innerHTML=`
+        if(!userSnap.exists()){
+            hideLoader();
+            alert("Profil utilisateur introuvable.");
+            return;
+        }
 
-<h2>
+        const user = userSnap.val();
 
-Mon profil
+        window.currentSchoolId = user.schoolId;
 
-</h2>
+        if(!user.schoolId){
 
-<img
-src="${user.photo||''}"
-id="profilPreview"
-style="
-width:120px;
-height:120px;
-border-radius:50%;
-object-fit:cover;
-">
+            hideLoader();
 
-<input
-type="file"
-id="newPhoto"
-accept="image/*"
-onchange="
-chargerPhoto(
-'newPhoto',
-'profilPreview'
-)
-">
+            alert(
+                "Cet administrateur n'est lié à aucune école."
+            );
 
-<input
-id="newName"
-value="${user.name||''}"
->
+            return;
+        }
 
-<button
-onclick="saveProfile()"
->
 
-Enregistrer
+        return db.ref(
+            "schools/" +
+            user.schoolId
+        ).once("value");
 
-</button>
+    })
+    .then(schoolSnap => {
 
-`;
+        if(!schoolSnap) return;
 
-});
+        hideLoader();
+
+        const school = schoolSnap.val() || {};
+
+        const logo =
+            school.logo ||
+            "";
+
+        const schoolName =
+            school.schoolName ||
+            "";
+
+
+        document.querySelector(
+            ".login-box"
+        ).innerHTML = `
+
+        <div style="
+            padding:10px 5px 25px;
+        ">
+
+            <button
+                onclick="openAdmin()"
+                style="
+                    background:none;
+                    color:#1f4cff;
+                    border:none;
+                    font-size:14px;
+                    padding:5px;
+                    margin-bottom:10px;
+                "
+            >
+                ⬅ Retour
+            </button>
+
+
+            <h2 style="
+                text-align:center;
+                margin:5px 0 20px;
+                color:#1f4cff;
+            ">
+                👤 Modifier mon profil
+            </h2>
+
+
+            <!-- PHOTO / LOGO -->
+            <div style="
+                display:flex;
+                justify-content:center;
+                margin:10px 0 20px;
+            ">
+
+                <div style="
+                    position:relative;
+                    width:130px;
+                    height:130px;
+                ">
+
+                    <img
+                        id="schoolLogoEditPreview"
+                        src="${logo}"
+                        style="
+                            width:130px;
+                            height:130px;
+                            border-radius:50%;
+                            object-fit:cover;
+                            border:4px solid white;
+                            box-shadow:
+                                0 3px 15px rgba(0,0,0,.18);
+                            background:#f1f1f1;
+                            display:block;
+                        "
+                    >
+
+
+                    <!-- PETIT BOUTON COMME WHATSAPP -->
+                    <label
+                        for="newSchoolLogo"
+                        style="
+                            position:absolute;
+                            right:2px;
+                            bottom:2px;
+
+                            width:42px;
+                            height:42px;
+
+                            border-radius:50%;
+
+                            background:#1f4cff;
+                            color:white;
+
+                            display:flex;
+                            align-items:center;
+                            justify-content:center;
+
+                            font-size:20px;
+
+                            border:3px solid white;
+
+                            box-shadow:
+                                0 3px 10px
+                                rgba(0,0,0,.25);
+
+                            cursor:pointer;
+                        "
+                        title="Modifier le logo"
+                    >
+                        📷
+                    </label>
+
+
+                    <input
+                        type="file"
+                        id="newSchoolLogo"
+                        accept="image/*"
+                        style="display:none;"
+                        onchange="
+                            chargerPhoto(
+                                'newSchoolLogo',
+                                'schoolLogoEditPreview'
+                            )
+                        "
+                    >
+
+                </div>
+
+            </div>
+
+
+            <div style="
+                text-align:center;
+                font-size:13px;
+                color:#777;
+                margin-bottom:20px;
+            ">
+                Appuyez sur 📷 pour modifier
+                le logo de l'école
+            </div>
+
+
+            <!-- NOM DE L'ÉCOLE -->
+            <label style="
+                display:block;
+                font-weight:bold;
+                margin-bottom:6px;
+            ">
+                🏫 Nom de l'école
+            </label>
+
+
+            <input
+                id="newSchoolName"
+                value="${schoolName}"
+                placeholder="Nom de l'école"
+                style="
+                    width:100%;
+                    box-sizing:border-box;
+                "
+            >
+
+
+            <button
+                onclick="saveAdminSchoolProfile()"
+                style="
+                    width:100%;
+                    margin-top:15px;
+                    background:#1f4cff;
+                    color:white;
+                    border:none;
+                    padding:13px;
+                    border-radius:12px;
+                    font-size:15px;
+                    font-weight:bold;
+                "
+            >
+                💾 Enregistrer
+            </button>
+
+
+            <button
+                onclick="openAdmin()"
+                style="
+                    width:100%;
+                    margin-top:8px;
+                    background:#777;
+                    color:white;
+                    border:none;
+                    padding:11px;
+                    border-radius:12px;
+                    font-size:14px;
+                "
+            >
+                Annuler
+            </button>
+
+        </div>
+
+        `;
+
+    })
+    .catch(error => {
+
+        hideLoader();
+
+        console.error(
+            "Erreur ouverture profil :",
+            error
+        );
+
+        alert(
+            "Impossible de charger le profil."
+        );
+
+    });
 
 }
 
+async function saveAdminSchoolProfile(){
+
+    try{
+
+        const schoolId =
+            window.currentSchoolId;
+
+        if(!schoolId){
+
+            alert(
+                "École introuvable."
+            );
+
+            return;
+
+        }
+
+
+        const nameInput =
+            document.getElementById(
+                "newSchoolName"
+            );
+
+
+        if(!nameInput){
+
+            alert(
+                "Formulaire introuvable."
+            );
+
+            return;
+
+        }
+
+
+        const schoolName =
+            nameInput.value.trim();
+
+
+        if(!schoolName){
+
+            alert(
+                "Veuillez entrer le nom de l'école."
+            );
+
+            return;
+
+        }
+
+
+        showLoader();
+
+
+        /*
+         * Si une nouvelle photo a été choisie,
+         * enregistrerPhoto() récupère le nouveau
+         * logo recadré.
+         */
+
+        let nouveauLogo =
+            enregistrerPhoto();
+
+
+        /*
+         * Préparer les modifications
+         */
+
+        const updates = {
+
+            schoolName:
+                schoolName
+
+        };
+
+
+        /*
+         * Modifier le logo seulement
+         * si l'administrateur en a choisi un nouveau.
+         */
+
+        if(nouveauLogo){
+
+            updates.logo =
+                nouveauLogo;
+
+        }
+
+
+        await db.ref(
+            "schools/" +
+            schoolId
+        ).update(updates);
+
+
+        /*
+         * Mettre également le cache Admin
+         * à jour pour que l'ancien logo
+         * ne réapparaisse pas.
+         */
+
+        const cacheKey =
+            "adminData_" +
+            schoolId;
+
+
+        const cache =
+            localStorage.getItem(
+                cacheKey
+            );
+
+
+        if(cache){
+
+            try{
+
+                const data =
+                    JSON.parse(cache);
+
+
+                if(data.school){
+
+                    data.school.schoolName =
+                        schoolName;
+
+
+                    if(nouveauLogo){
+
+                        data.school.logo =
+                            nouveauLogo;
+
+                    }
+
+                }
+
+
+                localStorage.setItem(
+                    cacheKey,
+                    JSON.stringify(data)
+                );
+
+            }catch(cacheError){
+
+                console.warn(
+                    "Cache non mis à jour :",
+                    cacheError
+                );
+
+            }
+
+        }
+
+
+        hideLoader();
+
+
+        alert(
+            "✅ Profil de l'école modifié avec succès."
+        );
+
+
+        /*
+         * Revenir à l'espace Admin
+         */
+
+        openAdmin();
+
+
+    }catch(error){
+
+        hideLoader();
+
+        console.error(
+            "Erreur modification profil école :",
+            error
+        );
+
+        alert(
+            "❌ Impossible de modifier le profil de l'école."
+        );
+
+    }
+
+}
 
 function saveProfile(){
 
@@ -27547,6 +30662,296 @@ cursor:pointer;
 
 }
 
+function obtenirNomClasseHoraire(){
+
+    const select =
+        document.getElementById(
+            "selectClasseHoraire"
+        );
+
+    if(!select){
+        return "Emploi_du_temps";
+    }
+
+    return select.value
+        ? "Emploi_du_temps_" + select.value
+        : "Emploi_du_temps";
+}
+
+
+function imprimerHoraire(){
+
+    const zone =
+        document.getElementById(
+            "grilleEmploiTemps"
+        );
+
+    if(!zone){
+        alert("Aucun emploi du temps à imprimer.");
+        return;
+    }
+
+    const select =
+        document.getElementById(
+            "selectClasseHoraire"
+        );
+
+    const classe =
+        select && select.value
+        ? select.value
+        : "Toutes les classes";
+
+
+    const fenetre =
+        window.open(
+            "",
+            "_blank",
+            "width=1200,height=800"
+        );
+
+    fenetre.document.write(`
+
+        <html>
+
+        <head>
+
+            <title>
+                ${classe} - Emploi du temps
+            </title>
+
+            <style>
+
+                body{
+                    font-family:Arial,sans-serif;
+                    padding:20px;
+                }
+
+                h2{
+                    text-align:center;
+                }
+
+                .titre{
+                    text-align:center;
+                    margin-bottom:20px;
+                }
+
+                table{
+                    width:100%;
+                    border-collapse:collapse;
+                }
+
+                th,td{
+                    border:1px solid #999;
+                    padding:8px;
+                }
+
+                th{
+                    background:#eee;
+                }
+
+                button{
+                    display:none;
+                }
+
+            </style>
+
+        </head>
+
+        <body>
+
+            <h2>📅 EMPLOI DU TEMPS</h2>
+
+            <div class="titre">
+                Classe : <b>
+                    ${classe}
+                </b>
+            </div>
+
+            ${zone.innerHTML}
+
+        </body>
+
+        </html>
+
+    `);
+
+    fenetre.document.close();
+
+    fenetre.focus();
+
+    setTimeout(() => {
+
+        fenetre.print();
+
+    },500);
+
+}
+
+function telechargerHoraireWord(){
+
+    const zone =
+        document.getElementById(
+            "grilleEmploiTemps"
+        );
+
+    if(!zone){
+        alert(
+            "Aucun emploi du temps à télécharger."
+        );
+        return;
+    }
+
+    const nom =
+        obtenirNomClasseHoraire();
+
+    const contenu = `
+
+        <html>
+
+        <head>
+            <meta charset="UTF-8">
+        </head>
+
+        <body>
+
+            <h2 style="text-align:center;">
+                📅 EMPLOI DU TEMPS
+            </h2>
+
+            ${zone.innerHTML}
+
+        </body>
+
+        </html>
+
+    `;
+
+
+    const blob =
+        new Blob(
+            ["\ufeff", contenu],
+            {
+                type:
+                "application/msword"
+            }
+        );
+
+
+    const url =
+        URL.createObjectURL(blob);
+
+
+    const lien =
+        document.createElement("a");
+
+    lien.href = url;
+
+    lien.download =
+        nom + ".doc";
+
+    document.body.appendChild(lien);
+
+    lien.click();
+
+    document.body.removeChild(lien);
+
+    URL.revokeObjectURL(url);
+
+}
+
+function telechargerHorairePDF(){
+
+    const zone =
+        document.getElementById(
+            "grilleEmploiTemps"
+        );
+
+    if(!zone){
+        alert(
+            "Aucun emploi du temps à télécharger."
+        );
+        return;
+    }
+
+    if(typeof window.jspdf === "undefined"){
+
+        alert(
+            "La fonction PDF n'est pas encore chargée."
+        );
+
+        return;
+    }
+
+
+    const { jsPDF } =
+        window.jspdf;
+
+
+    const pdf =
+        new jsPDF(
+            "landscape",
+            "mm",
+            "a4"
+        );
+
+
+    const select =
+        document.getElementById(
+            "selectClasseHoraire"
+        );
+
+
+    const classe =
+        select && select.value
+        ? select.value
+        : "Toutes les classes";
+
+
+    pdf.setFontSize(16);
+
+    pdf.text(
+        "EMPLOI DU TEMPS",
+        148,
+        15,
+        {
+            align:"center"
+        }
+    );
+
+
+    pdf.setFontSize(11);
+
+    pdf.text(
+        "Classe : " + classe,
+        148,
+        22,
+        {
+            align:"center"
+        }
+    );
+
+
+    pdf.html(
+        zone,
+        {
+            x:8,
+            y:28,
+            width:281,
+
+            callback:function(doc){
+
+                doc.save(
+                    obtenirNomClasseHoraire()
+                    + ".pdf"
+                );
+
+            }
+
+        }
+    );
+
+}
+
 
 function proposerExamen(){
 
@@ -28390,9 +31795,1526 @@ alert(error.message);
 
 }
 
+function selectionnerEnseignantHoraire(){
+
+    const select =
+        document.getElementById(
+            "nouvelHoraireEnseignant"
+        );
+
+    if(!select || !window.nouvelEmploiTemps){
+        return;
+    }
+
+    const option =
+        select.options[select.selectedIndex];
+
+    window.nouvelEmploiTemps.enseignant =
+        select.value || "";
+
+    window.nouvelEmploiTemps.enseignantNom =
+        option
+        ? option.textContent.trim()
+        : "";
+
+}
+
+function selectionnerClasseHoraire(){
+
+    const select =
+        document.getElementById(
+            "nouvelHoraireClasse"
+        );
+
+    if(!select || !window.nouvelEmploiTemps){
+        return;
+    }
+
+    window.nouvelEmploiTemps.classe =
+        select.value || "";
+
+}
+
+async function ouvrirAffectationEnseignantsPrimaire() {
+
+    showLoader();
+
+    try {
+
+        const schoolId = window.currentSchoolId;
+
+        if (!schoolId) {
+            hideLoader();
+            alert("École introuvable.");
+            return;
+        }
+
+
+        const [schoolSnap, teachersSnap] = await Promise.all([
+
+            db.ref(
+                "schools/" + schoolId
+            ).once("value"),
+
+            db.ref(
+                "schools/" +
+                schoolId +
+                "/teachers"
+            ).once("value")
+
+        ]);
+
+
+        hideLoader();
+
+
+        const school =
+            schoolSnap.val() || {};
+
+
+        /*
+         * ================================
+         * RÉCUPÉRER LES CLASSES
+         * ================================
+         */
+
+        let classes =
+            school.classes || [];
+
+
+        if (!Array.isArray(classes)) {
+
+            classes =
+                Object.values(classes);
+
+        }
+
+
+        classes = [
+            ...new Set(
+
+                classes
+                    .filter(c => c)
+                    .map(c => String(c))
+
+            )
+        ];
+
+
+        classes.sort((a, b) =>
+            a.localeCompare(
+                b,
+                undefined,
+                {
+                    numeric: true
+                }
+            )
+        );
+
+
+        /*
+         * ================================
+         * RÉCUPÉRER LES ENSEIGNANTS
+         * ================================
+         */
+
+        const enseignants = [];
+
+
+        teachersSnap.forEach(item => {
+
+            const t =
+                item.val() || {};
+
+
+            const telephone =
+                t.telephone || item.key;
+
+
+            const nomComplet = [
+
+                t.nom || "",
+                t.postnom || "",
+                t.prenom || ""
+
+            ]
+            .filter(x => x)
+            .join(" ");
+
+
+            enseignants.push({
+
+                id: telephone,
+
+                nom:
+                    nomComplet ||
+                    telephone
+
+            });
+
+        });
+
+
+        /*
+         * ================================
+         * AFFECTATIONS EXISTANTES
+         * ================================
+         */
+
+        const affectations =
+            school.affectationsPrimaire || {};
+
+
+        /*
+         * ================================
+         * CONSTRUIRE L'INTERFACE
+         * ================================
+         */
+
+        let html = `
+
+        <button
+            class="back-btn"
+            onclick="ouvrirEmploiTemps()"
+        >
+            ⬅ Retour
+        </button>
+
+
+        <h2 style="
+            text-align:center;
+            color:#1f4cff;
+            margin-top:15px;
+            margin-bottom:5px;
+        ">
+            📚 Classes primaires
+        </h2>
+
+
+        <div style="
+            text-align:center;
+            color:#666;
+            font-size:13px;
+            margin-bottom:15px;
+        ">
+            Affectez l'enseignant titulaire,
+            puis appuyez sur une classe pour ouvrir
+            son emploi du temps.
+        </div>
+
+
+        <div id="listeClassesPrimaire">
+        `;
+
+
+        /*
+         * ================================
+         * AUCUNE CLASSE
+         * ================================
+         */
+
+        if (classes.length === 0) {
+
+            html += `
+
+            <div style="
+                text-align:center;
+                padding:25px;
+                background:#f5f7ff;
+                border-radius:15px;
+                color:#666;
+            ">
+                ⚠️ Aucune classe primaire configurée.
+            </div>
+
+            `;
+
+        }
+
+
+        /*
+         * ================================
+         * AFFICHER LES CLASSES
+         * ================================
+         */
+
+        classes.forEach((classe, index) => {
+
+
+            const affectation =
+                affectations[classe] || {};
+
+
+            html += `
+
+            <div style="
+                background:white;
+                border:1px solid #ddd;
+                border-radius:14px;
+                padding:12px;
+                margin-bottom:10px;
+                box-shadow:0 2px 6px rgba(0,0,0,.05);
+            ">
+
+
+                <!--
+                    NOM DE LA CLASSE
+                    CLIQUABLE POUR OUVRIR L'HORAIRE
+                -->
+
+                <div
+                    onclick="ouvrirHoraireClassePrimaire('${escapeHtmlHoraire(classe)}')"
+                    style="
+                        display:flex;
+                        justify-content:space-between;
+                        align-items:center;
+                        cursor:pointer;
+                        padding:5px;
+                        margin-bottom:10px;
+                    "
+                >
+
+                    <div>
+
+                        <div style="
+                            font-size:15px;
+                            font-weight:bold;
+                            color:#1f4cff;
+                        ">
+                            📚
+                            ${escapeHtmlHoraire(classe)}
+                        </div>
+
+                        <div style="
+                            font-size:11px;
+                            color:#888;
+                            margin-top:3px;
+                        ">
+                            Appuyer pour ouvrir l'horaire
+                        </div>
+
+                    </div>
+
+
+                    <div style="
+                        font-size:22px;
+                    ">
+                        ➜
+                    </div>
+
+                </div>
+
+
+                <!--
+                    ENSEIGNANT TITULAIRE
+                -->
+
+                <div style="
+                    font-size:12px;
+                    font-weight:bold;
+                    color:#555;
+                    margin-bottom:5px;
+                ">
+                    👨‍🏫 Enseignant titulaire
+                </div>
+
+
+                <select
+                    id="enseignantClasse_${index}"
+                    data-classe="${escapeHtmlHoraire(classe)}"
+                    style="
+                        width:100%;
+                        padding:11px;
+                        border-radius:9px;
+                        border:1px solid #ccc;
+                        box-sizing:border-box;
+                        background:white;
+                    "
+                >
+
+                    <option value="">
+                        Choisir l'enseignant
+                    </option>
+
+            `;
+
+
+            /*
+             * ================================
+             * OPTIONS ENSEIGNANTS
+             * ================================
+             */
+
+            enseignants.forEach(enseignant => {
+
+
+                const selected =
+                    affectation.enseignant ===
+                    enseignant.id
+                    ? "selected"
+                    : "";
+
+
+                html += `
+
+                    <option
+                        value="${escapeHtmlHoraire(
+                            enseignant.id
+                        )}"
+                        ${selected}
+                    >
+                        ${escapeHtmlHoraire(
+                            enseignant.nom
+                        )}
+                    </option>
+
+                `;
+
+            });
+
+
+            html += `
+
+                </select>
+
+
+                ${
+                    affectation.enseignantNom
+                    ? `
+                    <div style="
+                        margin-top:6px;
+                        font-size:11px;
+                        color:#2e7d32;
+                    ">
+                        ✅ Titulaire :
+                        ${escapeHtmlHoraire(
+                            affectation.enseignantNom
+                        )}
+                    </div>
+                    `
+                    : ""
+                }
+
+
+            </div>
+
+            `;
+
+        });
+
+
+        html += `
+
+        </div>
+
+
+        <!--
+            ENREGISTRER LES AFFECTATIONS
+        -->
+
+        <button
+            onclick="enregistrerAffectationsPrimaire()"
+            style="
+                width:100%;
+                margin-top:5px;
+                padding:13px;
+                border-radius:12px;
+                background:#1f4cff;
+                color:white;
+                font-weight:bold;
+                border:none;
+                cursor:pointer;
+            "
+        >
+            💾 Enregistrer les affectations
+        </button>
+
+
+        `;
+
+
+        /*
+         * ================================
+         * AFFICHER
+         * ================================
+         */
+
+        const zone =
+            document.querySelector(
+                ".login-box"
+            );
+
+
+        if (!zone) {
+
+            alert(
+                "Zone d'affichage introuvable."
+            );
+
+            return;
+
+        }
+
+
+        zone.innerHTML = html;
+
+
+    }
+    catch(error) {
+
+        hideLoader();
+
+        console.error(
+            "Erreur affectation enseignants primaire :",
+            error
+        );
+
+
+        alert(
+            "Impossible de charger les classes et les enseignants."
+        );
+
+    }
+
+}
+
+async function ouvrirCoursPrimaire(idHeure, jour) {
+
+    const classe =
+        window.classeHorairePrimaireActuelle;
+
+    if (!classe) {
+        alert("Classe introuvable.");
+        return;
+    }
+
+
+    const schoolId =
+        window.currentSchoolId;
+
+    if (!schoolId) {
+        alert("École introuvable.");
+        return;
+    }
+
+
+    try {
+
+        /*
+         * ==========================================
+         * RÉCUPÉRER LA PLAGE HORAIRE COMMUNE
+         * ==========================================
+         */
+
+        const snapshot =
+            await db.ref(
+                "schools/" +
+                schoolId +
+                "/horairesCommuns/heures/" +
+                idHeure
+            ).once("value");
+
+
+        if (!snapshot.exists()) {
+
+            alert(
+                "Plage horaire introuvable dans les horaires communs."
+            );
+
+            return;
+        }
+
+
+        const ligne =
+            snapshot.val() || {};
+
+
+        /*
+         * ==========================================
+         * SI C'EST UNE PAUSE
+         * ==========================================
+         */
+
+        if (ligne.type === "pause") {
+
+            alert(
+                "Cette plage est une pause / récréation."
+            );
+
+            return;
+        }
+
+
+        /*
+         * ==========================================
+         * AFFICHER LE FORMULAIRE
+         * ==========================================
+         */
+
+        const matiere =
+            prompt(
+                "Matière pour " +
+                jour +
+                " :"
+            );
+
+
+        if (matiere === null) {
+            return;
+        }
+
+
+        if (!matiere.trim()) {
+
+            alert(
+                "Veuillez entrer une matière."
+            );
+
+            return;
+        }
+
+
+        /*
+         * ==========================================
+         * ENREGISTRER LE COURS
+         *
+         * Les heures restent communes.
+         * Le cours appartient uniquement
+         * à la classe actuellement ouverte.
+         * ==========================================
+         */
+
+        await db.ref(
+            "schools/" +
+            schoolId +
+            "/emploisTempsPrimaire/" +
+            encodeURIComponent(classe) +
+            "/cours/" +
+            idHeure +
+            "/jours/" +
+            jour
+        ).set({
+
+            matiere:
+                matiere.trim(),
+
+            jour:
+                jour,
+
+            classe:
+                classe,
+
+            heureDebut:
+                ligne.heureDebut || "",
+
+            heureFin:
+                ligne.heureFin || "",
+
+            createdAt:
+                Date.now()
+
+        });
+
+
+        /*
+         * ==========================================
+         * MESSAGE
+         * ==========================================
+         */
+
+        alert(
+            "✅ Cours enregistré pour " +
+            classe +
+            " — " +
+            jour
+        );
+
+
+        /*
+         * ==========================================
+         * RECHARGER LE TABLEAU
+         * ==========================================
+         */
+
+        await ouvrirHoraireClassePrimaire(
+            classe
+        );
+
+
+    }
+    catch (error) {
+
+        console.error(
+            "Erreur ajout cours primaire :",
+            error
+        );
+
+        alert(
+            "❌ Erreur lors de l'enregistrement du cours."
+        );
+
+    }
+
+}
+
+
+async function enregistrerAffectationsPrimaire() {
+
+    const schoolId =
+        window.currentSchoolId;
+
+    if (!schoolId) {
+
+        alert(
+            "École introuvable."
+        );
+
+        return;
+    }
+
+
+    const selects =
+        document.querySelectorAll(
+            "#listeClassesPrimaire select"
+        );
+
+
+    const affectations = {};
+
+
+    selects.forEach(select => {
+
+        const classe =
+            select.dataset.classe;
+
+        const enseignant =
+            select.value;
+
+
+        if (classe && enseignant) {
+
+            const option =
+                select.options[
+                    select.selectedIndex
+                ];
+
+
+            affectations[classe] = {
+
+                enseignant:
+                    enseignant,
+
+                enseignantNom:
+                    option
+                    ? option.textContent.trim()
+                    : ""
+
+            };
+
+        }
+
+    });
+
+
+    if (
+        Object.keys(affectations).length === 0
+    ) {
+
+        alert(
+            "Aucune affectation à enregistrer."
+        );
+
+        return;
+    }
+
+
+    showLoader();
+
+
+    try {
+
+        await db.ref(
+            "schools/" +
+            schoolId +
+            "/affectationsPrimaire"
+        ).set(
+            affectations
+        );
+
+
+        hideLoader();
+
+
+        alert(
+            "✅ Les enseignants titulaires ont été affectés aux classes."
+        );
+
+
+    }
+    catch(error) {
+
+        hideLoader();
+
+        console.error(
+            "Erreur enregistrement affectations :",
+            error
+        );
+
+        alert(
+            "Erreur lors de l'enregistrement."
+        );
+
+    }
+
+}
+
 function modifierProfilEnseignant(){
 
 alert("La modification du profil sera disponible dans une prochaine mise à jour.");
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* =========================================================
+   1. TÉLÉCHARGER EN PDF
+   ========================================================= */
+
+async function telechargerHorairePDFPrimaire() {
+
+    const tableau = document.getElementById(
+        "tableauHorairePrimaire"
+    );
+
+    if (!tableau) {
+        alert("Le tableau de l'horaire est introuvable.");
+        return;
+    }
+
+    const classe =
+        window.classeHorairePrimaireActuelle ||
+        "Classe primaire";
+
+
+    /*
+     * Si jsPDF est déjà disponible dans le projet
+     */
+
+    if (
+        typeof window.jspdf !== "undefined" &&
+        window.jspdf.jsPDF
+    ) {
+
+        try {
+
+            const PDF =
+                window.jspdf.jsPDF;
+
+            const pdf =
+                new PDF({
+                    orientation: "landscape",
+                    unit: "mm",
+                    format: "a4"
+                });
+
+
+            pdf.setFontSize(16);
+
+            pdf.text(
+                "EMPLOI DU TEMPS",
+                148,
+                15,
+                {
+                    align: "center"
+                }
+            );
+
+
+            pdf.setFontSize(11);
+
+            pdf.text(
+                String(classe),
+                148,
+                22,
+                {
+                    align: "center"
+                }
+            );
+
+
+            /*
+             * Vérifier AutoTable
+             */
+
+            if (
+                typeof pdf.autoTable === "function"
+            ) {
+
+                pdf.autoTable({
+
+                    html:
+                        "#tableauHorairePrimaire",
+
+                    startY: 28,
+
+                    theme: "grid",
+
+                    styles: {
+                        fontSize: 8,
+                        cellPadding: 3,
+                        halign: "center",
+                        valign: "middle"
+                    },
+
+                    headStyles: {
+                        fontSize: 8,
+                        halign: "center"
+                    }
+
+                });
+
+                pdf.save(
+                    "Horaire-" +
+                    String(classe) +
+                    ".pdf"
+                );
+
+                return;
+            }
+
+        }
+        catch (error) {
+
+            console.error(
+                "Erreur PDF :",
+                error
+            );
+
+        }
+
+    }
+
+
+    /*
+     * Si jsPDF n'est pas installé,
+     * proposer l'impression en PDF.
+     */
+
+    alert(
+        "Le module PDF n'est pas disponible. " +
+        "La fenêtre d'impression va s'ouvrir. " +
+        "Choisissez « Enregistrer au format PDF »."
+    );
+
+    imprimerHorairePrimaire();
+
+}
+
+
+
+/* =========================================================
+   2. TÉLÉCHARGER EN WORD
+   ========================================================= */
+
+function telechargerHoraireWordPrimaire() {
+
+    const tableau =
+        document.getElementById(
+            "tableauHorairePrimaire"
+        );
+
+
+    if (!tableau) {
+
+        alert(
+            "Le tableau de l'horaire est introuvable."
+        );
+
+        return;
+    }
+
+
+    const classe =
+        window.classeHorairePrimaireActuelle ||
+        "Classe primaire";
+
+
+    const contenuTableau =
+        tableau.outerHTML;
+
+
+    const contenuWord = `
+
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>
+Emploi du temps ${classe}
+</title>
+
+<style>
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 25px;
+}
+
+h1 {
+    text-align: center;
+    font-size: 20px;
+}
+
+h2 {
+    text-align: center;
+    font-size: 15px;
+    margin-bottom: 20px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th,
+td {
+    border: 1px solid #000;
+    padding: 8px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+th {
+    background: #eeeeee;
+    font-weight: bold;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>
+EMPLOI DU TEMPS
+</h1>
+
+<h2>
+${classe}
+</h2>
+
+${contenuTableau}
+
+</body>
+
+</html>
+`;
+
+
+    const blob =
+        new Blob(
+            [contenuWord],
+            {
+                type:
+                    "application/msword"
+            }
+        );
+
+
+    const url =
+        URL.createObjectURL(blob);
+
+
+    const lien =
+        document.createElement("a");
+
+
+    lien.href = url;
+
+    lien.download =
+        "Horaire-" +
+        String(classe) +
+        ".doc";
+
+
+    document.body.appendChild(
+        lien
+    );
+
+
+    lien.click();
+
+
+    document.body.removeChild(
+        lien
+    );
+
+
+    URL.revokeObjectURL(
+        url
+    );
+
+}
+
+
+
+/* =========================================================
+   3. TÉLÉCHARGER EN EXCEL
+   ========================================================= */
+
+function telechargerHoraireExcelPrimaire() {
+
+    const tableau =
+        document.getElementById(
+            "tableauHorairePrimaire"
+        );
+
+
+    if (!tableau) {
+
+        alert(
+            "Le tableau de l'horaire est introuvable."
+        );
+
+        return;
+    }
+
+
+    const classe =
+        window.classeHorairePrimaireActuelle ||
+        "Classe primaire";
+
+
+    /*
+     * Copier le tableau
+     */
+
+    const tableauCopie =
+        tableau.cloneNode(true);
+
+
+    /*
+     * Créer le document Excel
+     */
+
+    const contenuExcel = `
+
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+
+</head>
+
+<body>
+
+<h2>
+EMPLOI DU TEMPS
+</h2>
+
+<h3>
+${classe}
+</h3>
+
+${tableauCopie.outerHTML}
+
+</body>
+
+</html>
+`;
+
+
+    const blob =
+        new Blob(
+            [contenuExcel],
+            {
+                type:
+                    "application/vnd.ms-excel"
+            }
+        );
+
+
+    const url =
+        URL.createObjectURL(blob);
+
+
+    const lien =
+        document.createElement("a");
+
+
+    lien.href = url;
+
+
+    lien.download =
+        "Horaire-" +
+        String(classe) +
+        ".xls";
+
+
+    document.body.appendChild(
+        lien
+    );
+
+
+    lien.click();
+
+
+    document.body.removeChild(
+        lien
+    );
+
+
+    URL.revokeObjectURL(
+        url
+    );
+
+}
+
+
+
+/* =========================================================
+   4. IMPRIMER
+   ========================================================= */
+
+function imprimerHorairePrimaire() {
+
+    const tableau =
+        document.getElementById(
+            "tableauHorairePrimaire"
+        );
+
+
+    if (!tableau) {
+
+        alert(
+            "Le tableau de l'horaire est introuvable."
+        );
+
+        return;
+    }
+
+
+    const classe =
+        window.classeHorairePrimaireActuelle ||
+        "Classe primaire";
+
+
+    const fenetre =
+        window.open(
+            "",
+            "_blank",
+            "width=1000,height=700"
+        );
+
+
+    if (!fenetre) {
+
+        alert(
+            "Impossible d'ouvrir la fenêtre d'impression. " +
+            "Vérifiez que les fenêtres pop-up sont autorisées."
+        );
+
+        return;
+    }
+
+
+    fenetre.document.write(`
+
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>
+Horaire ${classe}
+</title>
+
+<style>
+
+@page {
+    size: landscape;
+    margin: 10mm;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+}
+
+h1 {
+    text-align: center;
+    font-size: 20px;
+    margin-bottom: 5px;
+}
+
+h2 {
+    text-align: center;
+    font-size: 15px;
+    margin-top: 0;
+    margin-bottom: 20px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th,
+td {
+    border: 1px solid #000;
+    padding: 8px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+th {
+    background: #eeeeee;
+    font-weight: bold;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>
+EMPLOI DU TEMPS
+</h1>
+
+<h2>
+${classe}
+</h2>
+
+${tableau.outerHTML}
+
+<script>
+
+window.onload = function() {
+
+    window.print();
+
+};
+
+<\/script>
+
+</body>
+
+</html>
+
+`);
+
+
+    fenetre.document.close();
+
+}
+
+
+
+/* =========================================================
+   5. PARTAGER
+   ========================================================= */
+
+async function partagerHorairePrimaire() {
+
+    const tableau =
+        document.getElementById(
+            "tableauHorairePrimaire"
+        );
+
+
+    if (!tableau) {
+
+        alert(
+            "Le tableau de l'horaire est introuvable."
+        );
+
+        return;
+    }
+
+
+    const classe =
+        window.classeHorairePrimaireActuelle ||
+        "Classe primaire";
+
+
+    /*
+     * Utiliser le partage Android
+     * si le navigateur le permet.
+     */
+
+    if (
+        navigator.share
+    ) {
+
+        try {
+
+            await navigator.share({
+
+                title:
+                    "Emploi du temps - " +
+                    String(classe),
+
+                text:
+                    "Voici l'emploi du temps de " +
+                    String(classe) +
+                    "."
+
+            });
+
+            return;
+
+        }
+        catch (error) {
+
+            /*
+             * L'utilisateur peut avoir
+             * annulé le partage.
+             */
+
+            if (
+                error &&
+                error.name === "AbortError"
+            ) {
+
+                return;
+
+            }
+
+            console.error(
+                "Erreur partage :",
+                error
+            );
+
+        }
+
+    }
+
+
+    /*
+     * Si le téléphone ne possède pas
+     * Web Share API : copier le texte.
+     */
+
+    let texte =
+        "EMPLOI DU TEMPS\n\n" +
+        String(classe) +
+        "\n\n";
+
+
+    const lignes =
+        tableau.querySelectorAll(
+            "tr"
+        );
+
+
+    lignes.forEach(ligne => {
+
+        const cellules =
+            ligne.querySelectorAll(
+                "th, td"
+            );
+
+
+        let ligneTexte = "";
+
+
+        cellules.forEach(cellule => {
+
+            const valeur =
+                cellule.innerText.trim();
+
+
+            if (ligneTexte) {
+
+                ligneTexte +=
+                    " | ";
+
+            }
+
+
+            ligneTexte +=
+                valeur;
+
+        });
+
+
+        if (ligneTexte) {
+
+            texte +=
+                ligneTexte +
+                "\n";
+
+        }
+
+    });
+
+
+    try {
+
+        await navigator.clipboard.writeText(
+            texte
+        );
+
+
+        alert(
+            "L'horaire a été copié. " +
+            "Vous pouvez maintenant le coller dans WhatsApp, Messenger, etc."
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "Erreur copie :",
+            error
+        );
+
+
+        alert(
+            "Le partage n'est pas disponible sur cet appareil."
+        );
+
+    }
 
 }
 
