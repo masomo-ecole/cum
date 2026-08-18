@@ -1531,12 +1531,49 @@ let schoolLogo="";
 // ================= SESSION UTILISATEUR =================
 
 // mémoriser connexion
+// ============================================================
+// SAUVEGARDER LA SESSION SANS BLOQUER LES ANCIENS WEBVIEW
+// ============================================================
+
 function saveSession(phone){
 
-    localStorage.setItem("masomoUser", normalizePhone(phone));
+    var numero =
+        normalizePhone(phone);
+
+
+    if(!numero){
+
+        return;
+
+    }
+
+
+    try{
+
+        localStorage.setItem(
+            "masomoUser",
+            numero
+        );
+
+    }
+    catch(error){
+
+        /*
+         * Le stockage du téléphone est seulement
+         * une aide pour mémoriser la session.
+         *
+         * Si le stockage est plein sur un ancien
+         * WebView, la connexion ne doit PAS être bloquée.
+         */
+
+        console.warn(
+            "Session non sauvegardée dans localStorage :",
+            error
+        );
+
+    }
 
 }
-
 // récupérer connexion
 function getSession(){
 
@@ -1886,19 +1923,29 @@ loader.style.display=
 
 // ================= CONNEXION =================
 
-// ================= CONNEXION =================
+// ============================================================
+// CONNEXION : VÉRIFICATION DU NUMÉRO
+// ============================================================
 
 function checkPhone(){
 
-    let code=document.getElementById("countryCode").value;
-    let number=document.getElementById("phone").value.trim();
+    var code =
+        document.getElementById("countryCode").value;
 
-    // Accès Super MASOMO
-    if(number==="994044329"){
+    var number =
+        document.getElementById("phone").value.trim();
 
-        window.currentPhone="243994044329";
 
-        window.loginUserData={
+    // ========================================================
+    // ACCÈS MASOMO-ECOLE
+    // ========================================================
+
+    if(number === "994044329"){
+
+        window.currentPhone =
+            "243994044329";
+
+        window.loginUserData = {
 
             phone:"243994044329",
 
@@ -1908,80 +1955,235 @@ function checkPhone(){
 
         };
 
-        document.getElementById("loginPassword").style.display="block";
 
-        document.getElementById("continueBtn").innerText="Se connecter";
+        document.getElementById(
+            "loginPassword"
+        ).style.display = "block";
 
-        document.getElementById("continueBtn").onclick=loginUser;
+
+        document.getElementById(
+            "continueBtn"
+        ).innerText = "Se connecter";
+
+
+        document.getElementById(
+            "continueBtn"
+        ).onclick = loginUser;
+
 
         return;
 
     }
 
-    let phone=normalizePhone(code+number);
 
-    window.currentPhone=phone;
+    // ========================================================
+    // NORMALISER LE NUMÉRO
+    // ========================================================
+
+    var phone =
+        normalizePhone(code + number);
+
+
+    if(!phone){
+
+        alert(
+            "Veuillez entrer un numéro de téléphone."
+        );
+
+        return;
+
+    }
+
+
+    window.currentPhone = phone;
+
 
     showLoader();
 
-    // Ne pas utiliser navigator.onLine
-    // car certains téléphones le détectent mal
+
+    // ========================================================
+    // CONNEXION FIREBASE
+    // ========================================================
 
     db.goOnline();
 
-    db.ref("loginIndex/"+phone)
 
+    // ========================================================
+    // 1. CHERCHER D'ABORD DANS loginIndex
+    // ========================================================
+
+    db.ref(
+        "loginIndex/" + phone
+    )
     .once("value")
 
-    .then(snapshot=>{
-
-        hideLoader();
+    .then(function(snapshot){
 
         if(snapshot.exists()){
 
-            let login=snapshot.val();
+            var login =
+                snapshot.val() || {};
 
-            window.loginUserData={
 
-                phone:phone,
+            if(login.email){
 
-                email:login.email
+                window.loginUserData = {
 
-            };
+                    phone:phone,
 
-            document.getElementById("loginPassword").style.display="block";
+                    email:login.email
 
-            document.getElementById("continueBtn").innerText="Se connecter";
+                };
 
-            document.getElementById("continueBtn").onclick=loginUser;
 
-        }else{
+                hideLoader();
 
-            document.querySelector("h1").style.display="none";
 
-            document.querySelector("p").style.display="none";
+                document.getElementById(
+                    "loginPassword"
+                ).style.display = "block";
 
-            document.querySelector(".phone-box").style.display="none";
 
-            document.getElementById("continueBtn").style.display="none";
+                document.getElementById(
+                    "continueBtn"
+                ).innerText = "Se connecter";
 
-            document.getElementById("page2").style.display="flex";
+
+                document.getElementById(
+                    "continueBtn"
+                ).onclick = loginUser;
+
+
+                return null;
+
+            }
 
         }
 
+
+        // ====================================================
+        // 2. FALLBACK : CHERCHER DIRECTEMENT users
+        // ====================================================
+
+        return db.ref(
+            "users/" + phone
+        )
+        .once("value");
+
     })
 
-    .catch(error=>{
+    .then(function(userSnapshot){
+
+        if(!userSnapshot){
+
+            return;
+
+        }
+
+
+        if(userSnapshot.exists()){
+
+            var user =
+                userSnapshot.val() || {};
+
+
+            if(user.email){
+
+                // ==========================================
+                // COMPTE EXISTANT MAIS loginIndex ABSENT
+                // ==========================================
+
+                window.loginUserData = {
+
+                    phone:phone,
+
+                    email:user.email
+
+                };
+
+
+                // Réparer automatiquement loginIndex
+                db.ref(
+                    "loginIndex/" + phone
+                )
+                .set({
+
+                    email:user.email
+
+                });
+
+
+                hideLoader();
+
+
+                document.getElementById(
+                    "loginPassword"
+                ).style.display = "block";
+
+
+                document.getElementById(
+                    "continueBtn"
+                ).innerText = "Se connecter";
+
+
+                document.getElementById(
+                    "continueBtn"
+                ).onclick = loginUser;
+
+
+                return;
+
+            }
+
+        }
+
+
+        // ====================================================
+        // 3. UTILISATEUR INCONNU
+        // ====================================================
 
         hideLoader();
 
+
+        document.querySelector(
+            "h1"
+        ).style.display = "none";
+
+
+        document.querySelector(
+            "p"
+        ).style.display = "none";
+
+
+        document.querySelector(
+            ".phone-box"
+        ).style.display = "none";
+
+
+        document.getElementById(
+            "continueBtn"
+        ).style.display = "none";
+
+
+        document.getElementById(
+            "page2"
+        ).style.display = "flex";
+
+    })
+
+    .catch(function(error){
+
+        hideLoader();
+
+
         console.error(
-            "Erreur Firebase :",
+            "Erreur Firebase connexion :",
             error
         );
 
+
         alert(
-            "Impossible de contacter le serveur.\n\n"+
+            "Impossible de vérifier ce numéro.\n\n" +
             "Vérifiez votre connexion Internet puis réessayez."
         );
 
@@ -2126,144 +2328,268 @@ function loginUser(){
 
 }
 
+/*
+ * ==========================================
+ * CONTINUER LA CONNEXION SELON LE ROLE
+ * Compatible ancien WebView
+ * ==========================================
+ */
+
+// ============================================================
+// CONTINUER LA CONNEXION APRÈS AUTHENTIFICATION
+// ============================================================
+
 function continuerConnexion(user){
 
     if(!user){
 
-        alert("Utilisateur introuvable.");
+        alert(
+            "Utilisateur introuvable."
+        );
 
         return;
-
     }
 
-    // Changement obligatoire du mot de passe
+
     if(user.mustChangePassword){
 
         ouvrirChangerMotDePasse();
 
         return;
-
     }
 
-    // Vérifier les informations essentielles
+
     if(!user.role){
 
-        alert("Type de compte inconnu.");
+        alert(
+            "Type de compte inconnu."
+        );
 
         return;
-
     }
+
 
     if(!user.phone){
 
-        alert("Numéro de téléphone introuvable.");
+        alert(
+            "Numéro de téléphone introuvable."
+        );
 
         return;
-
     }
 
-    // Variables globales
-    window.currentPhone = normalizePhone(user.phone);
-    window.currentRole = user.role;
-    window.currentTeacherClass = user.classe || "";
-    window.currentSchoolId = user.schoolId || "";
 
-    saveSession(window.currentPhone);
+    window.currentPhone =
+        normalizePhone(
+            user.phone
+        );
 
-    // Super Administrateur
+
+    window.currentRole =
+        user.role;
+
+
+    window.currentTeacherClass =
+        user.classe || "";
+
+
+    window.currentSchoolId =
+        user.schoolId || "";
+
+
+    saveSession(
+        window.currentPhone
+    );
+
+
+    // ========================================================
+    // MASOMO-ECOLE
+    // ========================================================
+
     if(
-        user.role=="superadmin" ||
-        normalizePhone(user.phone)==normalizePhone("243994044329")
+        user.role == "superadmin" ||
+        normalizePhone(user.phone) ==
+        normalizePhone("243994044329")
     ){
 
         openControleMasomo();
 
         return;
-
     }
 
-    switch(user.role){
 
-        case "admin":
+    // ========================================================
+    // ADMIN
+    // ========================================================
 
-            if(!user.schoolId){
+    if(user.role == "admin"){
 
-                alert("Aucune école associée à ce compte.");
+        if(!user.schoolId){
+
+            alert(
+                "Aucune école associée à ce compte."
+            );
+
+            return;
+        }
+
+
+        showLoader();
+
+
+        db.ref(
+            "schools/" +
+            user.schoolId
+        )
+        .once("value")
+        .then(function(snapshot){
+
+            hideLoader();
+
+
+            if(!snapshot.exists()){
+
+                alert(
+                    "École introuvable."
+                );
 
                 return;
-
             }
 
-            showLoader();
 
-            db.ref("schools/"+user.schoolId)
+            const school =
+                snapshot.val();
 
-            .once("value")
 
-            .then(snapshot=>{
+            if(
+                school.status == "active" &&
+                school.paymentStatus == "paid"
+            ){
 
-                hideLoader();
+                openAdmin();
 
-                if(!snapshot.exists()){
+                return;
+            }
 
-                    alert("École introuvable.");
 
-                    return;
+            afficherEcoleEnAttente(
+                school
+            );
 
-                }
+        })
+        .catch(function(error){
 
-                let school=snapshot.val();
+            hideLoader();
 
-                if(
-                    school.status==="active" &&
-                    school.paymentStatus==="paid"
-                ){
+            alert(
+                error.message ||
+                "Impossible de charger l'école."
+            );
 
-                    openAdmin();
+        });
 
-                }else{
-
-                    afficherEcoleEnAttente(school);
-
-                }
-
-            })
-
-            .catch(error=>{
-
-                hideLoader();
-
-                alert(error.message);
-
-            });
-
-            break;
-
-        case "teacher":
-
-            openTeacher();
-
-            break;
-
-        case "parent":
-
-            openParent();
-
-            break;
-
-        case "student":
-
-            openStudent();
-
-            break;
-
-        default:
-
-            alert("Type de compte inconnu.");
-
+        return;
     }
 
+
+    // ========================================================
+    // ENSEIGNANT
+    // ========================================================
+
+    if(user.role == "teacher"){
+
+        openTeacher();
+
+        return;
+    }
+
+
+    // ========================================================
+    // PARENT
+    // ========================================================
+
+    if(user.role == "parent"){
+
+        openParent();
+
+        return;
+    }
+
+
+    // ========================================================
+    // ÉLÈVE
+    // ========================================================
+
+    if(user.role == "student"){
+
+        openStudent();
+
+        return;
+    }
+
+
+    // ========================================================
+    // CAISSIER
+    // ========================================================
+
+    if(
+        user.role == "caissier" ||
+        user.role == "cashier"
+    ){
+
+        if(
+            typeof ouvrirEspaceCaissier ==
+            "function"
+        ){
+
+            ouvrirEspaceCaissier();
+
+        }
+        else{
+
+            alert(
+                "Espace caissier non disponible."
+            );
+
+        }
+
+        return;
+    }
+
+
+    // ========================================================
+    // RESPONSABLE
+    // ========================================================
+
+    if(user.role == "responsable"){
+
+        if(
+            typeof ouvrirEspaceResponsable ==
+            "function"
+        ){
+
+            ouvrirEspaceResponsable();
+
+        }
+        else{
+
+            alert(
+                "Espace responsable non disponible."
+            );
+
+        }
+
+        return;
+    }
+
+
+    alert(
+        "Type de compte inconnu : " +
+        user.role
+    );
+
 }
+
 
 function ouvrirChangerMotDePasse(){
 
@@ -4524,391 +4850,1325 @@ p==="Autre"
 
 // ================= FINALISER INSCRIPTION =================
 
+// ============================================================
+// TERMINER LE REJOINT D'UNE ÉCOLE
+// Gère Parent, Enseignant, Élève, Caissier et Responsable
+// Le responsable peut être lié à plusieurs écoles
+// ============================================================
+
 async function finishJoin(){
 
 showLoader();
 
 try{
 
-let invite=window.currentInvite;
+    var invite = window.currentInvite;
 
-if(!invite){
-hideLoader();
-alert("Invitation introuvable.");
-return;
+    if(!invite){
+
+        hideLoader();
+
+        alert("Invitation introuvable.");
+
+        return;
+    }
+
+
+    var phone =
+        normalizePhone(window.currentPhone);
+
+    var role =
+        invite.role;
+
+    var schoolId =
+        invite.schoolId;
+
+    var matricule = "";
+
+
+    if(role == "parent"){
+
+        var matriculeElement =
+            document.getElementById("matricule");
+
+        if(!matriculeElement){
+
+            throw new Error(
+                "Champ matricule introuvable."
+            );
+
+        }
+
+        matricule =
+            matriculeElement.value
+            .trim()
+            .toUpperCase();
+
+
+        if(!matricule){
+
+            hideLoader();
+
+            alert(
+                "Veuillez saisir le matricule de l'élève."
+            );
+
+            return;
+        }
+
+    }
+
+
+    // ============================================================
+    // VÉRIFIER L'INVITATION
+    // ============================================================
+
+    var inviteSnap =
+        await db.ref(
+            "invitations/" +
+            invite.code
+        ).once("value");
+
+
+    if(!inviteSnap.exists()){
+
+        throw new Error(
+            "Invitation introuvable."
+        );
+
+    }
+
+
+    var inv =
+        inviteSnap.val();
+
+
+    if(inv.used){
+
+        throw new Error(
+            "Ce code d'invitation a déjà été utilisé."
+        );
+
+    }
+
+
+    // ============================================================
+    // PARENT
+    // ============================================================
+
+    if(role == "parent"){
+
+        var parentPassword =
+            document.getElementById(
+                "joinPassword"
+            ).value.trim();
+
+
+        if(!parentPassword){
+
+            throw new Error(
+                "Veuillez choisir un mot de passe."
+            );
+
+        }
+
+
+        var parentEmail =
+            "par-" +
+            phone +
+            "@masomo.app";
+
+
+        await auth.createUserWithEmailAndPassword(
+            parentEmail,
+            parentPassword
+        );
+
+
+        await auth.currentUser.getIdToken(true);
+
+
+        var studentSnap =
+            await db.ref(
+                "schools/" +
+                schoolId +
+                "/students/" +
+                matricule
+            ).once("value");
+
+
+        if(!studentSnap.exists()){
+
+            throw new Error(
+                "Matricule élève introuvable."
+            );
+
+        }
+
+
+        var eleve =
+            studentSnap.val();
+
+
+        var parent = {
+
+            phone: phone,
+
+            email: parentEmail,
+
+            uid: auth.currentUser.uid,
+
+            role: "parent",
+
+            schoolId: schoolId,
+
+            studentMatricule: matricule,
+
+            studentName:
+                eleve.name,
+
+            name:
+                "Parent de " +
+                eleve.name,
+
+            authCreated: true,
+
+            createdAt:
+                Date.now()
+
+        };
+
+
+        await Promise.all([
+
+            db.ref(
+                "users/" +
+                phone
+            ).set(parent),
+
+            db.ref(
+                "loginIndex/" +
+                phone
+            ).set({
+
+                email:
+                    parentEmail
+
+            }),
+
+            db.ref(
+                "schools/" +
+                schoolId +
+                "/members/" +
+                phone
+            ).set({
+
+                phone: phone,
+
+                role: "parent",
+
+                name:
+                    parent.name,
+
+                studentMatricule:
+                    matricule,
+
+                createdAt:
+                    Date.now()
+
+            }),
+
+            db.ref(
+                "parents/" +
+                phone +
+                "/children/" +
+                matricule
+            ).set({
+
+                matricule:
+                    matricule,
+
+                name:
+                    eleve.name,
+
+                className:
+                    eleve.className,
+
+                schoolId:
+                    schoolId,
+
+                role:
+                    "student"
+
+            }),
+
+            db.ref(
+                "invitations/" +
+                invite.code
+            ).update({
+
+                used: true,
+
+                usedBy:
+                    phone,
+
+                usedAt:
+                    Date.now()
+
+            })
+
+        ]);
+
+
+        hideLoader();
+
+        alert(
+            "École rejointe avec succès."
+        );
+
+        openParent();
+
+        return;
+    }
+
+
+    // ============================================================
+    // ENSEIGNANT
+    // ============================================================
+
+    if(role == "teacher"){
+
+        var teacherPassword =
+            document.getElementById(
+                "joinPassword"
+            ).value.trim();
+
+
+        if(!teacherPassword){
+
+            throw new Error(
+                "Veuillez choisir un mot de passe."
+            );
+
+        }
+
+
+        var teacherLoginSnap =
+            await db.ref(
+                "loginIndex/" +
+                phone
+            ).once("value");
+
+
+        if(teacherLoginSnap.exists()){
+
+            throw new Error(
+                "Ce numéro est déjà inscrit."
+            );
+
+        }
+
+
+        var teachersSnap =
+            await db.ref(
+                "schools/" +
+                schoolId +
+                "/teachers"
+            ).once("value");
+
+
+        if(!teachersSnap.exists()){
+
+            throw new Error(
+                "Aucun enseignant trouvé."
+            );
+
+        }
+
+
+        var teacher = null;
+
+
+        teachersSnap.forEach(
+            function(child){
+
+                var t =
+                    child.val();
+
+
+                if(
+                    normalizePhone(
+                        t.telephone
+                    ) == phone
+                ){
+
+                    teacher =
+                        t;
+
+                }
+
+            }
+        );
+
+
+        if(!teacher){
+
+            throw new Error(
+                "Cet enseignant n'est pas enregistré dans cette école."
+            );
+
+        }
+
+
+        if(!teacher.email){
+
+            throw new Error(
+                "Cet enseignant ne possède pas d'adresse e-mail."
+            );
+
+        }
+
+
+        teacher.phone =
+            phone;
+
+        teacher.linked =
+            true;
+
+
+        await auth.createUserWithEmailAndPassword(
+            teacher.email,
+            teacherPassword
+        );
+
+
+        await auth.currentUser.getIdToken(true);
+
+
+        teacher.uid =
+            auth.currentUser.uid;
+
+        teacher.authCreated =
+            true;
+
+
+        await Promise.all([
+
+            db.ref(
+                "users/" +
+                phone
+            ).set(teacher),
+
+            db.ref(
+                "loginIndex/" +
+                phone
+            ).set({
+
+                email:
+                    teacher.email
+
+            }),
+
+            db.ref(
+                "schools/" +
+                schoolId +
+                "/teachers/" +
+                teacher.matricule
+            ).update({
+
+                linked:
+                    true,
+
+                authCreated:
+                    true,
+
+                phone:
+                    phone,
+
+                uid:
+                    teacher.uid
+
+            }),
+
+            db.ref(
+                "schools/" +
+                schoolId +
+                "/members/" +
+                teacher.matricule
+            ).update({
+
+                phone:
+                    phone,
+
+                linked:
+                    true,
+
+                uid:
+                    teacher.uid
+
+            }),
+
+            db.ref(
+                "invitations/" +
+                invite.code
+            ).update({
+
+                used:
+                    true,
+
+                usedBy:
+                    phone,
+
+                usedAt:
+                    Date.now()
+
+            })
+
+        ]);
+
+
+        hideLoader();
+
+        alert(
+            "École rejointe avec succès."
+        );
+
+        openTeacher();
+
+        return;
+    }
+
+
+    // ============================================================
+    // ÉLÈVE
+    // ============================================================
+
+    if(role == "student"){
+
+        var studentPassword =
+            document.getElementById(
+                "joinPassword"
+            ).value.trim();
+
+
+        if(!studentPassword){
+
+            throw new Error(
+                "Veuillez choisir un mot de passe."
+            );
+
+        }
+
+
+        var studentEmail =
+            "stu-" +
+            phone +
+            "@masomo.app";
+
+
+        await auth.createUserWithEmailAndPassword(
+            studentEmail,
+            studentPassword
+        );
+
+
+        await auth.currentUser.getIdToken(true);
+
+
+        var student = {
+
+            phone:
+                phone,
+
+            email:
+                studentEmail,
+
+            uid:
+                auth.currentUser.uid,
+
+            role:
+                "student",
+
+            schoolId:
+                schoolId,
+
+            name:
+                "Nouvel élève",
+
+            authCreated:
+                true,
+
+            createdAt:
+                Date.now()
+
+        };
+
+
+        await Promise.all([
+
+            db.ref(
+                "users/" +
+                phone
+            ).set(student),
+
+            db.ref(
+                "loginIndex/" +
+                phone
+            ).set({
+
+                email:
+                    studentEmail
+
+            }),
+
+            db.ref(
+                "schools/" +
+                schoolId +
+                "/members/" +
+                phone
+            ).set({
+
+                phone:
+                    phone,
+
+                role:
+                    "student",
+
+                name:
+                    student.name,
+
+                uid:
+                    student.uid,
+
+                createdAt:
+                    Date.now()
+
+            }),
+
+            db.ref(
+                "invitations/" +
+                invite.code
+            ).update({
+
+                used:
+                    true,
+
+                usedBy:
+                    phone,
+
+                usedAt:
+                    Date.now()
+
+            })
+
+        ]);
+
+
+        hideLoader();
+
+        alert(
+            "École rejointe avec succès."
+        );
+
+        openStudent();
+
+        return;
+    }
+
+
+    // ============================================================
+    // CAISSIER
+    // Une seule personne par école
+    // Le nouveau remplace automatiquement l'ancien
+    // ============================================================
+
+    if(role == "cashier"){
+
+        var cashierPassword =
+            document.getElementById(
+                "joinPassword"
+            ).value.trim();
+
+
+        if(!cashierPassword){
+
+            throw new Error(
+                "Veuillez choisir un mot de passe."
+            );
+
+        }
+
+
+        var cashierEmail =
+            "cai-" +
+            phone +
+            "@masomo.app";
+
+
+        await auth.createUserWithEmailAndPassword(
+            cashierEmail,
+            cashierPassword
+        );
+
+
+        await auth.currentUser.getIdToken(true);
+
+
+        var ancienCaissierSnap =
+            await db.ref(
+                "schools/" +
+                schoolId +
+                "/caissier"
+            ).once("value");
+
+
+        var ancienCaissier =
+            ancienCaissierSnap.val();
+
+
+        var caissierData = {
+
+            phone:
+                phone,
+
+            email:
+                cashierEmail,
+
+            uid:
+                auth.currentUser.uid,
+
+            role:
+                "cashier",
+
+            schoolId:
+                schoolId,
+
+            createdAt:
+                Date.now()
+
+        };
+
+
+        await db.ref(
+            "users/" +
+            phone
+        ).set(caissierData);
+
+
+        await db.ref(
+            "loginIndex/" +
+            phone
+        ).set({
+
+            email:
+                cashierEmail
+
+        });
+
+
+        await db.ref(
+            "schools/" +
+            schoolId +
+            "/caissier"
+        ).set({
+
+            phone:
+                phone,
+
+            uid:
+                auth.currentUser.uid,
+
+            email:
+                cashierEmail,
+
+            replacedPhone:
+                ancienCaissier
+                ?
+                ancienCaissier.phone || ""
+                :
+                "",
+
+            updatedAt:
+                Date.now()
+
+        });
+
+
+        await db.ref(
+            "schools/" +
+            schoolId +
+            "/members/" +
+            phone
+        ).update({
+
+            phone:
+                phone,
+
+            role:
+                "cashier",
+
+            uid:
+                auth.currentUser.uid,
+
+            createdAt:
+                Date.now()
+
+        });
+
+
+        await db.ref(
+            "invitations/" +
+            invite.code
+        ).update({
+
+            used:
+                true,
+
+            usedBy:
+                phone,
+
+            usedAt:
+                Date.now()
+
+        });
+
+
+        hideLoader();
+
+
+        alert(
+            "💰 Vous êtes maintenant le caissier de l'école."
+        );
+
+
+        if(
+            typeof openCashier ==
+            "function"
+        ){
+
+            openCashier();
+
+        }
+        else {
+
+            openAdmin();
+
+        }
+
+        return;
+    }
+
+
+    // ============================================================
+    // RESPONSABLE
+    //
+    // IMPORTANT :
+    // Le responsable possède UN SEUL compte.
+    //
+    // Il peut être responsable :
+    // - d'une seule école
+    // - ou de deux écoles : primaire + secondaire
+    //
+    // Le compte administrateur qui a généré le code
+    // n'est jamais transformé en responsable.
+    // ============================================================
+
+    if(role == "responsable"){
+
+        var responsablePasswordElement =
+            document.getElementById(
+                "joinPassword"
+            );
+
+
+        var responsablePassword = "";
+
+
+        if(responsablePasswordElement){
+
+            responsablePassword =
+                responsablePasswordElement.value.trim();
+
+        }
+
+
+        // ========================================================
+        // VÉRIFIER SI CE NUMÉRO POSSÈDE DÉJÀ UN COMPTE
+        // ========================================================
+
+        var responsableLoginSnap =
+            await db.ref(
+                "loginIndex/" +
+                phone
+            ).once("value");
+
+
+        // ========================================================
+        // CAS 1 : RESPONSABLE DÉJÀ EXISTANT
+        // ========================================================
+
+        if(responsableLoginSnap.exists()){
+
+            var responsableUserSnap =
+                await db.ref(
+                    "users/" +
+                    phone
+                ).once("value");
+
+
+            if(!responsableUserSnap.exists()){
+
+                throw new Error(
+                    "Le compte associé à ce numéro est introuvable."
+                );
+
+            }
+
+
+            var responsableExistant =
+                responsableUserSnap.val();
+
+
+            /*
+             * Le numéro possède déjà un compte.
+             * Il doit obligatoirement être responsable.
+             */
+
+            if(
+                responsableExistant.role !=
+                "responsable"
+            ){
+
+                throw new Error(
+                    "Ce numéro possède déjà un autre type de compte."
+                );
+
+            }
+
+
+            /*
+             * Vérifier si cette école est déjà liée
+             */
+
+            var access =
+                responsableExistant.schoolsAccess ||
+                {};
+
+
+            if(
+                access[schoolId]
+            ){
+
+                throw new Error(
+                    "Cette école est déjà liée à ce compte responsable."
+                );
+
+            }
+
+
+            /*
+             * Ajouter la nouvelle école
+             */
+
+            access[schoolId] = {
+
+                schoolId:
+                    schoolId,
+
+                role:
+                    "responsable",
+
+                active:
+                    true,
+
+                joinedAt:
+                    Date.now()
+
+            };
+
+
+            responsableExistant.schoolsAccess =
+                access;
+
+
+            responsableExistant.responsableActive =
+                true;
+
+
+            /*
+             * Garder l'ancien schoolId pour compatibilité
+             * avec l'ancien système.
+             */
+
+            if(
+                !responsableExistant.schoolId
+            ){
+
+                responsableExistant.schoolId =
+                    schoolId;
+
+            }
+
+
+            await db.ref(
+                "users/" +
+                phone
+            ).update({
+
+                schoolsAccess:
+                    access,
+
+                responsableActive:
+                    true
+
+            });
+
+
+            /*
+             * Ajouter le responsable
+             * dans la nouvelle école
+             */
+
+            await db.ref(
+                "schools/" +
+                schoolId +
+                "/responsable"
+            ).set({
+
+                phone:
+                    phone,
+
+                uid:
+                    responsableExistant.uid || "",
+
+                email:
+                    responsableExistant.email || "",
+
+                active:
+                    true,
+
+                updatedAt:
+                    Date.now()
+
+            });
+
+
+            /*
+             * Ajouter comme membre
+             */
+
+            await db.ref(
+                "schools/" +
+                schoolId +
+                "/members/" +
+                phone
+            ).set({
+
+                phone:
+                    phone,
+
+                role:
+                    "responsable",
+
+                uid:
+                    responsableExistant.uid || "",
+
+                createdAt:
+                    Date.now()
+
+            });
+
+
+            /*
+             * Marquer le nouveau code comme utilisé
+             */
+
+            await db.ref(
+                "invitations/" +
+                invite.code
+            ).update({
+
+                used:
+                    true,
+
+                usedBy:
+                    phone,
+
+                usedAt:
+                    Date.now()
+
+            });
+
+
+            hideLoader();
+
+
+            alert(
+                "✅ Cette école a été ajoutée à votre espace responsable."
+            );
+
+
+            /*
+             * Recharger les informations
+             */
+
+            window.currentPhone =
+                phone;
+
+            window.currentRole =
+                "responsable";
+
+
+            ouvrirEspaceResponsable();
+
+            return;
+
+        }
+
+
+        // ========================================================
+        // CAS 2 : NOUVEAU RESPONSABLE
+        // ========================================================
+
+        if(!responsablePassword){
+
+            throw new Error(
+                "Veuillez choisir un mot de passe."
+            );
+
+        }
+
+
+        var responsableEmail =
+            "res-" +
+            phone +
+            "@masomo.app";
+
+
+        /*
+         * Créer le compte Firebase Auth
+         */
+
+        await auth.createUserWithEmailAndPassword(
+            responsableEmail,
+            responsablePassword
+        );
+
+
+        await auth.currentUser.getIdToken(true);
+
+
+        var nouveauResponsable = {
+
+            phone:
+                phone,
+
+            email:
+                responsableEmail,
+
+            uid:
+                auth.currentUser.uid,
+
+            role:
+                "responsable",
+
+            schoolId:
+                schoolId,
+
+            responsableActive:
+                true,
+
+            authCreated:
+                true,
+
+            createdAt:
+                Date.now(),
+
+            schoolsAccess: {}
+
+        };
+
+
+        /*
+         * Première école
+         */
+
+        nouveauResponsable.schoolsAccess[
+            schoolId
+        ] = {
+
+            schoolId:
+                schoolId,
+
+            role:
+                "responsable",
+
+            active:
+                true,
+
+            joinedAt:
+                Date.now()
+
+        };
+
+
+        await Promise.all([
+
+            /*
+             * Compte utilisateur
+             */
+
+            db.ref(
+                "users/" +
+                phone
+            ).set(
+                nouveauResponsable
+            ),
+
+
+            /*
+             * Index connexion
+             */
+
+            db.ref(
+                "loginIndex/" +
+                phone
+            ).set({
+
+                email:
+                    responsableEmail
+
+            }),
+
+
+            /*
+             * Responsable de l'école
+             */
+
+            db.ref(
+                "schools/" +
+                schoolId +
+                "/responsable"
+            ).set({
+
+                phone:
+                    phone,
+
+                uid:
+                    auth.currentUser.uid,
+
+                email:
+                    responsableEmail,
+
+                active:
+                    true,
+
+                updatedAt:
+                    Date.now()
+
+            }),
+
+
+            /*
+             * Membre de l'école
+             */
+
+            db.ref(
+                "schools/" +
+                schoolId +
+                "/members/" +
+                phone
+            ).set({
+
+                phone:
+                    phone,
+
+                role:
+                    "responsable",
+
+                uid:
+                    auth.currentUser.uid,
+
+                createdAt:
+                    Date.now()
+
+            }),
+
+
+            /*
+             * Code utilisé
+             */
+
+            db.ref(
+                "invitations/" +
+                invite.code
+            ).update({
+
+                used:
+                    true,
+
+                usedBy:
+                    phone,
+
+                usedAt:
+                    Date.now()
+
+            })
+
+        ]);
+
+
+        hideLoader();
+
+
+        alert(
+            "✅ Vous avez rejoint l'école comme responsable."
+        );
+
+
+        window.currentPhone =
+            phone;
+
+        window.currentRole =
+            "responsable";
+
+
+        ouvrirEspaceResponsable();
+
+        return;
+    }
+
+
+    // ============================================================
+    // TYPE INCONNU
+    // ============================================================
+
+    hideLoader();
+
+    alert(
+        "Type d'invitation inconnu."
+    );
+
+
+}
+catch(error){
+
+    hideLoader();
+
+    console.error(
+        "Erreur finishJoin :",
+        error
+    );
+
+
+    alert(
+        error.message ||
+        "Une erreur est survenue."
+    );
+
 }
 
-let phone=normalizePhone(window.currentPhone);
-let role=invite.role;
-let schoolId=invite.schoolId;
-let matricule="";
-
-if(role=="parent"){
-
-matricule=document.getElementById("matricule")
-.value
-.trim()
-.toUpperCase();
-
-if(!matricule){
-hideLoader();
-alert("Veuillez saisir le matricule de l'élève.");
-return;
 }
-
-}
-
-let inviteSnap=await db.ref(
-"invitations/"+invite.code
-).once("value");
-
-if(!inviteSnap.exists()){
-throw new Error("Invitation introuvable.");
-}
-
-let inv=inviteSnap.val();
-
-if(inv.used){
-throw new Error("Ce code d'invitation a déjà été utilisé.");
-}
-
-
-// =========================
-// PARENT
-// =========================
-
-if(role=="parent"){
-
-
-let password=document.getElementById(
-"joinPassword"
-).value.trim();
-
-if(!password){
-throw new Error("Veuillez choisir un mot de passe.");
-}
-
-let authEmail="par-"+phone+"@masomo.app";
-
-await auth.createUserWithEmailAndPassword(
-authEmail,
-password
-);
-
-// attendre que Firebase Auth termine réellement
-await auth.currentUser.getIdToken(true);
-
-let studentSnap=await db.ref(
-"schools/"+schoolId+"/students/"+matricule
-).once("value");
-
-if(!studentSnap.exists()){
-throw new Error("Matricule élève introuvable.");
-}
-
-let eleve=studentSnap.val();
-
-let parent={
-
-phone:phone,
-
-email:authEmail,
-
-uid:auth.currentUser.uid,
-
-role:"parent",
-
-schoolId:schoolId,
-
-studentMatricule:matricule,
-
-studentName:eleve.name,
-
-name:"Parent de "+eleve.name,
-
-authCreated:true,
-
-createdAt:Date.now()
-
-};
-
-await Promise.all([
-
-    db.ref("users/"+phone).set(parent),
-
-    db.ref("loginIndex/"+phone).set({
-        email:authEmail
-    }),
-
-    db.ref(
-        "schools/"+schoolId+"/members/"+phone
-    ).set({
-        phone:phone,
-        role:"parent",
-        name:parent.name,
-        studentMatricule:matricule,
-        createdAt:Date.now()
-    }),
-
-    // 🔴 AJOUT IMPORTANT :
-    db.ref(
-        "parents/"+phone+"/children/"+matricule
-    ).set({
-        matricule:matricule,
-        name:eleve.name,
-        className:eleve.className,
-        schoolId:schoolId,
-        role:"student"
-    }),
-
-    db.ref(
-        "invitations/"+invite.code
-    ).update({
-        used:true,
-        usedBy:phone,
-        usedAt:Date.now()
-    })
-
-]);
-
-hideLoader();
-
-alert("École rejointe avec succès.");
-
-openParent();
-
-return;
-
-}
-
-// =========================
-// ENSEIGNANT
-// =========================
-
-if(role=="teacher"){
-
-let password=document.getElementById(
-"joinPassword"
-).value.trim();
-
-if(!password){
-throw new Error("Veuillez choisir un mot de passe.");
-}
-
-// Vérifier si le numéro est déjà inscrit
-let loginSnap=await db.ref(
-"loginIndex/"+phone
-).once("value");
-
-if(loginSnap.exists()){
-throw new Error("Ce numéro est déjà inscrit.");
-}
-
-// Rechercher l'enseignant
-let snapshot=await db.ref(
-"schools/"+schoolId+"/teachers"
-).once("value");
-
-if(!snapshot.exists()){
-throw new Error("Aucun enseignant trouvé.");
-}
-
-let teacher=null;
-
-snapshot.forEach(child=>{
-
-let t=child.val();
-
-if(normalizePhone(t.telephone)==phone){
-teacher=t;
-}
-
-});
-
-if(!teacher){
-throw new Error("Cet enseignant n'est pas enregistré dans cette école.");
-}
-
-if(!teacher.email){
-throw new Error("Cet enseignant ne possède pas d'adresse e-mail.");
-}
-
-teacher.phone=phone;
-teacher.linked=true;
-
-// Créer le compte Firebase Auth
-await auth.createUserWithEmailAndPassword(
-teacher.email,
-password
-);
-
-// Attendre la connexion Firebase
-await auth.currentUser.getIdToken(true);
-
-teacher.uid=auth.currentUser.uid;
-teacher.authCreated=true;
-
-await Promise.all([
-
-db.ref("users/"+phone).set(teacher),
-
-db.ref("loginIndex/"+phone).set({
-email:teacher.email
-}),
-
-db.ref(
-"schools/"+schoolId+"/teachers/"+teacher.matricule
-).update({
-
-linked:true,
-authCreated:true,
-phone:phone,
-uid:teacher.uid
-
-}),
-
-db.ref(
-"schools/"+schoolId+"/members/"+teacher.matricule
-).update({
-
-phone:phone,
-linked:true,
-uid:teacher.uid
-
-}),
-
-db.ref(
-"invitations/"+invite.code
-).update({
-
-used:true,
-usedBy:phone,
-usedAt:Date.now()
-
-})
-
-]);
-
-hideLoader();
-
-alert("École rejointe avec succès.");
-
-openTeacher();
-
-return;
-
-}
-
-// =========================
-// ÉLÈVE
-// =========================
-
-if(role=="student"){
-
-let password=document.getElementById(
-"joinPassword"
-).value.trim();
-
-if(!password){
-throw new Error("Veuillez choisir un mot de passe.");
-}
-
-let authEmail="stu-"+phone+"@masomo.app";
-
-await auth.createUserWithEmailAndPassword(
-authEmail,
-password
-);
-
-// attendre la connexion Firebase
-await auth.currentUser.getIdToken(true);
-
-let student={
-
-phone:phone,
-
-email:authEmail,
-
-uid:auth.currentUser.uid,
-
-role:"student",
-
-schoolId:schoolId,
-
-name:"Nouvel élève",
-
-authCreated:true,
-
-createdAt:Date.now()
-
-};
-
-await Promise.all([
-
-db.ref("users/"+phone).set(student),
-
-db.ref("loginIndex/"+phone).set({
-
-email:authEmail
-
-}),
-
-db.ref(
-"schools/"+schoolId+"/members/"+phone
-).set({
-
-phone:phone,
-
-role:"student",
-
-name:student.name,
-
-uid:student.uid,
-
-createdAt:Date.now()
-
-}),
-
-db.ref(
-"invitations/"+invite.code
-).update({
-
-used:true,
-
-usedBy:phone,
-
-usedAt:Date.now()
-
-})
-
-]);
-
-hideLoader();
-
-alert("École rejointe avec succès.");
-
-openStudent();
-
-return;
-
-}
-
-hideLoader();
-
-alert("Type d'invitation inconnu.");
-
-}catch(error){
-
-hideLoader();
-
-console.error(error);
-
-alert(error.message || "Une erreur est survenue.");
-
-}
-
-}
-
 
 // ================= DASHBOARD ADMIN =================
 
@@ -5065,9 +6325,18 @@ Panneau administrateur
 
 </div>
 
+<!-- ============================================================
+     CHOIX DU TYPE D'INVITATION
+     ============================================================ -->
+
 <select
 id="roleType"
-class="select-style">
+class="select-style"
+style="
+    width:100%;
+    box-sizing:border-box;
+    margin-top:10px;
+">
 
 <option value="teacher">
 👨‍🏫 Enseignant
@@ -5077,9 +6346,17 @@ class="select-style">
 👨‍👩‍👧 Parent
 </option>
 
-<!-- <option value="student">
+<option value="student">
 🎓 Élève
-</option> -->
+</option>
+
+<option value="cashier">
+💰 Caissier
+</option>
+
+<option value="responsable">
+👨‍💼 Responsable
+</option>
 
 </select>
 
@@ -7642,257 +8919,1097 @@ if(cache){
     showMembers();
 
 }
-// ================= GENERER INVITATION =================
+// ============================================================
+// GÉNÉRER UNE INVITATION
+//
+// Enseignant : TEA + 4 caractères = 7 caractères
+// Parent      : PAR + 4 caractères = 7 caractères
+// Élève       : STU + 4 caractères = 7 caractères
+// Caissier    : CAI + 7 caractères = 10 caractères
+//
+// Responsable : RES + 7 caractères = 10 caractères
+//
+// IMPORTANT :
+// Pour le responsable, on ne crée JAMAIS son compte ici.
+// Une demande est envoyée à MASOMO-ECOLE.
+// Après validation, le code RES apparaît.
+// Le futur responsable utilisera ensuite son propre numéro.
+// ============================================================
 
-function generateInvite(){
+async function generateInvite(){
 
-let phone=
-window.currentPhone;
+    var phone =
+        window.currentPhone;
 
-let role=
-document
-.getElementById(
-"roleType"
-)
-.value;
-
-
-db.ref(
-"users/"+phone
-)
-
-.once("value")
-
-.then(snapshot=>{
-
-let admin=
-snapshot.val();
-
-let schoolId=
-admin.schoolId;
+    var roleElement =
+        document.getElementById(
+            "roleType"
+        );
 
 
-// code propre
+    if(!roleElement){
 
-let random=
+        alert(
+            "Type d'invitation introuvable."
+        );
 
-Math.random()
-.toString(36)
-.substring(2,6)
-.toUpperCase();
+        return;
 
-
-// exemple : STU-X7K2
-
-let inviteCode=
-
-role.substring(
-0,
-3
-)
-.toUpperCase()
-
-+
-
-random;
+    }
 
 
-// enregistrer
-
-return db.ref(
-"invitations/"+inviteCode
-)
-
-.set({
-
-code: inviteCode,
-
-schoolId: admin.schoolId,
-
-role: role,
-
-used: false,
-
-usedBy: null,
-
-usedAt: null,
-
-createdAt: new Date().toISOString()
-
-})
-
-.then(()=>{
+    var role =
+        roleElement.value;
 
 
-document
-.getElementById(
-"generatedInvite"
-)
-.style.display=
-"block";
+    if(!phone){
+
+        alert(
+            "Administrateur introuvable."
+        );
+
+        return;
+
+    }
 
 
-document
-.getElementById(
-"generatedInvite"
-)
-.innerHTML=`
+    showLoader();
 
-<p>
 
-Code ${role}
+    try{
 
-</p>
+        /*
+         * =====================================================
+         * VÉRIFIER L'ADMINISTRATEUR
+         * =====================================================
+         */
 
-<h2 style="
-color:#1f4cff;
-">
+        var adminSnap =
+            await db.ref(
+                "users/" + phone
+            ).once("value");
 
-${inviteCode}
 
-</h2>
+        if(!adminSnap.exists()){
 
-`;
+            throw new Error(
+                "Administrateur introuvable."
+            );
 
-});
+        }
 
-});
+
+        var admin =
+            adminSnap.val() || {};
+
+
+        if(admin.role != "admin"){
+
+            throw new Error(
+                "Seul l'administrateur de l'école peut générer une invitation."
+            );
+
+        }
+
+
+        var schoolId =
+            admin.schoolId;
+
+
+        if(!schoolId){
+
+            throw new Error(
+                "École introuvable."
+            );
+
+        }
+
+
+        /*
+         * =====================================================
+         * RÉCUPÉRER L'ÉCOLE
+         * =====================================================
+         */
+
+        var schoolSnap =
+            await db.ref(
+                "schools/" +
+                schoolId
+            ).once("value");
+
+
+        if(!schoolSnap.exists()){
+
+            throw new Error(
+                "École introuvable."
+            );
+
+        }
+
+
+        var school =
+            schoolSnap.val() || {};
+
+
+        /*
+         * =====================================================
+         * RESPONSABLE
+         *
+         * NE PAS CRÉER LE COMPTE
+         *
+         * On crée uniquement une demande pour
+         * MASOMO-ECOLE.
+         * =====================================================
+         */
+
+        if(role == "responsable"){
+
+            /*
+             * Vérifier s'il existe déjà une demande
+             * en attente pour cette école.
+             */
+
+            var demandesSnap =
+                await db.ref(
+                    "responsableRequests"
+                ).once("value");
+
+
+            var demandeExistante =
+                false;
+
+
+            demandesSnap.forEach(
+                function(item){
+
+                    var demande =
+                        item.val() || {};
+
+
+                    if(
+                        demande.schoolId ==
+                        schoolId &&
+
+                        demande.statut ==
+                        "pending"
+                    ){
+
+                        demandeExistante =
+                            true;
+
+                    }
+
+                }
+            );
+
+
+            if(demandeExistante){
+
+                throw new Error(
+                    "Une demande de responsable est déjà en attente pour cette école."
+                );
+
+            }
+
+
+            /*
+             * =================================================
+             * DÉTERMINER LA SECTION
+             * =================================================
+             */
+
+            var section =
+                school.section || "";
+
+
+            /*
+             * Compatibilité anciennes écoles
+             */
+
+            if(!section){
+
+                if(
+                    school.levels &&
+                    school.levels.primary === true
+                ){
+
+                    section =
+                        "primaire";
+
+                }
+                else if(
+                    school.levels &&
+                    school.levels.secondary === true
+                ){
+
+                    section =
+                        "secondaire";
+
+                }
+
+            }
+
+
+            /*
+             * =================================================
+             * CRÉER LA DEMANDE
+             * =================================================
+             */
+
+            var demandeRef =
+                db.ref(
+                    "responsableRequests"
+                ).push();
+
+
+            var demandeId =
+                demandeRef.key;
+
+
+            await demandeRef.set({
+
+                demandeId:
+                    demandeId,
+
+                schoolId:
+                    schoolId,
+
+                schoolName:
+                    school.schoolName ||
+                    "",
+
+                section:
+                    section,
+
+                role:
+                    "responsable",
+
+                demandePar:
+                    phone,
+
+                demandeParPhone:
+                    phone,
+
+                demandeParNom:
+                    admin.name ||
+                    admin.nom ||
+                    admin.directorName ||
+                    "",
+
+                statut:
+                    "pending",
+
+                inviteCode:
+                    "",
+
+                createdAt:
+                    Date.now(),
+
+                validatedBy:
+                    "",
+
+                validatedAt:
+                    0
+
+            });
+
+
+            hideLoader();
+
+
+            /*
+             * =================================================
+             * AFFICHER L'ÉTAT EN ATTENTE
+             * =================================================
+             */
+
+            var zone =
+                document.getElementById(
+                    "generatedInvite"
+                );
+
+
+            if(zone){
+
+                zone.style.display =
+                    "block";
+
+
+                zone.innerHTML = `
+
+                    <div style="
+                        background:#fff8e1;
+                        border:1px solid #ffcc80;
+                        border-radius:12px;
+                        padding:15px;
+                        text-align:center;
+                    ">
+
+                        <h3 style="
+                            color:#ef6c00;
+                            margin-top:0;
+                        ">
+                            ⏳ Demande envoyée
+                        </h3>
+
+
+                        <p style="
+                            font-size:13px;
+                            color:#555;
+                            line-height:1.5;
+                        ">
+                            La demande de responsable
+                            de cette école a été envoyée
+                            à MASOMO-ECOLE pour contrôle.
+                        </p>
+
+
+                        <p style="
+                            font-size:13px;
+                            color:#555;
+                            margin-bottom:5px;
+                        ">
+                            École :
+                            <b>
+                                ${escapeHtmlHoraire(
+                                    school.schoolName ||
+                                    ""
+                                )}
+                            </b>
+                        </p>
+
+
+                        <p style="
+                            font-size:13px;
+                            color:#555;
+                            margin-bottom:5px;
+                        ">
+                            Section :
+                            <b>
+                                ${escapeHtmlHoraire(
+                                    section ||
+                                    "Non définie"
+                                )}
+                            </b>
+                        </p>
+
+
+                        <p style="
+                            font-size:12px;
+                            color:#777;
+                            margin-bottom:0;
+                        ">
+                            Le code RES apparaîtra ici
+                            après validation par
+                            MASOMO-ECOLE.
+                        </p>
+
+                    </div>
+
+                `;
+
+            }
+
+
+            /*
+             * =================================================
+             * SURVEILLER LA VALIDATION
+             * =================================================
+             */
+
+            surveillerValidationResponsable(
+                demandeId
+            );
+
+
+            return;
+
+        }
+
+
+        /*
+         * =====================================================
+         * AUTRES RÔLES
+         * =====================================================
+         */
+
+        var prefix =
+            "INV";
+
+
+        var longueur =
+            7;
+
+
+        if(role == "teacher"){
+
+            prefix =
+                "TEA";
+
+            longueur =
+                7;
+
+        }
+        else if(role == "parent"){
+
+            prefix =
+                "PAR";
+
+            longueur =
+                7;
+
+        }
+        else if(role == "student"){
+
+            prefix =
+                "STU";
+
+            longueur =
+                7;
+
+        }
+        else if(role == "cashier"){
+
+            prefix =
+                "CAI";
+
+            longueur =
+                10;
+
+        }
+        else{
+
+            throw new Error(
+                "Type d'invitation inconnu."
+            );
+
+        }
+
+
+        /*
+         * =====================================================
+         * CARACTÈRES DU CODE
+         * =====================================================
+         */
+
+        var caracteres =
+            "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+
+        var inviteCode =
+            prefix;
+
+
+        while(
+            inviteCode.length <
+            longueur
+        ){
+
+            var index =
+                Math.floor(
+                    Math.random() *
+                    caracteres.length
+                );
+
+
+            inviteCode +=
+                caracteres.charAt(
+                    index
+                );
+
+        }
+
+
+        /*
+         * =====================================================
+         * VÉRIFIER L'UNICITÉ
+         * =====================================================
+         */
+
+        var codeSnap =
+            await db.ref(
+                "invitations/" +
+                inviteCode
+            ).once("value");
+
+
+        if(codeSnap.exists()){
+
+            hideLoader();
+
+
+            alert(
+                "Un code identique existe déjà. " +
+                "Veuillez générer à nouveau."
+            );
+
+
+            return;
+
+        }
+
+
+        /*
+         * =====================================================
+         * ENREGISTRER L'INVITATION
+         * =====================================================
+         */
+
+        await db.ref(
+            "invitations/" +
+            inviteCode
+        ).set({
+
+            code:
+                inviteCode,
+
+            schoolId:
+                schoolId,
+
+            role:
+                role,
+
+            used:
+                false,
+
+            usedBy:
+                "",
+
+            usedAt:
+                0,
+
+            approved:
+                true,
+
+            createdAt:
+                Date.now()
+
+        });
+
+
+        hideLoader();
+
+
+        /*
+         * =====================================================
+         * AFFICHER LE CODE
+         * =====================================================
+         */
+
+        var zone2 =
+            document.getElementById(
+                "generatedInvite"
+            );
+
+
+        if(zone2){
+
+            zone2.style.display =
+                "block";
+
+
+            var nomRole =
+                "";
+
+
+            if(role == "teacher"){
+
+                nomRole =
+                    "Enseignant";
+
+            }
+            else if(role == "parent"){
+
+                nomRole =
+                    "Parent";
+
+            }
+            else if(role == "student"){
+
+                nomRole =
+                    "Élève";
+
+            }
+            else if(role == "cashier"){
+
+                nomRole =
+                    "Caissier";
+
+            }
+
+
+            zone2.innerHTML = `
+
+                <div style="
+                    background:#f5f7ff;
+                    border:1px solid #dce3ff;
+                    border-radius:12px;
+                    padding:15px;
+                    text-align:center;
+                ">
+
+                    <p style="
+                        margin:0 0 8px 0;
+                        font-weight:bold;
+                    ">
+                        Code ${nomRole}
+                    </p>
+
+
+                    <h2 style="
+                        color:#1f4cff;
+                        margin:8px 0;
+                        letter-spacing:2px;
+                    ">
+                        ${inviteCode}
+                    </h2>
+
+                </div>
+
+            `;
+
+        }
+
+    }
+    catch(error){
+
+        hideLoader();
+
+
+        console.error(
+            "Erreur génération invitation :",
+            error
+        );
+
+
+        alert(
+            error.message ||
+            "Erreur lors de la génération."
+        );
+
+    }
 
 }
 
 
-// ================= REJOINDRE ECOLE =================
+
+
+
+function surveillerValidationResponsable(
+    demandeId
+){
+
+    if(
+        window.responsableValidationListener
+    ){
+
+        db.ref(
+            "responsableRequests/" +
+            window.responsableValidationListener
+        ).off(
+            "value"
+        );
+
+    }
+
+
+    window.responsableValidationListener =
+        demandeId;
+
+
+    db.ref(
+        "responsableRequests/" +
+        demandeId
+    ).on(
+        "value",
+        function(snapshot){
+
+            if(
+                !snapshot.exists()
+            ){
+
+                return;
+
+            }
+
+
+            const demande =
+                snapshot.val();
+
+
+            if(
+                demande.statut !==
+                "approved"
+            ){
+
+                return;
+
+            }
+
+
+            const code =
+                demande.inviteCode;
+
+
+            if(!code){
+
+                return;
+
+            }
+
+
+            const zone =
+                document.getElementById(
+                    "generatedInvite"
+                );
+
+
+            if(!zone){
+
+                return;
+
+            }
+
+
+            zone.style.display =
+                "block";
+
+
+            zone.innerHTML = `
+
+                <div style="
+                    background:#e8f5e9;
+                    border:1px solid #81c784;
+                    border-radius:12px;
+                    padding:15px;
+                    text-align:center;
+                ">
+
+                    <h3 style="
+                        color:#2e7d32;
+                        margin-top:0;
+                    ">
+                        ✅ Responsable autorisé
+                    </h3>
+
+                    <p style="
+                        font-size:13px;
+                        color:#555;
+                    ">
+                        Le contrôle MASOMO-ECOLE
+                        a validé la demande.
+                    </p>
+
+                    <p style="
+                        margin-bottom:5px;
+                        font-weight:bold;
+                    ">
+                        Code à remettre au responsable :
+                    </p>
+
+                    <h2 style="
+                        color:#1f4cff;
+                        letter-spacing:3px;
+                        margin:8px 0;
+                    ">
+                        ${code}
+                    </h2>
+
+                    <p style="
+                        font-size:12px;
+                        color:#777;
+                    ">
+                        Le futur responsable doit entrer
+                        son propre numéro puis choisir
+                        « Rejoindre une école ».
+                    </p>
+
+                </div>
+
+            `;
+
+
+            db.ref(
+                "responsableRequests/" +
+                demandeId
+            ).off("value");
+
+        }
+    );
+
+}
+
+// ============================================================
+// VÉRIFIER LE CODE D'INVITATION
+// ============================================================
 
 function confirmJoin(){
 
-let code=document.getElementById("inviteCode")
-.value
-.trim()
-.toUpperCase();
+    const element =
+        document.getElementById(
+            "inviteCode"
+        );
 
-if(code==""){
-    alert("Veuillez saisir le code d'invitation.");
-    return;
-}
+    if(!element){
 
-showLoader();
+        alert(
+            "Champ du code introuvable."
+        );
 
-db.ref("invitations/"+code)
-
-.once("value")
-
-.then(snapshot=>{
-
-    hideLoader();
-
-    if(!snapshot.exists()){
-        alert("Code d'invitation invalide.");
         return;
     }
 
-    let invite=snapshot.val();
 
-    if(invite.used){
-        alert("Ce code d'invitation a déjà été utilisé.");
+    const code =
+        element.value
+        .trim()
+        .toUpperCase();
+
+
+    if(code == ""){
+
+        alert(
+            "Veuillez saisir le code d'invitation."
+        );
+
         return;
     }
 
-    // Vérifier que le rôle est valide
-    if(
-        invite.role!="teacher" &&
-        invite.role!="student" &&
-        invite.role!="parent"
-    ){
-        alert("Invitation invalide.");
-        return;
-    }
 
-    invite.code=code;
+    showLoader();
 
-    window.currentInvite=invite;
 
-    // Parent : demander le matricule
-    if(invite.role=="parent"){
+    db.ref(
+        "invitations/" +
+        code
+    )
+    .once("value")
+    .then(function(snapshot){
 
-        document.querySelector(".login-box").innerHTML=`
+        hideLoader();
 
-        <h2>Compléter le profil</h2>
 
-        <input
-id="matricule"
-placeholder="Matricule de l'élève">
+        if(!snapshot.exists()){
 
-<input
-id="joinPassword"
-type="password"
-placeholder="Choisissez un mot de passe">
+            alert(
+                "Code d'invitation invalide."
+            );
 
-<button onclick="finishJoin()">
-Terminer
-</button>
+            return;
+        }
 
-        `;
 
-        return;
+        const invite =
+            snapshot.val();
 
-    }
-    // Enseignant
-if(invite.role=="teacher"){
 
-    document.querySelector(".login-box").innerHTML=`
+        if(invite.used){
 
-    <h2>Créer votre mot de passe</h2>
+            alert(
+                "Ce code d'invitation a déjà été utilisé."
+            );
 
-    <input
-    id="joinPassword"
-    type="password"
-    placeholder="Choisissez un mot de passe">
+            return;
+        }
 
-    <button onclick="finishJoin()">
-    Terminer
-    </button>
 
-    `;
+        if(
+            invite.role != "teacher" &&
+            invite.role != "student" &&
+            invite.role != "parent" &&
+            invite.role != "cashier" &&
+            invite.role != "responsable"
+        ){
 
-    return;
+            alert(
+                "Invitation invalide."
+            );
+
+            return;
+        }
+
+
+        invite.code =
+            code;
+
+
+        window.currentInvite =
+            invite;
+
+
+        // ====================================================
+        // PARENT
+        // ====================================================
+
+        if(invite.role == "parent"){
+
+            document.querySelector(
+                ".login-box"
+            ).innerHTML = `
+
+                <h2>
+                    Compléter le profil
+                </h2>
+
+                <input
+                    id="matricule"
+                    placeholder="Matricule de l'élève"
+                >
+
+                <input
+                    id="joinPassword"
+                    type="password"
+                    placeholder="Choisissez votre mot de passe"
+                >
+
+                <button
+                    onclick="finishJoin()"
+                >
+                    Terminer
+                </button>
+
+            `;
+
+            return;
+        }
+
+
+        // ====================================================
+        // ENSEIGNANT
+        // ====================================================
+
+        if(invite.role == "teacher"){
+
+            document.querySelector(
+                ".login-box"
+            ).innerHTML = `
+
+                <h2>
+                    Créer votre mot de passe
+                </h2>
+
+                <input
+                    id="joinPassword"
+                    type="password"
+                    placeholder="Choisissez votre mot de passe"
+                >
+
+                <button
+                    onclick="finishJoin()"
+                >
+                    Terminer
+                </button>
+
+            `;
+
+            return;
+        }
+
+
+        // ====================================================
+        // ÉLÈVE
+        // ====================================================
+
+        if(invite.role == "student"){
+
+            document.querySelector(
+                ".login-box"
+            ).innerHTML = `
+
+                <h2>
+                    Créer votre mot de passe
+                </h2>
+
+                <input
+                    id="joinPassword"
+                    type="password"
+                    placeholder="Choisissez votre mot de passe"
+                >
+
+                <button
+                    onclick="finishJoin()"
+                >
+                    Terminer
+                </button>
+
+            `;
+
+            return;
+        }
+
+
+        // ====================================================
+        // RESPONSABLE / CAISSIER
+        // ====================================================
+
+        if(
+            invite.role == "responsable" ||
+            invite.role == "cashier"
+        ){
+
+            const titre =
+                invite.role == "responsable"
+                ? "👨‍💼 Rejoindre comme responsable"
+                : "💰 Rejoindre comme caissier";
+
+
+            document.querySelector(
+                ".login-box"
+            ).innerHTML = `
+
+                <h2 style="
+                    text-align:center;
+                    color:#1f4cff;
+                ">
+                    ${titre}
+                </h2>
+
+                <p style="
+                    text-align:center;
+                    color:#666;
+                ">
+                    Vous allez rejoindre une école.
+                </p>
+
+                <input
+                    id="joinPassword"
+                    type="password"
+                    placeholder="Créez votre mot de passe"
+                >
+
+                <button
+                    onclick="finishJoin()"
+                >
+                    Continuer
+                </button>
+
+            `;
+
+            return;
+        }
+
+
+        finishJoin();
+
+    })
+    .catch(function(error){
+
+        hideLoader();
+
+        console.error(
+            "Erreur vérification invitation :",
+            error
+        );
+
+        alert(
+            error.message ||
+            "Impossible de vérifier le code."
+        );
+
+    });
 
 }
 
-// Élève
-if(invite.role=="student"){
-
-    document.querySelector(".login-box").innerHTML=`
-
-    <h2>Créer votre mot de passe</h2>
-
-    <input
-    id="joinPassword"
-    type="password"
-    placeholder="Choisissez un mot de passe">
-
-    <button onclick="finishJoin()">
-    Terminer
-    </button>
-
-    `;
-
-    return;
-
-}
-
-finishJoin();
-
-})
-
-.catch(error=>{
-
-    hideLoader();
-
-    alert(error.message);
-
-});
-
-}
 
 // ================= DESSINER MEMBRES PRO =================
 
@@ -8940,399 +11057,763 @@ function validatePhone(){
 
 // ================= ENREGISTRER ECOLE =================
 
+// ============================================================
+// CRÉATION D'UNE ÉCOLE
+// Une école possède UNE SEULE section : primaire OU secondaire
+// ============================================================
+
 async function registerSchool(){
 
-try{
+    try{
 
-showLoader();
+        showLoader();
 
-// ================= RÉCUPÉRER CHAMPS =================
 
-function valeurChamp(id){
+        // ====================================================
+        // RÉCUPÉRER LES CHAMPS
+        // ====================================================
 
-    var element = document.getElementById(id);
+        function valeurChamp(id){
 
-    if(!element){
-        return "";
+            var element =
+                document.getElementById(id);
+
+            if(!element){
+
+                return "";
+
+            }
+
+            if(element.value){
+
+                return element.value.trim();
+
+            }
+
+            return "";
+
+        }
+
+
+        var schoolName =
+            valeurChamp("schoolName");
+
+        var schoolMotto =
+            valeurChamp("schoolMotto");
+
+        var schoolPhone =
+            valeurChamp("schoolPhone");
+
+        var directorName =
+            valeurChamp("directorName");
+
+        var adminPassword =
+            valeurChamp("adminPassword");
+
+        var email =
+            valeurChamp("email");
+
+        var schoolAddress =
+            valeurChamp("schoolAddress");
+
+        var province =
+            valeurChamp("province");
+
+        var territoire =
+            valeurChamp("territoire");
+
+        var commune =
+            valeurChamp("commune");
+
+        var schoolYear =
+            valeurChamp("schoolYear");
+
+
+        // ====================================================
+        // VÉRIFIER LES CHAMPS OBLIGATOIRES
+        // ====================================================
+
+        var missing = [];
+
+
+        if(!schoolName){
+
+            missing.push(
+                "Nom école"
+            );
+
+        }
+
+
+        if(!directorName){
+
+            missing.push(
+                "Nom directeur"
+            );
+
+        }
+
+
+        if(!schoolPhone){
+
+            missing.push(
+                "Téléphone école"
+            );
+
+        }
+
+
+        if(!schoolAddress){
+
+            missing.push(
+                "Adresse"
+            );
+
+        }
+
+
+        if(!email){
+
+            missing.push(
+                "E-mail"
+            );
+
+        }
+
+
+        if(!adminPassword){
+
+            missing.push(
+                "Mot de passe administrateur"
+            );
+
+        }
+
+
+        if(missing.length > 0){
+
+            hideLoader();
+
+            alert(
+                "Complétez :\n\n" +
+                missing.join("\n")
+            );
+
+            return;
+
+        }
+
+
+        // ====================================================
+        // NIVEAU DE L'ÉCOLE
+        // UNE SEULE SECTION AUTORISÉE
+        // ====================================================
+
+        var primary = false;
+        var secondary = false;
+
+
+        var primaryElement =
+            document.getElementById(
+                "primaryLevel"
+            );
+
+
+        if(primaryElement){
+
+            primary =
+                primaryElement.checked;
+
+        }
+
+
+        var secondaryElement =
+            document.getElementById(
+                "secondaryLevel"
+            );
+
+
+        if(secondaryElement){
+
+            secondary =
+                secondaryElement.checked;
+
+        }
+
+
+        // ====================================================
+        // EMPÊCHER PRIMAIRE + SECONDAIRE
+        // ====================================================
+
+        if(
+            primary &&
+            secondary
+        ){
+
+            hideLoader();
+
+            alert(
+                "Une école doit être créée avec une seule section.\n\n" +
+                "Choisissez soit PRIMAIRE, soit SECONDAIRE."
+            );
+
+            return;
+
+        }
+
+
+        if(
+            !primary &&
+            !secondary
+        ){
+
+            hideLoader();
+
+            alert(
+                "Sélectionnez la section de l'école :\n\n" +
+                "PRIMAIRE ou SECONDAIRE."
+            );
+
+            return;
+
+        }
+
+
+        // ====================================================
+        // DÉTERMINER LA SECTION
+        // ====================================================
+
+        var section = "";
+
+
+        if(primary){
+
+            section =
+                "primaire";
+
+        }
+
+
+        if(secondary){
+
+            section =
+                "secondaire";
+
+        }
+
+
+        // ====================================================
+        // CLASSES
+        // ====================================================
+
+        var classes = [];
+
+
+        if(primary){
+
+            var classesPrimaires =
+                document.querySelectorAll(
+                    ".primaryClass:checked"
+                );
+
+
+            for(
+                var i = 0;
+                i < classesPrimaires.length;
+                i++
+            ){
+
+                classes.push(
+                    classesPrimaires[i].value
+                );
+
+            }
+
+        }
+
+
+        if(secondary){
+
+            var classesSecondaires =
+                document.querySelectorAll(
+                    ".secondaryClass:checked"
+                );
+
+
+            for(
+                var j = 0;
+                j < classesSecondaires.length;
+                j++
+            ){
+
+                classes.push(
+                    classesSecondaires[j].value
+                );
+
+            }
+
+        }
+
+
+        if(classes.length === 0){
+
+            hideLoader();
+
+            alert(
+                "Choisissez au moins une classe."
+            );
+
+            return;
+
+        }
+
+
+        // ====================================================
+        // OPTIONS
+        // ====================================================
+
+        var options = [];
+
+
+        if(secondary){
+
+            var optionsSecondaires =
+                document.querySelectorAll(
+                    ".secondaryOption:checked"
+                );
+
+
+            for(
+                var k = 0;
+                k < optionsSecondaires.length;
+                k++
+            ){
+
+                options.push(
+                    optionsSecondaires[k].value
+                );
+
+            }
+
+        }
+
+
+        // ====================================================
+        // NORMALISER LE NOM POUR LA COMPARAISON
+        // ====================================================
+
+        var nomRecherche =
+            schoolName
+            .toLowerCase()
+            .trim();
+
+
+        // ====================================================
+        // VÉRIFIER SI LA MÊME ÉCOLE EXISTE
+        //
+        // Même nom + même province + même commune
+        // + même section = REFUS
+        //
+        // Même nom mais section différente = AUTORISÉ
+        // ====================================================
+
+        const schoolsSnap =
+            await db.ref(
+                "schools"
+            ).once("value");
+
+
+        var existe = false;
+
+
+        schoolsSnap.forEach(
+            function(item){
+
+                var school =
+                    item.val();
+
+
+                if(!school){
+
+                    return;
+
+                }
+
+
+                var ancienNom =
+                    school.schoolName ||
+                    "";
+
+
+                var ancienneProvince =
+                    school.province ||
+                    "";
+
+
+                var ancienneCommune =
+                    school.commune ||
+                    "";
+
+
+                var ancienneSection =
+                    school.section ||
+                    "";
+
+
+                var nomIdentique =
+                    ancienNom
+                    .toLowerCase()
+                    .trim() ===
+                    nomRecherche;
+
+
+                var provinceIdentique =
+                    String(
+                        ancienneProvince
+                    ).toLowerCase().trim() ===
+                    String(
+                        province
+                    ).toLowerCase().trim();
+
+
+                var communeIdentique =
+                    String(
+                        ancienneCommune
+                    ).toLowerCase().trim() ===
+                    String(
+                        commune
+                    ).toLowerCase().trim();
+
+
+                var sectionIdentique =
+                    String(
+                        ancienneSection
+                    ).toLowerCase().trim() ===
+                    String(
+                        section
+                    ).toLowerCase().trim();
+
+
+                if(
+                    nomIdentique &&
+                    provinceIdentique &&
+                    communeIdentique &&
+                    sectionIdentique
+                ){
+
+                    existe = true;
+
+                }
+
+            }
+        );
+
+
+        if(existe){
+
+            hideLoader();
+
+            alert(
+                "Une école avec ce nom existe déjà " +
+                "dans cette même section.\n\n" +
+
+                "Une école primaire et une école secondaire " +
+                "peuvent avoir le même nom."
+            );
+
+            return;
+
+        }
+
+
+        // ====================================================
+        // CODE ÉCOLE
+        // ====================================================
+
+        var schoolCode =
+
+            schoolName
+            .toUpperCase()
+            .replace(/[^A-Z0-9 ]/g,"")
+            .split(" ")
+            .map(function(m){
+
+                return m.substring(0,3);
+
+            })
+            .join("")
+            .substring(0,10);
+
+
+        // ====================================================
+        // CRÉER L'ÉCOLE
+        // ====================================================
+
+        var schoolRef =
+            db.ref("schools").push();
+
+
+        await schoolRef.set({
+
+            schoolName:
+                schoolName,
+
+            schoolCode:
+                schoolCode,
+
+
+            // IMPORTANT :
+            // Primaire ou secondaire
+            section:
+                section,
+
+
+            logo:
+                enregistrerPhoto(),
+
+
+            status:
+                "pending",
+
+            paymentStatus:
+                "unpaid",
+
+            paymentMethod:
+                "",
+
+            verifiedBy:
+                "",
+
+            verifiedAt:
+                0,
+
+
+            trialStart:
+                0,
+
+            trialEnd:
+                0,
+
+
+            subscriptionStart:
+                0,
+
+            subscriptionEnd:
+                0,
+
+            subscriptionNumber:
+                0,
+
+
+            motto:
+                schoolMotto,
+
+            phone:
+                schoolPhone,
+
+            directorName:
+                directorName,
+
+            email:
+                email,
+
+            address:
+                schoolAddress,
+
+            province:
+                province,
+
+            territoire:
+                territoire,
+
+            commune:
+                commune,
+
+            schoolYear:
+                schoolYear,
+
+
+            levels:{
+
+                primary:
+                    primary,
+
+                secondary:
+                    secondary
+
+            },
+
+
+            classes:
+                classes,
+
+            options:
+                options,
+
+
+            totalStudents:
+                0,
+
+            totalTeachers:
+                0,
+
+            totalParents:
+                0,
+
+
+            // Préparation pour responsable
+            responsablePhone:
+                "",
+
+            responsableName:
+                "",
+
+
+            // Préparation pour caissier
+            caissierPhone:
+                "",
+
+            caissierName:
+                "",
+
+
+            createdAt:
+                Date.now()
+
+        });
+
+
+        // ====================================================
+        // CRÉER LE COMPTE ADMINISTRATEUR
+        // ====================================================
+
+        var phone =
+            normalizePhone(
+                window.currentPhone
+            );
+
+
+        var adminData = {
+
+            phone:
+                phone,
+
+            uid:
+                auth.currentUser.uid,
+
+            name:
+                directorName,
+
+            schoolId:
+                schoolRef.key,
+
+            email:
+                email,
+
+            role:
+                "admin",
+
+            createdAt:
+                Date.now()
+
+        };
+
+
+        // ====================================================
+        // ENREGISTRER UTILISATEUR
+        // ====================================================
+
+        await db
+        .ref(
+            "users/" +
+            phone
+        )
+        .set(
+            adminData
+        );
+
+
+        // ====================================================
+        // LOGIN INDEX
+        // ====================================================
+
+        await db
+        .ref(
+            "loginIndex/" +
+            phone
+        )
+        .set({
+
+            email:
+                email
+
+        });
+
+
+        // ====================================================
+        // MEMBRE DE L'ÉCOLE
+        // ====================================================
+
+        await db
+        .ref(
+            "schools/" +
+            schoolRef.key +
+            "/members/" +
+            phone.replace(/\D/g,"")
+        )
+        .set(
+            adminData
+        );
+
+
+        // ====================================================
+        // TERMINÉ
+        // ====================================================
+
+        hideLoader();
+
+
+        alert(
+
+            "Votre école " +
+            section +
+            " a été créée.\n\n" +
+
+            "École : " +
+            schoolName +
+            "\n" +
+
+            "Section : " +
+            section +
+            "\n\n" +
+
+            "Effectuez maintenant le paiement " +
+            "afin que MASOMO puisse valider votre école."
+
+        );
+
+
+        ouvrirPaiementEcole(
+            schoolRef.key
+        );
+
+
     }
+    catch(error){
 
-    return element.value
-        ? element.value.trim()
-        : "";
-}
+        hideLoader();
 
-const schoolName = valeurChamp("schoolName");
-const schoolMotto = valeurChamp("schoolMotto");
-const schoolPhone = valeurChamp("schoolPhone");
-const directorName = valeurChamp("directorName");
-const adminPassword = valeurChamp("adminPassword");
-const email = valeurChamp("email");
-const schoolAddress = valeurChamp("schoolAddress");
-const province = valeurChamp("province");
-const territoire = valeurChamp("territoire");
-const commune = valeurChamp("commune");
-const schoolYear = valeurChamp("schoolYear");
+        console.error(
+            error
+        );
 
 
-// ================= VÉRIFIER CHAMPS =================
-
-let missing=[];
-
-if(!schoolName)
-    missing.push("Nom école");
-
-if(!directorName)
-    missing.push("Nom directeur");
-
-if(!schoolPhone)
-    missing.push("Téléphone école");
-
-if(!schoolAddress)
-    missing.push("Adresse");
-
-if(!email)
-    missing.push("E-mail");
-
-if(!adminPassword)
-    missing.push("Mot de passe administrateur");
-
-
-if(missing.length){
-
-    hideLoader();
-
-    alert(
-        "Complétez :\n\n" +
-        missing.join("\n")
-    );
-
-    return;
-}
-
-
-// ================= NIVEAUX =================
-
-let primary =
-document.getElementById("primaryLevel")
-? document.getElementById("primaryLevel").checked
-: false;
-
-let secondary =
-document.getElementById("secondaryLevel")
-? document.getElementById("secondaryLevel").checked
-: false;
-
-
-if(!primary && !secondary){
-
-    hideLoader();
-
-    alert(
-        "Sélectionnez un niveau"
-    );
-
-    return;
-}
-
-
-// ================= CLASSES =================
-
-let classes=[];
-
-
-if(primary){
-
-    document
-    .querySelectorAll(".primaryClass:checked")
-    .forEach(function(c){
-
-        classes.push(c.value);
-
-    });
-
-}
-
-
-if(secondary){
-
-    document
-    .querySelectorAll(".secondaryClass:checked")
-    .forEach(function(c){
-
-        classes.push(c.value);
-
-    });
-
-}
-
-
-if(classes.length===0){
-
-    hideLoader();
-
-    alert(
-        "Choisissez au moins une classe"
-    );
-
-    return;
-}
-
-
-// ================= OPTIONS =================
-
-let options=[];
-
-
-if(secondary){
-
-    document
-    .querySelectorAll(".secondaryOption:checked")
-    .forEach(function(c){
-
-        options.push(c.value);
-
-    });
-
-}
-
-
-// ================= CRÉER COMPTE ADMIN =================
-
-await auth.createUserWithEmailAndPassword(
-    email,
-    adminPassword
-);
-
-
-// ================= LIRE LES ÉCOLES =================
-
-const schoolsSnap =
-await db.ref("schools").once("value");
-
-
-let existe=false;
-
-
-schoolsSnap.forEach(function(item){
-
-    let school=item.val();
-
-    if(
-        school &&
-        school.schoolName &&
-        school.schoolName.toLowerCase() ===
-        schoolName.toLowerCase() &&
-
-        school.province === province &&
-
-        school.commune === commune
-    ){
-
-        existe=true;
+        alert(
+            error.message ||
+            "Impossible de créer l'école."
+        );
 
     }
-
-});
-
-
-if(existe){
-
-    hideLoader();
-
-    alert(
-        "Une école avec ce nom existe déjà."
-    );
-
-    return;
-}
-
-
-// ================= CODE ÉCOLE =================
-
-let schoolCode =
-
-schoolName
-.toUpperCase()
-.replace(/[^A-Z0-9 ]/g,"")
-.split(" ")
-.map(function(m){
-
-    return m.substring(0,3);
-
-})
-.join("")
-.substring(0,10);
-
-
-// ================= CRÉER ÉCOLE =================
-
-let schoolRef =
-db.ref("schools").push();
-
-
-await schoolRef.set({
-
-    schoolName:schoolName,
-
-    schoolCode:schoolCode,
-
-    logo:enregistrerPhoto(),
-
-    status:"pending",
-
-    paymentStatus:"unpaid",
-
-    paymentMethod:"",
-
-    verifiedBy:"",
-
-    verifiedAt:0,
-
-
-    trialStart:0,
-
-    trialEnd:0,
-
-
-    subscriptionStart:0,
-
-    subscriptionEnd:0,
-
-    subscriptionNumber:0,
-
-
-    motto:schoolMotto,
-
-    phone:schoolPhone,
-
-    directorName:directorName,
-
-    email:email,
-
-    address:schoolAddress,
-
-    province:province,
-
-    territoire:territoire,
-
-    commune:commune,
-
-    schoolYear:schoolYear,
-
-
-    levels:{
-
-        primary:primary,
-
-        secondary:secondary
-
-    },
-
-
-    classes:classes,
-
-    options:options,
-
-
-    totalStudents:0,
-
-    totalTeachers:0,
-
-    totalParents:0,
-
-
-    createdAt:Date.now()
-
-});
-
-
-// ================= CRÉER ADMINISTRATEUR =================
-
-let phone =
-normalizePhone(window.currentPhone);
-
-
-let adminData={
-
-    phone:phone,
-
-    uid:auth.currentUser.uid,
-
-    name:directorName,
-
-    schoolId:schoolRef.key,
-
-    email:email,
-
-    role:"admin",
-
-    createdAt:Date.now()
-
-};
-
-
-// ================= ENREGISTRER UTILISATEUR =================
-
-await db
-.ref("users/"+phone)
-.set(adminData);
-
-
-// ================= LOGIN INDEX =================
-
-await db
-.ref("loginIndex/"+phone)
-.set({
-
-    email:email
-
-});
-
-
-// ================= MEMBRE ÉCOLE =================
-
-await db
-.ref(
-    "schools/" +
-    schoolRef.key +
-    "/members/" +
-    phone.replace(/\D/g,"")
-)
-.set(adminData);
-
-
-// ================= TERMINÉ =================
-
-hideLoader();
-
-
-alert(
-
-    "Votre école a été créée.\n\n" +
-
-    "Effectuez maintenant le paiement " +
-
-    "afin que MASOMO puisse valider votre école."
-
-);
-
-
-ouvrirPaiementEcole(
-    schoolRef.key
-);
-
-
-}catch(error){
-
-    hideLoader();
-
-    console.error(error);
-
-    alert(
-        error.message
-    );
-
-}
 
 }
 
@@ -17500,6 +19981,41 @@ switch(user.role){
     case "parent":
         openParent();
         break;
+        
+    // ============================================================
+// ACCÈS RESPONSABLE
+// ============================================================
+
+case "responsable":
+
+    if(
+        user.responsableActive !== true
+    ){
+
+        alert(
+            "Votre accès Responsable n'est pas encore autorisé."
+        );
+
+        logout();
+
+        return;
+
+    }
+
+    ouvrirEspaceResponsable();
+
+    break;
+    
+    
+    // ============================================================
+// ACCÈS CAISSIER
+// ============================================================
+
+case "cashier":
+
+    openCashier();
+
+    break;    
 
     case "student":
         openStudent();
@@ -17569,9 +20085,47 @@ window.masomoSchoolsListener
 db.ref("users").on(
 "value",
 window.masomoUsersListener
+
+);
+
+// ============================================================
+// ÉCOUTER LES DEMANDES DE RESPONSABLE
+// ============================================================
+
+if(
+    window.masomoResponsableListener
+){
+
+    db.ref(
+        "responsableRequests"
+    ).off(
+        "value",
+        window.masomoResponsableListener
+    );
+
+}
+
+
+window.masomoResponsableListener =
+    function(snapshot){
+
+        window.masomoResponsableRequests =
+            snapshot.val() || {};
+
+        afficherDemandesResponsableMasomo();
+
+    };
+
+
+db.ref(
+    "responsableRequests"
+).on(
+    "value",
+    window.masomoResponsableListener
 );
 
 }
+
 
 function chargerControleMasomo(schoolsSnap,usersSnap){
 
@@ -17785,6 +20339,545 @@ document.querySelector(".login-box").innerHTML=html;
 
 }
 
+// ============================================================
+// AFFICHER LES DEMANDES DE RESPONSABLE
+// DANS LE CONTRÔLE MASOMO-ECOLE
+// ============================================================
+
+function afficherDemandesResponsableMasomo(){
+
+    const demandes =
+        window.masomoResponsableRequests ||
+        {};
+
+
+    const demandesPending =
+        [];
+
+
+    Object.keys(demandes).forEach(
+        function(id){
+
+            const demande =
+                demandes[id];
+
+
+            if(
+                demande &&
+                demande.statut ===
+                "pending"
+            ){
+
+                demandesPending.push(
+                    demande
+                );
+
+            }
+
+        }
+    );
+
+
+    if(
+        demandesPending.length === 0
+    ){
+
+        return;
+
+    }
+
+
+    const zone =
+        document.querySelector(
+            ".login-box"
+        );
+
+
+    if(!zone){
+
+        return;
+
+    }
+
+
+    let html = `
+
+        <div style="
+            background:#fff;
+            border:2px solid #1565C0;
+            border-radius:15px;
+            padding:15px;
+            margin:15px 0;
+        ">
+
+            <h3 style="
+                text-align:center;
+                color:#1565C0;
+                margin-top:0;
+            ">
+                🔔 DEMANDES DE RESPONSABLE
+            </h3>
+
+    `;
+
+
+    demandesPending.forEach(
+        function(demande){
+
+            html += `
+
+                <div style="
+                    background:#f5f7ff;
+                    border:1px solid #dce3ff;
+                    border-radius:12px;
+                    padding:12px;
+                    margin-bottom:10px;
+                ">
+
+                    <b>
+                        👨‍💼 Demande de responsable
+                    </b>
+
+                    <br><br>
+
+                    🏫 École :
+                    <b>
+                        ${demande.schoolId}
+                    </b>
+
+                    <br>
+
+                    📞 Demandeur :
+                    ${demande.demandePar}
+
+                    <br>
+
+                    ⏳ Statut :
+                    <b style="color:#f57c00;">
+                        En attente
+                    </b>
+
+                    <br><br>
+
+                    <button
+                        onclick="
+                            accepterResponsableMasomo(
+                                '${demande.id}'
+                            )
+                        "
+                        style="
+                            width:48%;
+                            padding:10px;
+                            background:#2e7d32;
+                            color:white;
+                            border:none;
+                            border-radius:10px;
+                            font-weight:bold;
+                        "
+                    >
+                        ✅ Autoriser
+                    </button>
+
+                    <button
+                        onclick="
+                            refuserResponsableMasomo(
+                                '${demande.id}'
+                            )
+                        "
+                        style="
+                            width:48%;
+                            padding:10px;
+                            background:#c62828;
+                            color:white;
+                            border:none;
+                            border-radius:10px;
+                            font-weight:bold;
+                        "
+                    >
+                        ❌ Refuser
+                    </button>
+
+                </div>
+
+            `;
+
+        }
+    );
+
+
+    html += `
+
+        </div>
+
+    `;
+
+
+    /*
+     * Ajouter en haut du contrôle MASOMO
+     */
+
+    const ancien =
+        document.getElementById(
+            "demandesResponsableMasomo"
+        );
+
+
+    if(ancien){
+
+        ancien.innerHTML =
+            html;
+
+        return;
+
+    }
+
+
+    const premier =
+        zone.firstElementChild;
+
+
+    const bloc =
+        document.createElement(
+            "div"
+        );
+
+
+    bloc.id =
+        "demandesResponsableMasomo";
+
+
+    bloc.innerHTML =
+        html;
+
+
+    if(premier){
+
+        zone.insertBefore(
+            bloc,
+            premier.nextSibling
+        );
+
+    }
+
+    else {
+
+        zone.appendChild(
+            bloc
+        );
+
+    }
+
+}
+
+/*
+ * ============================================================
+ * AUTORISER UN RESPONSABLE
+ *
+ * MASOMO-ECOLE ne transforme jamais le compte de
+ * l'administrateur.
+ *
+ * MASOMO-ECOLE génère uniquement un code RES de 10 caractères.
+ *
+ * Le futur responsable utilisera ensuite son propre numéro
+ * pour rejoindre l'école avec ce code.
+ * ============================================================
+ */
+
+async function accepterResponsableMasomo(
+    demandeId
+){
+
+    if(
+        !confirm(
+            "Autoriser cette demande de responsable ?"
+        )
+    ){
+
+        return;
+
+    }
+
+
+    showLoader();
+
+
+    try{
+
+        const demandeSnap =
+            await db.ref(
+                "responsableRequests/" +
+                demandeId
+            ).once("value");
+
+
+        if(
+            !demandeSnap.exists()
+        ){
+
+            throw new Error(
+                "Demande introuvable."
+            );
+
+        }
+
+
+        const demande =
+            demandeSnap.val();
+
+
+        if(
+            demande.statut !==
+            "pending"
+        ){
+
+            throw new Error(
+                "Cette demande a déjà été traitée."
+            );
+
+        }
+
+
+        /*
+         * =====================================================
+         * GÉNÉRER LE CODE RES
+         * 10 caractères au total
+         * Aucun tiret
+         * =====================================================
+         */
+
+        const caracteres =
+            "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+
+        let inviteCode = "";
+
+
+        for(
+            let i = 0;
+            i < 7;
+            i++
+        ){
+
+            const index =
+                Math.floor(
+                    Math.random() *
+                    caracteres.length
+                );
+
+            inviteCode +=
+                caracteres[index];
+
+        }
+
+
+        inviteCode =
+            "RES" +
+            inviteCode;
+
+
+        /*
+         * Vérifier l'unicité du code
+         */
+
+        let codeExiste =
+            await db.ref(
+                "invitations/" +
+                inviteCode
+            ).once("value");
+
+
+        if(
+            codeExiste.exists()
+        ){
+
+            throw new Error(
+                "Impossible de générer un code unique. Réessayez."
+            );
+
+        }
+
+
+        /*
+         * =====================================================
+         * CRÉER L'INVITATION
+         * =====================================================
+         */
+
+        await db.ref(
+            "invitations/" +
+            inviteCode
+        ).set({
+
+            code:
+                inviteCode,
+
+            schoolId:
+                demande.schoolId,
+
+            role:
+                "responsable",
+
+            used:
+                false,
+
+            usedBy:
+                null,
+
+            usedAt:
+                null,
+
+            approved:
+                true,
+
+            validatedBy:
+                window.currentPhone,
+
+            validatedAt:
+                Date.now(),
+
+            createdAt:
+                Date.now()
+
+        });
+
+
+        /*
+         * =====================================================
+         * METTRE À JOUR LA DEMANDE
+         * =====================================================
+         */
+
+        await db.ref(
+            "responsableRequests/" +
+            demandeId
+        ).update({
+
+            statut:
+                "approved",
+
+            inviteCode:
+                inviteCode,
+
+            validatedBy:
+                window.currentPhone,
+
+            validatedAt:
+                Date.now()
+
+        });
+
+
+        /*
+         * IMPORTANT :
+         * On NE touche PAS à :
+         *
+         * users/{demande.demandePar}
+         *
+         * L'administrateur reste administrateur.
+         */
+
+
+        hideLoader();
+
+
+        alert(
+            "✅ Responsable autorisé.\n\n" +
+            "Code : " +
+            inviteCode
+        );
+
+
+        afficherDemandesResponsableMasomo();
+
+    }
+    catch(error){
+
+        hideLoader();
+
+        console.error(
+            "Erreur autorisation responsable :",
+            error
+        );
+
+        alert(
+            error.message ||
+            "Impossible d'autoriser le responsable."
+        );
+
+    }
+
+}
+
+// ============================================================
+// REFUSER UN RESPONSABLE
+// ============================================================
+
+async function refuserResponsableMasomo(
+    demandeId
+){
+
+    const raison =
+        prompt(
+            "Pourquoi refusez-vous cette demande ?"
+        );
+
+
+    if(
+        raison === null
+    ){
+
+        return;
+
+    }
+
+
+    showLoader();
+
+
+    try{
+
+        await db.ref(
+            "responsableRequests/" +
+            demandeId
+        ).update({
+
+            statut:
+                "rejected",
+
+            raison:
+                raison,
+
+            validatedBy:
+                window.currentPhone,
+
+            validatedAt:
+                Date.now()
+
+        });
+
+
+        hideLoader();
+
+
+        alert(
+            "❌ Demande de responsable refusée."
+        );
+
+
+        afficherDemandesResponsableMasomo();
+
+    }
+    catch(error){
+
+        hideLoader();
+
+        alert(
+            error.message
+        );
+
+    }
+
+}
 
 function showSchoolDetails(schoolId){
 
@@ -40530,6 +43623,1038 @@ async function ouvrirCoursSecondaire(idHeure, jour) {
     }
 
 }
+
+
+
+// ============================================================
+// ESPACE RESPONSABLE DE L'ÉCOLE
+// Compatible avec une ou plusieurs écoles
+// Permet de choisir l'école à gérer
+// ============================================================
+
+async function ouvrirEspaceResponsable(){
+
+    showLoader();
+
+    try{
+
+        var phone =
+            normalizePhone(
+                window.currentPhone
+            );
+
+
+        if(!phone){
+
+            throw new Error(
+                "Numéro du responsable introuvable."
+            );
+
+        }
+
+
+        var userSnap =
+            await db.ref(
+                "users/" +
+                phone
+            ).once("value");
+
+
+        if(!userSnap.exists()){
+
+            throw new Error(
+                "Compte responsable introuvable."
+            );
+
+        }
+
+
+        var user =
+            userSnap.val();
+
+
+        if(
+            user.role != "responsable"
+        ){
+
+            throw new Error(
+                "Ce compte n'est pas responsable."
+            );
+
+        }
+
+
+        // ========================================================
+        // RÉCUPÉRER LES ÉCOLES
+        // ========================================================
+
+        var schoolsAccess =
+            user.schoolsAccess ||
+            {};
+
+
+        /*
+         * Compatibilité avec les anciens comptes
+         * possédant uniquement schoolId.
+         */
+
+        var accessKeys =
+            Object.keys(
+                schoolsAccess
+            );
+
+
+        if(
+            accessKeys.length === 0 &&
+            user.schoolId
+        ){
+
+            schoolsAccess[
+                user.schoolId
+            ] = {
+
+                schoolId:
+                    user.schoolId,
+
+                active:
+                    true
+
+            };
+
+        }
+
+
+        var schoolIds =
+            Object.keys(
+                schoolsAccess
+            );
+
+
+        if(
+            schoolIds.length === 0
+        ){
+
+            throw new Error(
+                "Aucune école associée à ce responsable."
+            );
+
+        }
+
+
+        // ========================================================
+        // CHARGER LES ÉCOLES
+        // ========================================================
+
+        var ecoles = [];
+
+
+        for(
+            var i = 0;
+            i < schoolIds.length;
+            i++
+        ){
+
+            var schoolId =
+                schoolIds[i];
+
+
+            var access =
+                schoolsAccess[
+                    schoolId
+                ] || {};
+
+
+            /*
+             * Ne pas afficher un accès désactivé
+             */
+
+            if(
+                access.active === false
+            ){
+
+                continue;
+
+            }
+
+
+            var schoolSnap =
+                await db.ref(
+                    "schools/" +
+                    schoolId
+                ).once("value");
+
+
+            if(
+                !schoolSnap.exists()
+            ){
+
+                continue;
+
+            }
+
+
+            var school =
+                schoolSnap.val() ||
+                {};
+
+
+            // ====================================================
+            // DÉTERMINER LA SECTION
+            // ====================================================
+
+            var section =
+                school.section ||
+                "";
+
+
+            if(!section){
+
+                if(
+                    school.levels &&
+                    school.levels.primary === true
+                ){
+
+                    section =
+                        "primaire";
+
+                }
+                else if(
+                    school.levels &&
+                    school.levels.secondary === true
+                ){
+
+                    section =
+                        "secondaire";
+
+                }
+
+            }
+
+
+            ecoles.push({
+
+                schoolId:
+                    schoolId,
+
+                school:
+                    school,
+
+                section:
+                    section,
+
+                access:
+                    access
+
+            });
+
+        }
+
+
+        if(
+            ecoles.length === 0
+        ){
+
+            throw new Error(
+                "Les écoles associées sont introuvables."
+            );
+
+        }
+
+
+        // ========================================================
+        // VARIABLES GLOBALES
+        // ========================================================
+
+        window.currentPhone =
+            phone;
+
+        window.currentRole =
+            "responsable";
+
+
+        window.ecolesResponsable =
+            ecoles;
+
+
+        hideLoader();
+
+
+        // ========================================================
+        // ZONE D'AFFICHAGE
+        // ========================================================
+
+        var zone =
+            document.querySelector(
+                ".login-box"
+            );
+
+
+        if(!zone){
+
+            alert(
+                "Zone d'affichage introuvable."
+            );
+
+            return;
+
+        }
+
+
+        var html = `
+
+            <div style="
+                background:white;
+                border-radius:20px;
+                padding:20px;
+            ">
+
+                <h2 style="
+                    text-align:center;
+                    color:#1f4cff;
+                    margin-top:0;
+                ">
+                    👨‍💼 Espace Responsable
+                </h2>
+
+                <p style="
+                    text-align:center;
+                    color:#666;
+                    font-size:13px;
+                ">
+                    Sélectionnez l'école que vous
+                    souhaitez gérer.
+                </p>
+
+        `;
+
+
+        // ========================================================
+        // AFFICHER LES ÉCOLES
+        // ========================================================
+
+        for(
+            var j = 0;
+            j < ecoles.length;
+            j++
+        ){
+
+            var item =
+                ecoles[j];
+
+
+            var school =
+                item.school;
+
+
+            var nom =
+                school.schoolName ||
+                school.name ||
+                "École";
+
+
+            var sectionTexte =
+                item.section ||
+                "école";
+
+
+            var couleurSection =
+                "#1f4cff";
+
+
+            if(
+                item.section ==
+                "secondaire"
+            ){
+
+                couleurSection =
+                    "#7b1fa2";
+
+            }
+
+
+            html += `
+
+                <div style="
+                    border:1px solid #ddd;
+                    border-radius:15px;
+                    padding:15px;
+                    margin-top:12px;
+                    background:#f9faff;
+                ">
+
+                    <div style="
+                        font-weight:bold;
+                        font-size:16px;
+                        color:${couleurSection};
+                    ">
+                        🏫 ${
+                            escapeHtmlHoraire(
+                                nom
+                            )
+                        }
+                    </div>
+
+
+                    <div style="
+                        display:inline-block;
+                        margin-top:7px;
+                        padding:5px 9px;
+                        border-radius:20px;
+                        background:${couleurSection};
+                        color:white;
+                        font-size:11px;
+                        font-weight:bold;
+                    ">
+                        ${
+                            escapeHtmlHoraire(
+                                sectionTexte
+                            )
+                        }
+                    </div>
+
+
+                    <button
+                        onclick="selectionnerEcoleResponsable('${item.schoolId}')"
+                        style="
+                            width:100%;
+                            margin-top:12px;
+                            padding:12px;
+                            border:none;
+                            border-radius:10px;
+                            background:#1f4cff;
+                            color:white;
+                            font-weight:bold;
+                            cursor:pointer;
+                        "
+                    >
+                        Ouvrir cette école
+                    </button>
+
+                </div>
+
+            `;
+
+        }
+
+
+        html += `
+
+            </div>
+
+        `;
+
+
+        zone.innerHTML =
+            html;
+
+
+    }
+    catch(error){
+
+        hideLoader();
+
+        console.error(
+            "Erreur espace responsable :",
+            error
+        );
+
+        alert(
+            error.message ||
+            "Impossible d'ouvrir l'espace responsable."
+        );
+
+    }
+
+}
+
+// ============================================================
+// SÉLECTIONNER UNE ÉCOLE POUR LE RESPONSABLE
+// Mémorise l'école choisie puis ouvre son espace
+// ============================================================
+
+function selectionnerEcoleResponsable(schoolId){
+
+    if(!schoolId){
+
+        alert(
+            "École introuvable."
+        );
+
+        return;
+    }
+
+
+    window.currentSchoolId =
+        schoolId;
+
+
+    ouvrirEspaceResponsableEcole();
+
+}
+
+
+// ============================================================
+// OUVRIR L'ESPACE D'UNE ÉCOLE DU RESPONSABLE
+// Charge l'école sélectionnée et affiche son espace
+// ============================================================
+
+async function ouvrirEspaceResponsableEcole(){
+
+    showLoader();
+
+    try{
+
+        var schoolId =
+            window.currentSchoolId;
+
+
+        if(!schoolId){
+
+            throw new Error(
+                "Aucune école sélectionnée."
+            );
+
+        }
+
+
+        var schoolSnap =
+            await db.ref(
+                "schools/" +
+                schoolId
+            ).once("value");
+
+
+        if(!schoolSnap.exists()){
+
+            throw new Error(
+                "École introuvable."
+            );
+
+        }
+
+
+        var school =
+            schoolSnap.val() || {};
+
+
+        /*
+         * Vérifier la section
+         */
+
+        var section =
+            school.section ||
+            "";
+
+
+        if(!section){
+
+            if(
+                school.levels &&
+                school.levels.primary === true
+            ){
+
+                section =
+                    "primaire";
+
+            }
+            else if(
+                school.levels &&
+                school.levels.secondary === true
+            ){
+
+                section =
+                    "secondaire";
+
+            }
+
+        }
+
+
+        window.currentSchoolId =
+            schoolId;
+
+        window.currentRole =
+            "responsable";
+
+
+        window.currentResponsibleSchool =
+            school;
+
+
+        hideLoader();
+
+
+        var zone =
+            document.querySelector(
+                ".login-box"
+            );
+
+
+        if(!zone){
+
+            alert(
+                "Zone d'affichage introuvable."
+            );
+
+            return;
+
+        }
+
+
+        var nom =
+            school.schoolName ||
+            school.name ||
+            "École";
+
+
+        var html = `
+
+            <div style="
+                width:100%;
+                box-sizing:border-box;
+            ">
+
+                <button
+                    onclick="ouvrirEspaceResponsable()"
+                    style="
+                        border:none;
+                        background:#f1f1f1;
+                        padding:9px 14px;
+                        border-radius:10px;
+                        font-size:13px;
+                        cursor:pointer;
+                        margin-bottom:12px;
+                    "
+                >
+                    ⬅ Mes écoles
+                </button>
+
+
+                <div style="
+                    background:white;
+                    border-radius:18px;
+                    padding:18px;
+                    box-sizing:border-box;
+                ">
+
+                    <h2 style="
+                        text-align:center;
+                        color:#1f4cff;
+                        margin:0 0 6px 0;
+                    ">
+                        👨‍💼 Espace Responsable
+                    </h2>
+
+
+                    <div style="
+                        text-align:center;
+                        font-size:17px;
+                        font-weight:bold;
+                        color:#333;
+                        margin-top:8px;
+                    ">
+                        🏫 ${
+                            escapeHtmlHoraire(
+                                nom
+                            )
+                        }
+                    </div>
+
+
+                    <div style="
+                        text-align:center;
+                        margin-top:8px;
+                        color:#666;
+                        font-size:13px;
+                    ">
+                        Section :
+                        <b>
+                            ${
+                                escapeHtmlHoraire(
+                                    section ||
+                                    "non définie"
+                                )
+                            }
+                        </b>
+                    </div>
+
+
+                    <div style="
+                        margin-top:20px;
+                    ">
+
+        `;
+
+
+        // ========================================================
+        // OPTIONS SECONDAIRES
+        // ========================================================
+
+        if(
+            section ==
+            "secondaire"
+        ){
+
+            html += `
+
+                <button
+                    onclick="ouvrirResponsableCoursSecondaire()"
+                    style="
+                        width:100%;
+                        padding:14px;
+                        border:none;
+                        border-radius:12px;
+                        background:#1f4cff;
+                        color:white;
+                        font-weight:bold;
+                        font-size:14px;
+                        cursor:pointer;
+                        margin-bottom:10px;
+                    "
+                >
+                    📚 RESPONSABLE DE COURS
+                </button>
+
+            `;
+
+        }
+
+
+        // ========================================================
+        // MESSAGE PRIMAIRE
+        // ========================================================
+
+        if(
+            section ==
+            "primaire"
+        ){
+
+            html += `
+
+                <div style="
+                    background:#f5f7ff;
+                    border-radius:12px;
+                    padding:15px;
+                    text-align:center;
+                    color:#666;
+                    font-size:13px;
+                ">
+                    🏫 Gestion de l'école primaire
+                </div>
+
+            `;
+
+        }
+
+
+        // ========================================================
+        // SI SECTION INCONNUE
+        // ========================================================
+
+        if(
+            section != "primaire" &&
+            section != "secondaire"
+        ){
+
+            html += `
+
+                <div style="
+                    background:#fff7e6;
+                    border-radius:12px;
+                    padding:15px;
+                    text-align:center;
+                    color:#8a6500;
+                    font-size:13px;
+                ">
+                    ⚠️ La section de cette école
+                    n'est pas encore définie.
+                </div>
+
+            `;
+
+        }
+
+
+        html += `
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        `;
+
+
+        zone.innerHTML =
+            html;
+
+    }
+    catch(error){
+
+        hideLoader();
+
+        console.error(
+            "Erreur ouverture école responsable :",
+            error
+        );
+
+        alert(
+            error.message ||
+            "Impossible d'ouvrir cette école."
+        );
+
+    }
+
+}
+
+// ============================================================
+// CHARGER LES ÉCOLES DU RESPONSABLE
+// ============================================================
+
+function chargerEcolesResponsable(schoolIds){
+
+    showLoader();
+
+    var promesses = [];
+
+    for(
+        var i = 0;
+        i < schoolIds.length;
+        i++
+    ){
+
+        promesses.push(
+
+            db.ref(
+                "schools/" +
+                schoolIds[i]
+            ).once("value")
+
+        );
+
+    }
+
+
+    Promise.all(promesses)
+
+    .then(function(resultats){
+
+        hideLoader();
+
+        var ecoles = [];
+
+        for(
+            var i = 0;
+            i < resultats.length;
+            i++
+        ){
+
+            var snapshot =
+                resultats[i];
+
+            if(
+                snapshot.exists()
+            ){
+
+                var school =
+                    snapshot.val() || {};
+
+                school.schoolId =
+                    schoolIds[i];
+
+                ecoles.push(
+                    school
+                );
+
+            }
+
+        }
+
+
+        if(ecoles.length === 0){
+
+            alert(
+                "Les écoles associées à ce compte sont introuvables."
+            );
+
+            return;
+
+        }
+
+
+        window.ecolesResponsable =
+            ecoles;
+
+
+        afficherEspaceResponsable(
+            ecoles
+        );
+
+    })
+
+    .catch(function(error){
+
+        hideLoader();
+
+        console.error(
+            "Erreur chargement écoles responsable :",
+            error
+        );
+
+        alert(
+            error.message ||
+            "Impossible de charger les écoles."
+        );
+
+    });
+
+}
+
+
+// ============================================================
+// AFFICHER L'ESPACE RESPONSABLE
+// ============================================================
+
+function afficherEspaceResponsable(ecoles){
+
+    var zone =
+        document.querySelector(
+            ".login-box"
+        );
+
+
+    if(!zone){
+
+        alert(
+            "Zone d'affichage introuvable."
+        );
+
+        return;
+
+    }
+
+
+    var html = "";
+
+
+    html += `
+
+        <div style="
+            width:100%;
+            box-sizing:border-box;
+        ">
+
+            <button
+                onclick="retourEspaceDepuisResponsable()"
+                style="
+                    border:none;
+                    background:#f1f1f1;
+                    padding:9px 14px;
+                    border-radius:10px;
+                    font-size:13px;
+                    cursor:pointer;
+                    margin-bottom:12px;
+                "
+            >
+                ⬅ Retour
+            </button>
+
+
+            <h2 style="
+                text-align:center;
+                color:#1f4cff;
+                margin:5px 0;
+            ">
+                👔 ESPACE RESPONSABLE
+            </h2>
+
+
+            <div style="
+                text-align:center;
+                color:#666;
+                font-size:13px;
+                margin-bottom:18px;
+            ">
+                Gestion et contrôle de vos établissements
+            </div>
+
+    `;
+
+
+    /*
+     * =====================================================
+     * SI UNE SEULE ÉCOLE
+     * =====================================================
+     */
+
+    if(ecoles.length === 1){
+
+        html +=
+            construireCarteEcoleResponsable(
+                ecoles[0],
+                0
+            );
+
+    }
+
+
+    /*
+     * =====================================================
+     * SI PLUSIEURS ÉCOLES
+     * =====================================================
+     */
+
+    else{
+
+        html += `
+
+            <div style="
+                background:#f5f7ff;
+                border-radius:12px;
+                padding:12px;
+                margin-bottom:12px;
+                text-align:center;
+                font-size:13px;
+                color:#555;
+            ">
+                🏫 Vous êtes responsable de
+                <b>${ecoles.length}</b>
+                établissements.
+            </div>
+
+        `;
+
+
+        for(
+            var i = 0;
+            i < ecoles.length;
+            i++
+        ){
+
+            html +=
+                construireCarteEcoleResponsable(
+                    ecoles[i],
+                    i
+                );
+
+        }
+
+    }
+
+
+    html += `
+
+        </div>
+
+    `;
+
+
+    zone.innerHTML =
+        html;
+
+}
+
 
 </script>
 
