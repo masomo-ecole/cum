@@ -1982,33 +1982,34 @@ loader.style.display=
 
 // ============================================================
 // VÉRIFIER LE NUMÉRO DE TÉLÉPHONE
-// Utilise le cache en priorité pour une connexion instantanée
+//
+// Ancien numéro : ouvrir directement la connexion
+// Nouveau numéro : proposer Créer une école / Rejoindre
+// Utilise le cache avant Firebase pour accélérer
 // ============================================================
 
 async function checkPhone(){
 
     try{
 
-        let phoneInput =
-            document.getElementById("loginPhone");
+        const input =
+            document.getElementById("phone");
 
-        if(!phoneInput){
 
-            phoneInput =
-                document.getElementById("phone");
+        if(!input){
 
-        }
+            alert(
+                "Champ téléphone introuvable."
+            );
 
-        if(!phoneInput){
-
-            alert("Champ téléphone introuvable.");
             return;
 
         }
 
+
         let phone =
             normalizePhone(
-                phoneInput.value.trim()
+                input.value.trim()
             );
 
 
@@ -2028,7 +2029,7 @@ async function checkPhone(){
 
 
         // ====================================================
-        // 1. CHERCHER D'ABORD DANS LE CACHE LOCAL
+        // 1. CHERCHER LE PROFIL DANS LE CACHE
         // ====================================================
 
         let cachedUser = null;
@@ -2036,63 +2037,22 @@ async function checkPhone(){
 
         try{
 
-            if(
-                typeof getCachedUser ===
-                "function"
-            ){
-
-                cachedUser =
-                    getCachedUser(phone);
-
-            }
+            cachedUser =
+                getCachedUser(phone);
 
         }
-        catch(cacheError){
+        catch(error){
 
             console.warn(
-                "Erreur lecture cache :",
-                cacheError
+                "Lecture cache impossible :",
+                error
             );
 
         }
 
 
-        // Compatibilité avec le cache direct
-        if(!cachedUser){
-
-            try{
-
-                let localData =
-                    localStorage.getItem(
-                        "masomoUserData_" +
-                        phone
-                    );
-
-
-                if(localData){
-
-                    cachedUser =
-                        JSON.parse(
-                            localData
-                        );
-
-                }
-
-            }
-            catch(e){
-
-                console.warn(
-                    "Cache utilisateur invalide."
-                );
-
-            }
-
-        }
-
-
         // ====================================================
-        // 2. SI LE COMPTE EST DÉJÀ EN CACHE
-        // NE PAS ATTENDRE FIREBASE
+        // 2. COMPTE DÉJÀ CONNU
         // ====================================================
 
         if(
@@ -2104,68 +2064,14 @@ async function checkPhone(){
                 cachedUser;
 
 
-            window.currentPhone =
-                phone;
+            afficherConnexionMotDePasse(
+                cachedUser.email
+            );
 
 
             /*
-             * Affichage immédiat
-             */
-
-            let status =
-                document.getElementById(
-                    "loginStatus"
-                );
-
-
-            if(status){
-
-                status.innerHTML =
-                    "✓ Numéro valide";
-
-                status.style.color =
-                    "green";
-
-            }
-
-
-            /*
-             * Le compte est connu :
-             * on laisse l'utilisateur entrer
-             * directement son mot de passe.
-             */
-
-            let password =
-                document.getElementById(
-                    "loginPassword"
-                );
-
-
-            if(password){
-
-                password.disabled =
-                    false;
-
-            }
-
-
-            let button =
-                document.querySelector(
-                    'button[onclick="loginUser()"]'
-                );
-
-
-            if(button){
-
-                button.disabled =
-                    false;
-
-            }
-
-
-            /*
-             * Firebase est vérifié derrière,
-             * sans bloquer l'affichage.
+             * Firebase vérifie silencieusement
+             * que l'adresse du compte est toujours correcte.
              */
 
             db.ref(
@@ -2176,28 +2082,38 @@ async function checkPhone(){
             .then(function(snapshot){
 
                 if(
-                    snapshot.exists() &&
-                    snapshot.val().email
+                    snapshot.exists()
                 ){
 
-                    cachedUser.email =
-                        snapshot.val().email;
+                    let data =
+                        snapshot.val() || {};
 
 
-                    window.loginUserData =
-                        cachedUser;
+                    if(
+                        data.email
+                    ){
+
+                        window.loginUserData.email =
+                            data.email;
 
 
-                    localStorage.setItem(
+                        try{
 
-                        "masomoUserData_" +
-                        phone,
+                            localStorage.setItem(
 
-                        JSON.stringify(
-                            cachedUser
-                        )
+                                "masomoUserData_" +
+                                phone,
 
-                    );
+                                JSON.stringify(
+                                    window.loginUserData
+                                )
+
+                            );
+
+                        }
+                        catch(error){}
+
+                    }
 
                 }
 
@@ -2205,7 +2121,7 @@ async function checkPhone(){
             .catch(function(error){
 
                 console.warn(
-                    "Synchronisation loginIndex :",
+                    "Synchronisation numéro :",
                     error
                 );
 
@@ -2218,8 +2134,7 @@ async function checkPhone(){
 
 
         // ====================================================
-        // 3. PREMIÈRE CONNEXION
-        // ICI SEULEMENT : INTERROGER FIREBASE
+        // 3. VÉRIFIER FIREBASE
         // ====================================================
 
         showLoader();
@@ -2235,26 +2150,46 @@ async function checkPhone(){
         hideLoader();
 
 
-        if(!snapshot.exists()){
+        // ====================================================
+        // 4. NOUVEAU NUMÉRO
+        // ====================================================
+
+        if(
+            !snapshot.exists()
+        ){
 
             window.loginUserData =
                 null;
 
 
-            alert(
-                "Aucun compte trouvé avec ce numéro."
-            );
+            /*
+             * Le numéro n'a jamais eu de compte.
+             *
+             * On ne demande PAS de mot de passe.
+             * On affiche directement :
+             *
+             * - Créer une école
+             * - Rejoindre une école
+             */
+
+            afficherChoixNouveauUtilisateur();
 
             return;
 
         }
 
 
+        // ====================================================
+        // 5. COMPTE EXISTANT MAIS NON ACTIVÉ
+        // ====================================================
+
         let loginData =
             snapshot.val() || {};
 
 
-        if(!loginData.email){
+        if(
+            !loginData.email
+        ){
 
             alert(
                 "Ce compte n'est pas encore activé."
@@ -2264,6 +2199,10 @@ async function checkPhone(){
 
         }
 
+
+        // ====================================================
+        // 6. COMPTE EXISTANT
+        // ====================================================
 
         window.loginUserData = {
 
@@ -2275,11 +2214,6 @@ async function checkPhone(){
 
         };
 
-
-        /*
-         * Sauvegarder immédiatement
-         * pour les prochaines connexions.
-         */
 
         try{
 
@@ -2295,58 +2229,13 @@ async function checkPhone(){
             );
 
         }
-        catch(e){
-
-            console.warn(
-                "Impossible de sauvegarder le cache."
-            );
-
-        }
+        catch(error){}
 
 
-        let status =
-            document.getElementById(
-                "loginStatus"
-            );
+        afficherConnexionMotDePasse(
+            loginData.email
+        );
 
-
-        if(status){
-
-            status.innerHTML =
-                "✓ Numéro valide";
-
-            status.style.color =
-                "green";
-
-        }
-
-
-        let password =
-            document.getElementById(
-                "loginPassword"
-            );
-
-
-        if(password){
-
-            password.disabled =
-                false;
-
-        }
-
-
-        let button =
-            document.querySelector(
-                'button[onclick="loginUser()"]'
-            );
-
-
-        if(button){
-
-            button.disabled =
-                false;
-
-        }
 
     }
     catch(error){
@@ -2358,10 +2247,219 @@ async function checkPhone(){
             error
         );
 
+
         alert(
             error.message ||
             "Impossible de vérifier le numéro."
         );
+
+    }
+
+}
+
+
+// ============================================================
+// AFFICHER LE MOT DE PASSE POUR UN COMPTE EXISTANT
+// ============================================================
+
+function afficherConnexionMotDePasse(email){
+
+    const password =
+        document.getElementById(
+            "loginPassword"
+        );
+
+
+    const button =
+        document.getElementById(
+            "continueBtn"
+        );
+
+
+    const status =
+        document.getElementById(
+            "phoneStatus"
+        );
+
+
+    if(password){
+
+        password.style.display =
+            "block";
+
+        password.disabled =
+            false;
+
+        password.focus();
+
+    }
+
+
+    if(button){
+
+        button.innerHTML =
+            "🔐 Se connecter";
+
+        button.onclick =
+            function(){
+
+                loginUser();
+
+            };
+
+        button.disabled =
+            false;
+
+        button.style.opacity =
+            "1";
+
+        button.style.pointerEvents =
+            "auto";
+
+    }
+
+
+    if(status){
+
+        status.innerHTML =
+            "✓ Compte trouvé";
+
+        status.style.color =
+            "green";
+
+    }
+
+}
+
+
+// ============================================================
+// AFFICHER LE CHOIX POUR UN NOUVEL UTILISATEUR
+// ============================================================
+
+function afficherChoixNouveauUtilisateur(){
+
+    const page2 =
+        document.getElementById(
+            "page2"
+        );
+
+
+    if(!page2){
+
+        alert(
+            "Espace de choix introuvable."
+        );
+
+        return;
+
+    }
+
+
+    page2.style.display =
+        "flex";
+
+
+    page2.innerHTML = `
+
+        <h2 style="
+            text-align:center;
+            color:#1f4cff;
+            margin:0;
+        ">
+            Bienvenue
+        </h2>
+
+
+        <p style="
+            text-align:center;
+            color:#666;
+            margin:0;
+        ">
+            Ce numéro ne possède pas encore de compte.
+        </p>
+
+
+        <button
+            onclick="createSchool()"
+            style="
+                width:100%;
+                padding:13px;
+                border:none;
+                border-radius:10px;
+                background:#1f4cff;
+                color:white;
+                font-weight:bold;
+                font-size:15px;
+            "
+        >
+            🏫 Créer une école
+        </button>
+
+
+        <button
+            onclick="joinSchool()"
+            style="
+                width:100%;
+                padding:13px;
+                border:none;
+                border-radius:10px;
+                background:#2e7d32;
+                color:white;
+                font-weight:bold;
+                font-size:15px;
+            "
+        >
+            🔗 Rejoindre une école
+        </button>
+
+    `;
+
+
+    /*
+     * Masquer la partie connexion
+     */
+
+    const password =
+        document.getElementById(
+            "loginPassword"
+        );
+
+
+    if(password){
+
+        password.style.display =
+            "none";
+
+    }
+
+
+    const button =
+        document.getElementById(
+            "continueBtn"
+        );
+
+
+    if(button){
+
+        button.style.display =
+            "none";
+
+    }
+
+
+    const status =
+        document.getElementById(
+            "phoneStatus"
+        );
+
+
+    if(status){
+
+        status.innerHTML =
+            "Nouveau numéro";
+
+        status.style.color =
+            "#1f4cff";
 
     }
 
@@ -7014,8 +7112,13 @@ catch(error){
 }
 
 // ============================================================
-// ESPACE ADMINISTRATEUR
-// Utilise le cache en priorité puis synchronise Firebase
+// OUVRIR L'ESPACE ADMINISTRATEUR
+//
+// - Utilise le cache immédiatement
+// - N'attend pas Firebase si les données locales existent
+// - Une seule synchronisation arrière-plan
+// - Évite les doubles lectures Firebase
+// - Compatible avec actualiserAdmin(true)
 // ============================================================
 
 function openAdmin(user){
@@ -7024,17 +7127,28 @@ function openAdmin(user){
         "admin";
 
 
-    /*
-     * Si l'utilisateur n'est pas fourni,
-     * récupérer le profil depuis le cache.
-     */
+    // ========================================================
+    // RÉCUPÉRER LE PROFIL
+    // ========================================================
 
     if(!user){
 
-        user =
-            getCachedUser(
-                window.currentPhone
+        try{
+
+            user =
+                getCachedUser(
+                    window.currentPhone
+                );
+
+        }
+        catch(error){
+
+            console.warn(
+                "Lecture cache utilisateur :",
+                error
             );
+
+        }
 
     }
 
@@ -7050,16 +7164,22 @@ function openAdmin(user){
     }
 
 
+    // ========================================================
+    // INFORMATIONS COMPTE
+    // ========================================================
+
     var phone =
         normalizePhone(
             user.phone ||
-            window.currentPhone
+            window.currentPhone ||
+            ""
         );
 
 
     var schoolId =
         user.schoolId ||
-        window.currentSchoolId;
+        window.currentSchoolId ||
+        "";
 
 
     if(!schoolId){
@@ -7081,11 +7201,9 @@ function openAdmin(user){
         schoolId;
 
 
-    /*
-     * ========================================================
-     * CACHE ÉCOLE
-     * ========================================================
-     */
+    // ========================================================
+    // CACHE ÉCOLE
+    // ========================================================
 
     var cacheKey =
         "adminData_" +
@@ -7105,16 +7223,18 @@ function openAdmin(user){
     }
     catch(error){
 
-        cache = null;
+        console.warn(
+            "Lecture cache école impossible :",
+            error
+        );
 
     }
 
 
-    /*
-     * ========================================================
-     * OUVERTURE IMMÉDIATE SI CACHE DISPONIBLE
-     * ========================================================
-     */
+    // ========================================================
+    // SI CACHE DISPONIBLE
+    // OUVERTURE IMMÉDIATE
+    // ========================================================
 
     if(cache){
 
@@ -7131,43 +7251,57 @@ function openAdmin(user){
                 data.school
             ){
 
-                window.adminCache =
+                var school =
                     data.school;
 
 
+                window.adminCache =
+                    school;
+
+
+                window.currentSchool =
+                    school;
+
+
                 /*
-                 * Affichage immédiat
+                 * Vérification locale de l'accès.
+                 *
+                 * Aucun appel Firebase ici.
                  */
 
                 if(
-                    verifierEssai(
-                        data.school
-                    )
+                    typeof verifierEssai ===
+                    "function"
                 ){
 
-                    afficherAdmin(
-                        data.school
-                    );
+                    if(
+                        !verifierEssai(
+                            school
+                        )
+                    ){
 
+                        return;
 
-                    surveillerEssai();
-
-
-                    /*
-                     * Firebase sera actualisé
-                     * en arrière-plan.
-                     */
-
-                    actualiserAdmin(
-                        true
-                    );
+                    }
 
                 }
 
 
-                /*
-                 * Ne pas attendre Firebase
-                 */
+                // =================================================
+                // AFFICHAGE IMMÉDIAT
+                // =================================================
+
+                afficherAdmin(
+                    school
+                );
+
+
+                surveillerEssai();
+
+
+                // =================================================
+                // UNE SEULE SYNCHRONISATION ARRIÈRE-PLAN
+                // =================================================
 
                 synchroniserAdminArrierePlan(
                     schoolId,
@@ -7192,13 +7326,10 @@ function openAdmin(user){
     }
 
 
-    /*
-     * ========================================================
-     * PREMIÈRE CONNEXION
-     * Pas encore de cache.
-     * Firebase est nécessaire une seule fois.
-     * ========================================================
-     */
+    // ========================================================
+    // PREMIÈRE OUVERTURE
+    // Aucun cache disponible
+    // ========================================================
 
     showLoader();
 
@@ -7211,7 +7342,9 @@ function openAdmin(user){
 
     .then(function(snapshot){
 
-        if(!snapshot.exists()){
+        if(
+            !snapshot.exists()
+        ){
 
             throw new Error(
                 "École introuvable."
@@ -7224,13 +7357,26 @@ function openAdmin(user){
             snapshot.val() || {};
 
 
+        // ====================================================
+        // VÉRIFICATION ABONNEMENT / ESSAI
+        // ====================================================
+
         if(
-            !verifierEssai(
-                school
-            )
+            typeof verifierEssai ===
+            "function"
         ){
 
-            return;
+            if(
+                !verifierEssai(
+                    school
+                )
+            ){
+
+                hideLoader();
+
+                return;
+
+            }
 
         }
 
@@ -7239,10 +7385,13 @@ function openAdmin(user){
             school;
 
 
-        /*
-         * Sauvegarder immédiatement
-         * pour les prochaines ouvertures.
-         */
+        window.currentSchool =
+            school;
+
+
+        // ====================================================
+        // SAUVEGARDER LE CACHE
+        // ====================================================
 
         try{
 
@@ -7269,7 +7418,7 @@ function openAdmin(user){
         catch(error){
 
             console.warn(
-                "Impossible de sauvegarder le cache école :",
+                "Sauvegarde cache admin impossible :",
                 error
             );
 
@@ -7279,12 +7428,17 @@ function openAdmin(user){
         hideLoader();
 
 
+        // ====================================================
+        // AFFICHER L'ADMIN
+        // ====================================================
+
         afficherAdmin(
             school
         );
 
 
         surveillerEssai();
+
 
     })
 
@@ -7307,6 +7461,7 @@ function openAdmin(user){
     });
 
 }
+
 
 // ============================================================
 // SYNCHRONISER L'ADMIN EN ARRIÈRE-PLAN
@@ -7722,80 +7877,243 @@ setTimeout(function(){
 }
 
 
-function actualiserAdmin(silencieux=false){
+// ============================================================
+// ACTUALISER LES DONNÉES ADMIN
+//
+// - Charge les nouvelles données Firebase
+// - Met à jour le cache
+// - Ne reconstruit PAS l'espace admin lors d'une
+//   actualisation silencieuse
+// - Évite les ralentissements et clignotements
+// ============================================================
 
-    if(!window.currentSchoolId){
+async function actualiserAdmin(silencieux){
+
+    if(
+        !window.currentSchoolId
+    ){
+
         return;
+
     }
+
+
+    /*
+     * Compatibilité avec les anciens appels :
+     *
+     * actualiserAdmin()
+     * actualiserAdmin(true)
+     */
+
+    silencieux =
+        silencieux === true;
+
 
     if(!silencieux){
+
         showLoader();
+
     }
 
-    db.ref("schools/"+window.currentSchoolId)
-    .once("value")
-    .then(snapshot=>{
 
-        if(!snapshot.exists()){
+    try{
+
+        const schoolId =
+            window.currentSchoolId;
+
+
+        /*
+         * ====================================================
+         * CHARGER L'ÉCOLE
+         * ====================================================
+         */
+
+        const snapshot =
+            await db.ref(
+                "schools/" +
+                schoolId
+            ).once("value");
+
+
+        if(
+            !snapshot.exists()
+        ){
 
             if(!silencieux){
+
                 hideLoader();
+
             }
 
+            console.warn(
+                "École introuvable :",
+                schoolId
+            );
+
             return;
+
         }
 
-        let school = snapshot.val();
 
-        // Mise à jour du cache mémoire
-        window.adminCache = school;
+        const school =
+            snapshot.val() || {};
 
-        // Mise à jour du cache local
-        
-       localStorage.setItem(
 
-"adminData_"+window.currentSchoolId,
+        /*
+         * ====================================================
+         * METTRE À JOUR LE CACHE MÉMOIRE
+         * ====================================================
+         */
 
-JSON.stringify({
+        window.adminCache =
+            school;
 
-school:school,
 
-schoolId:window.currentSchoolId,
+        window.currentSchool =
+            school;
 
-phone:window.currentPhone
 
-})
+        /*
+         * ====================================================
+         * METTRE À JOUR LE CACHE LOCAL
+         * ====================================================
+         */
 
-);
+        try{
 
-        // Si l'utilisateur est sur l'espace admin
-        if(document.querySelector(".admin-header")){
+            localStorage.setItem(
 
-    if(verifierEssai(school)){
+                "adminData_" +
+                schoolId,
 
-        afficherAdmin(school);
+                JSON.stringify({
 
-    }else{
+                    school:
+                        school,
 
-        return;
+                    schoolId:
+                        schoolId,
+
+                    phone:
+                        window.currentPhone
+
+                })
+
+            );
+
+        }
+        catch(cacheError){
+
+            console.warn(
+                "Impossible de mettre à jour le cache admin :",
+                cacheError
+            );
+
+        }
+
+
+        /*
+         * ====================================================
+         * VÉRIFIER L'ABONNEMENT
+         * ====================================================
+         */
+
+        if(
+            typeof verifierEssai ===
+            "function"
+        ){
+
+            const autorise =
+                verifierEssai(
+                    school
+                );
+
+
+            if(!autorise){
+
+                if(!silencieux){
+
+                    hideLoader();
+
+                }
+
+                return;
+
+            }
+
+        }
+
+
+        /*
+         * ====================================================
+         * ACTUALISATION DE L'INTERFACE
+         *
+         * IMPORTANT :
+         *
+         * En mode silencieux :
+         * NE PAS appeler afficherAdmin().
+         *
+         * L'espace est déjà affiché.
+         * On laisse donc l'écran tranquille.
+         *
+         * En mode normal :
+         * on reconstruit l'interface.
+         * ====================================================
+         */
+
+        if(!silencieux){
+
+            if(
+                document.querySelector(
+                    ".admin-header"
+                )
+            ){
+
+                afficherAdmin(
+                    school
+                );
+
+            }
+
+        }
+
+
+        /*
+         * ====================================================
+         * FIN
+         * ====================================================
+         */
+
+        if(!silencieux){
+
+            hideLoader();
+
+        }
+
 
     }
-
-}
-
-        if(!silencieux){
-            hideLoader();
-        }
-
-    })
-    .catch(error=>{
+    catch(error){
 
         if(!silencieux){
+
             hideLoader();
-            alert(error.message);
+
+            alert(
+                error.message ||
+                "Impossible d'actualiser l'école."
+            );
+
+        }
+        else{
+
+            console.warn(
+                "Actualisation admin en arrière-plan :",
+                error
+            );
+
         }
 
-    });
+    }
 
 }
 
