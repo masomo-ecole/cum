@@ -1535,7 +1535,12 @@ let schoolLogo="";
 // SAUVEGARDER LA SESSION SANS BLOQUER LES ANCIENS WEBVIEW
 // ============================================================
 
-function saveSession(phone){
+// ============================================================
+// SAUVEGARDER LA SESSION ET LE PROFIL EN CACHE
+// Ne bloque jamais la connexion
+// ============================================================
+
+function saveSession(phone, user){
 
     var numero =
         normalizePhone(phone);
@@ -1550,34 +1555,88 @@ function saveSession(phone){
 
     try{
 
+        // Téléphone de session
         localStorage.setItem(
             "masomoUser",
             numero
         );
 
+
+        // Profil utilisateur
+        if(user){
+
+            localStorage.setItem(
+                "masomoUserData_" + numero,
+                JSON.stringify(user)
+            );
+
+        }
+
     }
     catch(error){
 
-        /*
-         * Le stockage du téléphone est seulement
-         * une aide pour mémoriser la session.
-         *
-         * Si le stockage est plein sur un ancien
-         * WebView, la connexion ne doit PAS être bloquée.
-         */
-
         console.warn(
-            "Session non sauvegardée dans localStorage :",
+            "Cache session indisponible :",
             error
         );
 
     }
 
 }
+
 // récupérer connexion
 function getSession(){
 
     return localStorage.getItem("masomoUser");
+
+}
+
+// ============================================================
+// RÉCUPÉRER LE PROFIL UTILISATEUR DEPUIS LE CACHE
+// Permet une ouverture rapide sans attendre Firebase
+// ============================================================
+
+function getCachedUser(phone){
+
+    var numero =
+        normalizePhone(phone);
+
+
+    if(!numero){
+
+        return null;
+
+    }
+
+
+    try{
+
+        var data =
+            localStorage.getItem(
+                "masomoUserData_" + numero
+            );
+
+
+        if(!data){
+
+            return null;
+
+        }
+
+
+        return JSON.parse(data);
+
+    }
+    catch(error){
+
+        console.warn(
+            "Impossible de lire le profil en cache :",
+            error
+        );
+
+        return null;
+
+    }
 
 }
 
@@ -1921,217 +1980,110 @@ loader.style.display=
 
 }
 
-// ================= CONNEXION =================
-
 // ============================================================
-// CONNEXION : VÉRIFICATION DU NUMÉRO
+// VÉRIFIER LE NUMÉRO DE TÉLÉPHONE
+// Utilise le cache en priorité pour une connexion instantanée
 // ============================================================
 
-function checkPhone(){
+async function checkPhone(){
 
-    var code =
-        document.getElementById("countryCode").value;
+    try{
 
-    var number =
-        document.getElementById("phone").value.trim();
+        let phoneInput =
+            document.getElementById("loginPhone");
 
+        if(!phoneInput){
 
-    // ========================================================
-    // ACCÈS MASOMO-ECOLE
-    // ========================================================
-
-    if(number === "994044329"){
-
-        window.currentPhone =
-            "243994044329";
-
-        window.loginUserData = {
-
-            phone:"243994044329",
-
-            email:"controle@masomo.app",
-
-            role:"superadmin"
-
-        };
-
-
-        document.getElementById(
-            "loginPassword"
-        ).style.display = "block";
-
-
-        document.getElementById(
-            "continueBtn"
-        ).innerText = "Se connecter";
-
-
-        document.getElementById(
-            "continueBtn"
-        ).onclick = loginUser;
-
-
-        return;
-
-    }
-
-
-    // ========================================================
-    // NORMALISER LE NUMÉRO
-    // ========================================================
-
-    var phone =
-        normalizePhone(code + number);
-
-
-    if(!phone){
-
-        alert(
-            "Veuillez entrer un numéro de téléphone."
-        );
-
-        return;
-
-    }
-
-
-    window.currentPhone = phone;
-
-
-    showLoader();
-
-
-    // ========================================================
-    // CONNEXION FIREBASE
-    // ========================================================
-
-    db.goOnline();
-
-
-    // ========================================================
-    // 1. CHERCHER D'ABORD DANS loginIndex
-    // ========================================================
-
-    db.ref(
-        "loginIndex/" + phone
-    )
-    .once("value")
-
-    .then(function(snapshot){
-
-        if(snapshot.exists()){
-
-            var login =
-                snapshot.val() || {};
-
-
-            if(login.email){
-
-                window.loginUserData = {
-
-                    phone:phone,
-
-                    email:login.email
-
-                };
-
-
-                hideLoader();
-
-
-                document.getElementById(
-                    "loginPassword"
-                ).style.display = "block";
-
-
-                document.getElementById(
-                    "continueBtn"
-                ).innerText = "Se connecter";
-
-
-                document.getElementById(
-                    "continueBtn"
-                ).onclick = loginUser;
-
-
-                return null;
-
-            }
+            phoneInput =
+                document.getElementById("phone");
 
         }
 
+        if(!phoneInput){
 
-        // ====================================================
-        // 2. FALLBACK : CHERCHER DIRECTEMENT users
-        // ====================================================
+            alert("Champ téléphone introuvable.");
+            return;
 
-        return db.ref(
-            "users/" + phone
-        )
-        .once("value");
+        }
 
-    })
+        let phone =
+            normalizePhone(
+                phoneInput.value.trim()
+            );
 
-    .then(function(userSnapshot){
 
-        if(!userSnapshot){
+        if(!phone){
+
+            alert(
+                "Veuillez entrer un numéro de téléphone."
+            );
 
             return;
 
         }
 
 
-        if(userSnapshot.exists()){
-
-            var user =
-                userSnapshot.val() || {};
+        window.currentPhone =
+            phone;
 
 
-            if(user.email){
+        // ====================================================
+        // 1. CHERCHER D'ABORD DANS LE CACHE LOCAL
+        // ====================================================
 
-                // ==========================================
-                // COMPTE EXISTANT MAIS loginIndex ABSENT
-                // ==========================================
-
-                window.loginUserData = {
-
-                    phone:phone,
-
-                    email:user.email
-
-                };
+        let cachedUser = null;
 
 
-                // Réparer automatiquement loginIndex
-                db.ref(
-                    "loginIndex/" + phone
-                )
-                .set({
+        try{
 
-                    email:user.email
+            if(
+                typeof getCachedUser ===
+                "function"
+            ){
 
-                });
+                cachedUser =
+                    getCachedUser(phone);
 
+            }
 
-                hideLoader();
+        }
+        catch(cacheError){
 
+            console.warn(
+                "Erreur lecture cache :",
+                cacheError
+            );
 
-                document.getElementById(
-                    "loginPassword"
-                ).style.display = "block";
-
-
-                document.getElementById(
-                    "continueBtn"
-                ).innerText = "Se connecter";
-
-
-                document.getElementById(
-                    "continueBtn"
-                ).onclick = loginUser;
+        }
 
 
-                return;
+        // Compatibilité avec le cache direct
+        if(!cachedUser){
+
+            try{
+
+                let localData =
+                    localStorage.getItem(
+                        "masomoUserData_" +
+                        phone
+                    );
+
+
+                if(localData){
+
+                    cachedUser =
+                        JSON.parse(
+                            localData
+                        );
+
+                }
+
+            }
+            catch(e){
+
+                console.warn(
+                    "Cache utilisateur invalide."
+                );
 
             }
 
@@ -2139,194 +2091,921 @@ function checkPhone(){
 
 
         // ====================================================
-        // 3. UTILISATEUR INCONNU
+        // 2. SI LE COMPTE EST DÉJÀ EN CACHE
+        // NE PAS ATTENDRE FIREBASE
         // ====================================================
 
-        hideLoader();
+        if(
+            cachedUser &&
+            cachedUser.email
+        ){
+
+            window.loginUserData =
+                cachedUser;
 
 
-        document.querySelector(
-            "h1"
-        ).style.display = "none";
+            window.currentPhone =
+                phone;
 
 
-        document.querySelector(
-            "p"
-        ).style.display = "none";
+            /*
+             * Affichage immédiat
+             */
+
+            let status =
+                document.getElementById(
+                    "loginStatus"
+                );
 
 
-        document.querySelector(
-            ".phone-box"
-        ).style.display = "none";
+            if(status){
 
+                status.innerHTML =
+                    "✓ Numéro valide";
 
-        document.getElementById(
-            "continueBtn"
-        ).style.display = "none";
-
-
-        document.getElementById(
-            "page2"
-        ).style.display = "flex";
-
-    })
-
-    .catch(function(error){
-
-        hideLoader();
-
-
-        console.error(
-            "Erreur Firebase connexion :",
-            error
-        );
-
-
-        alert(
-            "Impossible de vérifier ce numéro.\n\n" +
-            "Vérifiez votre connexion Internet puis réessayez."
-        );
-
-    });
-
-}
-
-function loginUser(){
-
-    let password = document.getElementById("loginPassword").value.trim();
-
-    let login = window.loginUserData;
-
-    if(!login){
-
-        alert("Utilisateur introuvable.");
-
-        return;
-
-    }
-
-    if(!login.email){
-
-        alert("Ce compte n'est pas encore activé.");
-
-        return;
-
-    }
-
-    showLoader();
-
-    auth.signInWithEmailAndPassword(login.email,password)
-
-    .then(()=>{
-
-        let uid = auth.currentUser.uid;
-
-        return db.ref("users/"+login.phone)
-
-        .once("value")
-
-        .then(snapshot=>{
-
-            if(!snapshot.exists()){
-
-                throw new Error("Compte introuvable.");
+                status.style.color =
+                    "green";
 
             }
 
-            let user = snapshot.val();
 
-            user.uid = uid;
+            /*
+             * Le compte est connu :
+             * on laisse l'utilisateur entrer
+             * directement son mot de passe.
+             */
 
-            let updates = [];
+            let password =
+                document.getElementById(
+                    "loginPassword"
+                );
 
-            // Sauvegarder le uid dans le compte
+
+            if(password){
+
+                password.disabled =
+                    false;
+
+            }
+
+
+            let button =
+                document.querySelector(
+                    'button[onclick="loginUser()"]'
+                );
+
+
+            if(button){
+
+                button.disabled =
+                    false;
+
+            }
+
+
+            /*
+             * Firebase est vérifié derrière,
+             * sans bloquer l'affichage.
+             */
+
+            db.ref(
+                "loginIndex/" +
+                phone
+            )
+            .once("value")
+            .then(function(snapshot){
+
+                if(
+                    snapshot.exists() &&
+                    snapshot.val().email
+                ){
+
+                    cachedUser.email =
+                        snapshot.val().email;
+
+
+                    window.loginUserData =
+                        cachedUser;
+
+
+                    localStorage.setItem(
+
+                        "masomoUserData_" +
+                        phone,
+
+                        JSON.stringify(
+                            cachedUser
+                        )
+
+                    );
+
+                }
+
+            })
+            .catch(function(error){
+
+                console.warn(
+                    "Synchronisation loginIndex :",
+                    error
+                );
+
+            });
+
+
+            return;
+
+        }
+
+
+        // ====================================================
+        // 3. PREMIÈRE CONNEXION
+        // ICI SEULEMENT : INTERROGER FIREBASE
+        // ====================================================
+
+        showLoader();
+
+
+        let snapshot =
+            await db.ref(
+                "loginIndex/" +
+                phone
+            ).once("value");
+
+
+        hideLoader();
+
+
+        if(!snapshot.exists()){
+
+            window.loginUserData =
+                null;
+
+
+            alert(
+                "Aucun compte trouvé avec ce numéro."
+            );
+
+            return;
+
+        }
+
+
+        let loginData =
+            snapshot.val() || {};
+
+
+        if(!loginData.email){
+
+            alert(
+                "Ce compte n'est pas encore activé."
+            );
+
+            return;
+
+        }
+
+
+        window.loginUserData = {
+
+            phone:
+                phone,
+
+            email:
+                loginData.email
+
+        };
+
+
+        /*
+         * Sauvegarder immédiatement
+         * pour les prochaines connexions.
+         */
+
+        try{
+
+            localStorage.setItem(
+
+                "masomoUserData_" +
+                phone,
+
+                JSON.stringify(
+                    window.loginUserData
+                )
+
+            );
+
+        }
+        catch(e){
+
+            console.warn(
+                "Impossible de sauvegarder le cache."
+            );
+
+        }
+
+
+        let status =
+            document.getElementById(
+                "loginStatus"
+            );
+
+
+        if(status){
+
+            status.innerHTML =
+                "✓ Numéro valide";
+
+            status.style.color =
+                "green";
+
+        }
+
+
+        let password =
+            document.getElementById(
+                "loginPassword"
+            );
+
+
+        if(password){
+
+            password.disabled =
+                false;
+
+        }
+
+
+        let button =
+            document.querySelector(
+                'button[onclick="loginUser()"]'
+            );
+
+
+        if(button){
+
+            button.disabled =
+                false;
+
+        }
+
+    }
+    catch(error){
+
+        hideLoader();
+
+        console.error(
+            "Erreur checkPhone :",
+            error
+        );
+
+        alert(
+            error.message ||
+            "Impossible de vérifier le numéro."
+        );
+
+    }
+
+}
+
+// ============================================================
+// CONNEXION UTILISATEUR
+// Utilise le profil en cache immédiatement après Auth
+// puis synchronise Firebase en arrière-plan
+// ============================================================
+
+async function loginUser(){
+
+    let passwordElement =
+        document.getElementById(
+            "loginPassword"
+        );
+
+
+    let password =
+        passwordElement
+        ? passwordElement.value.trim()
+        : "";
+
+
+    if(!password){
+
+        alert(
+            "Veuillez entrer votre mot de passe."
+        );
+
+        return;
+
+    }
+
+
+    let login =
+        window.loginUserData;
+
+
+    if(!login){
+
+        alert(
+            "Utilisateur introuvable."
+        );
+
+        return;
+
+    }
+
+
+    if(!login.email){
+
+        alert(
+            "Ce compte n'est pas encore activé."
+        );
+
+        return;
+
+    }
+
+
+    let phone =
+        normalizePhone(
+            window.currentPhone ||
+            login.phone ||
+            ""
+        );
+
+
+    if(!phone){
+
+        alert(
+            "Numéro de téléphone introuvable."
+        );
+
+        return;
+
+    }
+
+
+    showLoader();
+
+
+    try{
+
+        // ====================================================
+        // 1. AUTHENTIFICATION FIREBASE
+        // ====================================================
+
+        await auth.signInWithEmailAndPassword(
+
+            login.email,
+
+            password
+
+        );
+
+
+        let uid =
+            auth.currentUser.uid;
+
+
+        // ====================================================
+        // 2. CHERCHER LE PROFIL DANS LE CACHE
+        // ====================================================
+
+        let cachedUser = null;
+
+
+        try{
+
+            if(
+                typeof getCachedUser ===
+                "function"
+            ){
+
+                cachedUser =
+                    getCachedUser(phone);
+
+            }
+
+        }
+        catch(e){
+
+            console.warn(
+                "Lecture cache impossible :",
+                e
+            );
+
+        }
+
+
+        if(!cachedUser){
+
+            try{
+
+                let localData =
+                    localStorage.getItem(
+
+                        "masomoUserData_" +
+                        phone
+
+                    );
+
+
+                if(localData){
+
+                    cachedUser =
+                        JSON.parse(
+                            localData
+                        );
+
+                }
+
+            }
+            catch(e){
+
+                console.warn(
+                    "Cache invalide."
+                );
+
+            }
+
+        }
+
+
+        // ====================================================
+        // 3. SI LE PROFIL EST EN CACHE
+        // OUVRIR IMMÉDIATEMENT L'ESPACE
+        // ====================================================
+
+        if(
+            cachedUser &&
+            cachedUser.role
+        ){
+
+            let user =
+                Object.assign(
+                    {},
+                    cachedUser
+                );
+
+
+            user.phone =
+                phone;
+
+
+            user.uid =
+                uid;
+
+
+            /*
+             * Variables globales immédiatement
+             */
+
+            window.currentPhone =
+                phone;
+
+            window.currentRole =
+                user.role;
+
+            window.currentTeacherClass =
+                user.classe || "";
+
+            window.currentSchoolId =
+                user.schoolId || "";
+
+
+            saveSession(
+                phone
+            );
+
+
+            /*
+             * Mettre le nouveau UID
+             * dans le cache.
+             */
+
+            try{
+
+                localStorage.setItem(
+
+                    "masomoUserData_" +
+                    phone,
+
+                    JSON.stringify(
+                        user
+                    )
+
+                );
+
+            }
+            catch(e){}
+
+
+            hideLoader();
+
+
+            // =================================================
+            // OUVERTURE IMMÉDIATE
+            // =================================================
+
+            if(
+                user.role ===
+                "superadmin" ||
+
+                normalizePhone(
+                    phone
+                ) ===
+                normalizePhone(
+                    "243994044329"
+                )
+            ){
+
+                openControleMasomo();
+
+            }
+
+            else if(
+                user.role ===
+                "admin"
+            ){
+
+                openAdmin();
+
+            }
+
+            else if(
+                user.role ===
+                "teacher"
+            ){
+
+                openTeacher();
+
+            }
+
+            else if(
+                user.role ===
+                "parent"
+            ){
+
+                openParent();
+
+            }
+
+            else if(
+                user.role ===
+                "student"
+            ){
+
+                openStudent();
+
+            }
+
+            else if(
+                user.role ===
+                "cashier"
+            ){
+
+                if(
+                    typeof openCashier ===
+                    "function"
+                ){
+
+                    openCashier();
+
+                }
+
+                else if(
+                    typeof openCaissier ===
+                    "function"
+                ){
+
+                    openCaissier();
+
+                }
+
+            }
+
+            else if(
+                user.role ===
+                "responsable"
+            ){
+
+                if(
+                    typeof ouvrirEspaceResponsable ===
+                    "function"
+                ){
+
+                    ouvrirEspaceResponsable();
+
+                }
+
+            }
+
+            else{
+
+                alert(
+                    "Type de compte inconnu."
+                );
+
+            }
+
+
+            // =================================================
+            // 4. SYNCHRONISATION FIREBASE EN ARRIÈRE-PLAN
+            // =================================================
+
+            db.ref(
+                "users/" +
+                phone
+            )
+            .once("value")
+            .then(function(snapshot){
+
+                if(!snapshot.exists()){
+
+                    console.warn(
+                        "Profil Firebase introuvable."
+                    );
+
+                    return;
+
+                }
+
+
+                let firebaseUser =
+                    snapshot.val() || {};
+
+
+                firebaseUser.uid =
+                    uid;
+
+
+                window.loginUserData =
+                    firebaseUser;
+
+
+                /*
+                 * Mettre à jour le cache
+                 */
+
+                try{
+
+                    localStorage.setItem(
+
+                        "masomoUserData_" +
+                        phone,
+
+                        JSON.stringify(
+                            firebaseUser
+                        )
+
+                    );
+
+                }
+                catch(e){}
+
+
+                /*
+                 * Mettre à jour le UID
+                 */
+
+                return db.ref(
+                    "users/" +
+                    phone
+                )
+                .update({
+
+                    uid:
+                        uid
+
+                });
+
+            })
+            .catch(function(error){
+
+                console.warn(
+                    "Synchronisation utilisateur :",
+                    error
+                );
+
+            });
+
+
+            return;
+
+        }
+
+
+        // ====================================================
+        // 5. PAS DE CACHE
+        // PREMIÈRE CONNEXION / ANCIEN APPAREIL
+        // ====================================================
+
+        let userSnap =
+            await db.ref(
+                "users/" +
+                phone
+            ).once("value");
+
+
+        if(!userSnap.exists()){
+
+            throw new Error(
+                "Compte introuvable."
+            );
+
+        }
+
+
+        let user =
+            userSnap.val();
+
+
+        user.uid =
+            uid;
+
+
+        if(!user.role){
+
+            throw new Error(
+                "Type de compte inconnu."
+            );
+
+        }
+
+
+        /*
+         * Sauvegarder le profil localement
+         */
+
+        try{
+
+            localStorage.setItem(
+
+                "masomoUserData_" +
+                phone,
+
+                JSON.stringify(
+                    user
+                )
+
+            );
+
+        }
+        catch(e){}
+
+
+        /*
+         * Sauvegarder UID
+         */
+
+        let updates = [];
+
+
+        updates.push(
+
+            db.ref(
+                "users/" +
+                phone
+            )
+            .update({
+
+                uid:
+                    uid
+
+            })
+
+        );
+
+
+        /*
+         * UserIndex pour tous sauf superadmin
+         */
+
+        if(
+            user.role !=
+            "superadmin"
+        ){
+
             updates.push(
 
-                db.ref("users/"+login.phone).update({
+                db.ref(
+                    "userIndex/" +
+                    uid
+                )
+                .set({
 
-                    uid: uid
+                    phone:
+                        user.phone ||
+                        phone,
+
+                    schoolId:
+                        user.schoolId ||
+                        "",
+
+                    role:
+                        user.role ||
+                        ""
 
                 })
 
             );
 
-            // Tous sauf le superadmin utilisent userIndex
-            if(user.role != "superadmin"){
+        }
 
-                let indexData = {
 
-                    phone: user.phone || login.phone,
-                    schoolId: user.schoolId || "",
-                    role: user.role || ""
+        await Promise.all(
+            updates
+        );
 
-                };
-
-                updates.push(
-
-                    db.ref("userIndex/"+uid).set(indexData)
-
-                );
-
-            }
-
-            return Promise.all(updates)
-
-            .then(()=>user);
-
-        });
-
-    })
-
-    .then(user=>{
 
         hideLoader();
 
-        continuerConnexion(user);
 
-    })
+        /*
+         * Première connexion :
+         * utiliser le système existant.
+         */
 
-    .catch(error=>{
+        continuerConnexion(
+            user
+        );
+
+
+    }
+    catch(error){
 
         hideLoader();
 
-        console.error(error);
+        console.error(
+            "Erreur connexion :",
+            error
+        );
 
-        switch(error.code){
+
+        switch(
+            error.code
+        ){
 
             case "auth/wrong-password":
+
             case "auth/invalid-credential":
 
-                alert("Mot de passe incorrect.");
+                alert(
+                    "Mot de passe incorrect."
+                );
 
                 break;
+
 
             case "auth/user-not-found":
 
-                alert("Compte introuvable.");
+                alert(
+                    "Compte introuvable."
+                );
 
                 break;
+
 
             case "auth/invalid-email":
 
-                alert("Adresse e-mail invalide.");
+                alert(
+                    "Adresse e-mail invalide."
+                );
 
                 break;
+
 
             case "auth/too-many-requests":
 
-                alert("Trop de tentatives. Réessayez plus tard.");
+                alert(
+                    "Trop de tentatives. Réessayez plus tard."
+                );
 
                 break;
 
+
+            case "auth/network-request-failed":
+
+                alert(
+                    "Connexion Internet indisponible."
+                );
+
+                break;
+
+
             default:
 
-                alert(error.message || "Connexion impossible.");
+                alert(
+
+                    error.message ||
+                    "Connexion impossible."
+
+                );
 
         }
 
-    });
+    }
 
 }
+
 
 /*
  * ==========================================
@@ -2398,8 +3077,9 @@ function continuerConnexion(user){
 
 
     saveSession(
-        window.currentPhone
-    );
+    window.currentPhone,
+    user
+);
 
 
     // ========================================================
@@ -2418,78 +3098,241 @@ function continuerConnexion(user){
     }
 
 
-    // ========================================================
-    // ADMIN
-    // ========================================================
+// ========================================================
+// ADMIN
+// Ouverture rapide avec les données déjà chargées
+// Synchronisation de l'école sans double lecture inutile
+// ========================================================
 
-    if(user.role == "admin"){
+if(user.role == "admin"){
 
-        if(!user.schoolId){
+    if(!user.schoolId){
 
-            alert(
-                "Aucune école associée à ce compte."
-            );
-
-            return;
-        }
-
-
-        showLoader();
-
-
-        db.ref(
-            "schools/" +
-            user.schoolId
-        )
-        .once("value")
-        .then(function(snapshot){
-
-            hideLoader();
-
-
-            if(!snapshot.exists()){
-
-                alert(
-                    "École introuvable."
-                );
-
-                return;
-            }
-
-
-            const school =
-                snapshot.val();
-
-
-            if(
-                school.status == "active" &&
-                school.paymentStatus == "paid"
-            ){
-
-                openAdmin();
-
-                return;
-            }
-
-
-            afficherEcoleEnAttente(
-                school
-            );
-
-        })
-        .catch(function(error){
-
-            hideLoader();
-
-            alert(
-                error.message ||
-                "Impossible de charger l'école."
-            );
-
-        });
+        alert(
+            "Aucune école associée à ce compte."
+        );
 
         return;
     }
+
+
+    /*
+     * Vérifier d'abord si l'école est déjà
+     * disponible dans le cache local.
+     */
+
+    var adminCacheKey =
+        "adminData_" +
+        user.schoolId;
+
+
+    var adminCache = null;
+
+
+    try{
+
+        var cacheData =
+            localStorage.getItem(
+                adminCacheKey
+            );
+
+
+        if(cacheData){
+
+            adminCache =
+                JSON.parse(
+                    cacheData
+                );
+
+        }
+
+    }
+    catch(error){
+
+        console.warn(
+            "Cache administrateur invalide :",
+            error
+        );
+
+        adminCache = null;
+
+    }
+
+
+    /*
+     * ========================================================
+     * CACHE DISPONIBLE
+     * ========================================================
+     *
+     * On ouvre immédiatement l'espace.
+     * Firebase sera vérifié en arrière-plan.
+     */
+
+    if(
+        adminCache &&
+        adminCache.school
+    ){
+
+        var cachedSchool =
+            adminCache.school;
+
+
+        /*
+         * Vérification locale de l'état
+         */
+
+        if(
+            cachedSchool.status == "active" &&
+            cachedSchool.paymentStatus == "paid"
+        ){
+
+            openAdmin(
+                user
+            );
+
+
+            /*
+             * Actualisation silencieuse
+             */
+
+            synchroniserAdminArrierePlan(
+                user.schoolId,
+                user.phone
+            );
+
+
+            return;
+
+        }
+
+    }
+
+
+    /*
+     * ========================================================
+     * PREMIÈRE CONNEXION OU CACHE ABSENT
+     * ========================================================
+     */
+
+    showLoader();
+
+
+    db.ref(
+        "schools/" +
+        user.schoolId
+    )
+    .once("value")
+
+    .then(function(snapshot){
+
+        if(!snapshot.exists()){
+
+            hideLoader();
+
+
+            alert(
+                "École introuvable."
+            );
+
+
+            return;
+
+        }
+
+
+        var school =
+            snapshot.val() || {};
+
+
+        /*
+         * Sauvegarder l'école dans le cache
+         * pour les prochaines ouvertures.
+         */
+
+        try{
+
+            localStorage.setItem(
+
+                adminCacheKey,
+
+                JSON.stringify({
+
+                    school:
+                        school,
+
+                    schoolId:
+                        user.schoolId,
+
+                    phone:
+                        user.phone
+
+                })
+
+            );
+
+        }
+        catch(error){
+
+            console.warn(
+                "Impossible de sauvegarder le cache admin :",
+                error
+            );
+
+        }
+
+
+        /*
+         * Vérifier l'état réel de l'école
+         */
+
+        if(
+            school.status == "active" &&
+            school.paymentStatus == "paid"
+        ){
+
+            hideLoader();
+
+
+            openAdmin(
+                user
+            );
+
+
+            return;
+
+        }
+
+
+        hideLoader();
+
+
+        afficherEcoleEnAttente(
+            school
+        );
+
+    })
+
+    .catch(function(error){
+
+        hideLoader();
+
+
+        console.error(
+            "Erreur chargement école admin :",
+            error
+        );
+
+
+        alert(
+            error.message ||
+            "Impossible de charger l'école."
+        );
+
+    });
+
+
+    return;
+}
 
 
     // ========================================================
@@ -6170,127 +7013,414 @@ catch(error){
 
 }
 
-// ================= DASHBOARD ADMIN =================
+// ============================================================
+// ESPACE ADMINISTRATEUR
+// Utilise le cache en priorité puis synchronise Firebase
+// ============================================================
 
-function openAdmin(){
+function openAdmin(user){
 
-    window.currentRole = "admin";
+    window.currentRole =
+        "admin";
 
-    let phone = window.currentPhone;
+
+    /*
+     * Si l'utilisateur n'est pas fourni,
+     * récupérer le profil depuis le cache.
+     */
+
+    if(!user){
+
+        user =
+            getCachedUser(
+                window.currentPhone
+            );
+
+    }
+
+
+    if(!user){
+
+        alert(
+            "Utilisateur introuvable."
+        );
+
+        return;
+
+    }
+
+
+    var phone =
+        normalizePhone(
+            user.phone ||
+            window.currentPhone
+        );
+
+
+    var schoolId =
+        user.schoolId ||
+        window.currentSchoolId;
+
+
+    if(!schoolId){
+
+        alert(
+            "École introuvable pour ce compte."
+        );
+
+        return;
+
+    }
+
+
+    window.currentPhone =
+        phone;
+
+
+    window.currentSchoolId =
+        schoolId;
+
+
+    /*
+     * ========================================================
+     * CACHE ÉCOLE
+     * ========================================================
+     */
+
+    var cacheKey =
+        "adminData_" +
+        schoolId;
+
+
+    var cache = null;
+
+
+    try{
+
+        cache =
+            localStorage.getItem(
+                cacheKey
+            );
+
+    }
+    catch(error){
+
+        cache = null;
+
+    }
+
+
+    /*
+     * ========================================================
+     * OUVERTURE IMMÉDIATE SI CACHE DISPONIBLE
+     * ========================================================
+     */
+
+    if(cache){
+
+        try{
+
+            var data =
+                JSON.parse(
+                    cache
+                );
+
+
+            if(
+                data &&
+                data.school
+            ){
+
+                window.adminCache =
+                    data.school;
+
+
+                /*
+                 * Affichage immédiat
+                 */
+
+                if(
+                    verifierEssai(
+                        data.school
+                    )
+                ){
+
+                    afficherAdmin(
+                        data.school
+                    );
+
+
+                    surveillerEssai();
+
+
+                    /*
+                     * Firebase sera actualisé
+                     * en arrière-plan.
+                     */
+
+                    actualiserAdmin(
+                        true
+                    );
+
+                }
+
+
+                /*
+                 * Ne pas attendre Firebase
+                 */
+
+                synchroniserAdminArrierePlan(
+                    schoolId,
+                    phone
+                );
+
+
+                return;
+
+            }
+
+        }
+        catch(error){
+
+            console.warn(
+                "Cache admin invalide :",
+                error
+            );
+
+        }
+
+    }
+
+
+    /*
+     * ========================================================
+     * PREMIÈRE CONNEXION
+     * Pas encore de cache.
+     * Firebase est nécessaire une seule fois.
+     * ========================================================
+     */
 
     showLoader();
 
-    db.ref("users/"+phone)
+
+    db.ref(
+        "schools/" +
+        schoolId
+    )
     .once("value")
-    .then(userSnap=>{
 
-        let user = userSnap.val();
-
-        if(!user){
-
-            hideLoader();
-
-            alert("Utilisateur introuvable.");
-
-            return;
-
-        }
-
-        window.currentSchoolId = user.schoolId;
-
-        // Cache propre à cette école
-        let cacheKey = "adminData_" + user.schoolId;
-
-        let cache = localStorage.getItem(cacheKey);
-
-        if(cache){
-
-            let data = JSON.parse(cache);
-
-            window.adminCache = data.school;
-
-hideLoader();
-
-if(verifierEssai(data.school)){
-
-    afficherAdmin(data.school);
-
-    surveillerEssai();
-
-    actualiserAdmin(true);
-
-}
-
-return Promise.reject("CACHE");
-}
-
-        // Aucun cache : télécharger depuis Firebase
-        return db.ref(
-            "schools/"+user.schoolId
-        ).once("value");
-
-    })
-    .then(snapshot=>{
+    .then(function(snapshot){
 
         if(!snapshot.exists()){
 
-            hideLoader();
+            throw new Error(
+                "École introuvable."
+            );
 
-            alert("École introuvable.");
+        }
+
+
+        var school =
+            snapshot.val() || {};
+
+
+        if(
+            !verifierEssai(
+                school
+            )
+        ){
 
             return;
 
         }
 
-        let school = snapshot.val();
-        
-        if(!verifierEssai(school)){
 
-    hideLoader();
+        window.adminCache =
+            school;
 
-    return;
 
-}
+        /*
+         * Sauvegarder immédiatement
+         * pour les prochaines ouvertures.
+         */
 
-        window.adminCache = school;
+        try{
 
-        let data = {
+            localStorage.setItem(
 
-            school:school,
+                cacheKey,
 
-            schoolId:window.currentSchoolId,
+                JSON.stringify({
 
-            phone:phone
+                    school:
+                        school,
 
-        };
+                    schoolId:
+                        schoolId,
 
-        // Sauvegarde du cache de cette école
-        localStorage.setItem(
+                    phone:
+                        phone
 
-            "adminData_"+window.currentSchoolId,
+                })
 
-            JSON.stringify(data)
+            );
 
-        );
+        }
+        catch(error){
+
+            console.warn(
+                "Impossible de sauvegarder le cache école :",
+                error
+            );
+
+        }
+
 
         hideLoader();
 
-        afficherAdmin(school);
-        
+
+        afficherAdmin(
+            school
+        );
+
+
         surveillerEssai();
 
     })
-    .catch(error=>{
 
-        if(error==="CACHE") return;
+    .catch(function(error){
 
         hideLoader();
 
-        alert(error.message || error);
+
+        console.error(
+            "Erreur ouverture admin :",
+            error
+        );
+
+
+        alert(
+            error.message ||
+            "Impossible de charger l'école."
+        );
 
     });
 
 }
+
+// ============================================================
+// SYNCHRONISER L'ADMIN EN ARRIÈRE-PLAN
+// Ne bloque jamais l'affichage déjà ouvert
+// ============================================================
+
+function synchroniserAdminArrierePlan(
+    schoolId,
+    phone
+){
+
+    if(!schoolId){
+
+        return;
+
+    }
+
+
+    db.ref(
+        "schools/" +
+        schoolId
+    )
+    .once("value")
+
+    .then(function(snapshot){
+
+        if(!snapshot.exists()){
+
+            return;
+
+        }
+
+
+        var school =
+            snapshot.val() || {};
+
+
+        window.adminCache =
+            school;
+
+
+        try{
+
+            localStorage.setItem(
+
+                "adminData_" +
+                schoolId,
+
+                JSON.stringify({
+
+                    school:
+                        school,
+
+                    schoolId:
+                        schoolId,
+
+                    phone:
+                        phone
+
+                })
+
+            );
+
+        }
+        catch(error){
+
+            console.warn(
+                "Mise à jour cache admin :",
+                error
+            );
+
+        }
+
+
+        /*
+         * Actualiser silencieusement
+         * les données déjà affichées.
+         */
+
+        try{
+
+            actualiserAdmin(
+                true
+            );
+
+        }
+        catch(error){
+
+            console.warn(
+                "Actualisation admin :",
+                error
+            );
+
+        }
+
+    })
+
+    .catch(function(error){
+
+        /*
+         * Aucune alerte.
+         * L'utilisateur continue à travailler
+         * avec les données du cache.
+         */
+
+        console.warn(
+            "Synchronisation arrière-plan :",
+            error
+        );
+
+    });
+
+}
+
 
 function afficherAdmin(school){
 
@@ -7693,133 +8823,248 @@ function chargerListeClasses(){
 
 }
 
-// ================= FICHES ENSEIGNANTS =================
+// ============================================================
+// FICHES ENSEIGNANTS
+// Affichage compact et compatible WebView / Tecno
+// ============================================================
 
 function teacherRecords(){
 
-showLoader();
+    showLoader();
 
-db.ref(
-  "schools/" +
-  window.currentSchoolId +
-  "/teachers"
-)
+    db.ref(
+        "schools/" +
+        window.currentSchoolId +
+        "/teachers"
+    )
+    .once("value")
 
-.once("value")
+    .then(snapshot=>{
 
-.then(snapshot=>{
+        let html = `
 
-let html=`
+            <div style="
+                width:100%;
+                box-sizing:border-box;
+            ">
 
-<h2 style="
-text-align:center;
-color:#1f4cff;
-">
+                <h2 style="
+                    text-align:center;
+                    color:#1f4cff;
+                    margin:5px 0 15px 0;
+                    font-size:24px;
+                ">
+                    Fiches enseignants
+                </h2>
 
-Fiches enseignants
 
-</h2>
+                <button
+                    onclick="openAddTeacher()"
+                    style="
+                        width:100%;
+                        box-sizing:border-box;
+                        padding:12px;
+                        margin:0 0 12px 0;
+                        border:none;
+                        border-radius:12px;
+                        background:#1f4cff;
+                        color:white;
+                        font-size:15px;
+                        font-weight:bold;
+                    "
+                >
+                    ➕ Ajouter enseignant
+                </button>
 
-<button
-onclick="openAddTeacher()"
->
 
-➕ Ajouter enseignant
+                <div style="
+                    display:flex;
+                    flex-direction:column;
+                    gap:8px;
+                    margin:0;
+                    padding:0;
+                ">
 
-</button>
+        `;
 
-<div style="
-display:flex;
-flex-direction:column;
-gap:10px;
-margin-top:15px;
-">
 
-`;
+        // =====================================================
+        // AUCUN ENSEIGNANT
+        // =====================================================
 
-if(!snapshot.exists()){
+        if(!snapshot.exists()){
 
-html+=`
+            html += `
 
-<div style="
-text-align:center;
-padding:20px;
-color:gray;
-">
+                <div style="
+                    text-align:center;
+                    padding:15px;
+                    color:#777;
+                    background:#f8f9ff;
+                    border-radius:12px;
+                    font-size:14px;
+                ">
+                    Aucun enseignant
+                </div>
 
-Aucun enseignant
+            `;
 
-</div>
+        }
 
-`;
 
-}
+        // =====================================================
+        // LISTE DES ENSEIGNANTS
+        // =====================================================
 
-snapshot.forEach(item=>{
+        else{
 
-let data=item.val();
+            snapshot.forEach(item=>{
 
-html+=`
+                let data =
+                    item.val() || {};
 
-<div style="
-background:white;
-padding:15px;
-border-radius:15px;
-box-shadow:
-0 4px 10px rgba(0,0,0,.08);
-">
 
-<b>
+                let nom =
+                    data.name ||
+                    "Enseignant";
 
-${data.name}
 
-</b>
+                let matiere =
+                    data.matiere ||
+                    "-";
 
-<br>
 
-📘 ${data.matiere||"-"}
+                let matricule =
+                    data.matricule ||
+                    "-";
 
-<br>
 
-🆔 ${data.matricule}
+                html += `
 
-<br><br>
+                    <div style="
+                        background:white;
+                        padding:12px;
+                        border-radius:14px;
+                        box-shadow:0 3px 8px rgba(0,0,0,.08);
+                        box-sizing:border-box;
+                        width:100%;
+                        margin:0;
+                    ">
 
-<button
-onclick="viewTeacher('${data.matricule}')"
->
 
-Voir
+                        <div style="
+                            font-weight:bold;
+                            font-size:15px;
+                            line-height:1.25;
+                            color:#111;
+                            margin-bottom:4px;
+                            word-break:break-word;
+                        ">
+                            ${nom}
+                        </div>
 
-</button>
 
-</div>
+                        <div style="
+                            font-size:13px;
+                            color:#333;
+                            line-height:1.4;
+                        ">
+                            📘 ${matiere}
+                        </div>
 
-`;
 
-});
+                        <div style="
+                            font-size:13px;
+                            color:#333;
+                            line-height:1.4;
+                            margin-bottom:8px;
+                            word-break:break-word;
+                        ">
+                            🆔 ${matricule}
+                        </div>
 
-html+=`
 
-</div>
+                        <button
+                            onclick="viewTeacher('${matricule}')"
+                            style="
+                                width:100%;
+                                box-sizing:border-box;
+                                padding:9px;
+                                margin:0;
+                                border:none;
+                                border-radius:10px;
+                                background:#1f4cff;
+                                color:white;
+                                font-size:14px;
+                                font-weight:bold;
+                            "
+                        >
+                            Voir
+                        </button>
 
-<button
-onclick="openAdmin()"
->
 
-⬅ Retour
+                    </div>
 
-</button>
+                `;
 
-`;
+            });
 
-document.querySelector(
-".login-box"
-).innerHTML=html;
+        }
 
-hideLoader();
 
-});
+        html += `
+
+                </div>
+
+
+                <button
+                    onclick="openAdmin()"
+                    style="
+                        width:100%;
+                        box-sizing:border-box;
+                        padding:10px;
+                        margin:12px 0 0 0;
+                        border:none;
+                        border-radius:10px;
+                        background:#1f4cff;
+                        color:white;
+                        font-size:14px;
+                        font-weight:bold;
+                    "
+                >
+                    ⬅ Retour
+                </button>
+
+
+            </div>
+
+        `;
+
+
+        document.querySelector(
+            ".login-box"
+        ).innerHTML = html;
+
+
+        hideLoader();
+
+    })
+
+    .catch(error=>{
+
+        hideLoader();
+
+        console.error(
+            "Erreur fiches enseignants :",
+            error
+        );
+
+        alert(
+            error.message ||
+            "Impossible de charger les enseignants."
+        );
+
+    });
 
 }
 
@@ -8267,129 +9512,292 @@ hideLoader();
 
 // ================= FICHES ELEVES =================
 
+// ============================================================
+// FICHES ÉLÈVES
+// Affichage compact et adapté aux téléphones
+// ============================================================
+
 function studentRecords(){
 
     showLoader();
 
-    db.ref("schools/"+window.currentSchoolId+"/students")
+    db.ref(
+        "schools/" +
+        window.currentSchoolId +
+        "/students"
+    )
 
     .once("value")
 
     .then(snapshot=>{
 
-        let html=`
+        let html = `
 
-<h2 style="
-text-align:center;
-color:#1f4cff;
-">
+            <h2 style="
+                text-align:center;
+                color:#1f4cff;
+                margin:5px 0 15px;
+                font-size:24px;
+            ">
+                Fiches élèves
+            </h2>
 
-Fiches élèves
 
-</h2>
+            <button
+                onclick="openAddStudent()"
+                style="
+                    width:100%;
+                    box-sizing:border-box;
+                    border:none;
+                    border-radius:10px;
+                    background:#1f4cff;
+                    color:white;
+                    padding:10px 12px;
+                    font-size:15px;
+                    font-weight:500;
+                    cursor:pointer;
+                    margin-bottom:12px;
+                "
+            >
+                ➕ Ajouter élève
+            </button>
 
-<button onclick="openAddStudent()">
 
-➕ Ajouter élève
+            <div style="
+                display:flex;
+                flex-direction:column;
+                gap:8px;
+                margin-top:5px;
+                width:100%;
+                box-sizing:border-box;
+            ">
 
-</button>
+        `;
 
-<div style="
-display:flex;
-flex-direction:column;
-gap:10px;
-margin-top:15px;
-">
 
-`;
+        // =====================================================
+        // AUCUN ÉLÈVE
+        // =====================================================
 
         if(!snapshot.exists()){
 
-            html+=`
+            html += `
 
-<div style="
-text-align:center;
-padding:20px;
-color:gray;
-">
+                <div style="
+                    text-align:center;
+                    padding:15px;
+                    color:#777;
+                    font-size:14px;
+                ">
+                    Aucun élève
+                </div>
 
-Aucun élève
+            `;
 
-</div>
+        }
 
-`;
 
-        }else{
+        // =====================================================
+        // LISTE DES ÉLÈVES
+        // =====================================================
+
+        else{
 
             snapshot.forEach(item=>{
 
-                let data=item.val();
+                let data =
+                    item.val() || {};
 
-                html+=`
 
-<div style="
-background:white;
-padding:15px;
-border-radius:15px;
-box-shadow:0 4px 10px rgba(0,0,0,.08);
-display:flex;
-justify-content:space-between;
-align-items:center;
-">
+                let nom =
+                    data.name ||
+                    "Élève";
 
-<div>
 
-<b>${data.name}</b>
+                let classe =
+                    data.className ||
+                    "Classe inconnue";
 
-<br>
 
-🎓 ${data.className}
+                let matricule =
+                    data.matricule ||
+                    "";
 
-<br>
 
-🆔 ${data.matricule}
+                html += `
 
-</div>
+                    <div style="
+                        width:100%;
+                        box-sizing:border-box;
+                        background:white;
+                        padding:10px 12px;
+                        border-radius:12px;
+                        box-shadow:0 2px 8px rgba(0,0,0,.06);
 
-<button onclick="viewStudent('${data.matricule}')">
+                        display:flex;
+                        align-items:center;
+                        gap:10px;
 
-Voir
+                        min-height:70px;
+                    ">
 
-</button>
 
-</div>
+                        <!-- INFORMATIONS ÉLÈVE -->
 
-`;
+                        <div style="
+                            flex:1;
+                            min-width:0;
+                            overflow:hidden;
+                            line-height:1.35;
+                        ">
+
+                            <div style="
+                                font-size:15px;
+                                font-weight:bold;
+                                color:#111;
+                                white-space:normal;
+                                overflow-wrap:anywhere;
+                            ">
+                                ${nom}
+                            </div>
+
+
+                            <div style="
+                                margin-top:2px;
+                                font-size:13px;
+                                color:#333;
+                            ">
+                                🎓 ${classe}
+                            </div>
+
+
+                            <div style="
+                                margin-top:2px;
+                                font-size:12px;
+                                color:#555;
+                                overflow-wrap:anywhere;
+                            ">
+                                🆔 ${matricule}
+                            </div>
+
+                        </div>
+
+
+                        <!-- BOUTON VOIR -->
+
+                        <button
+                            onclick="viewStudent('${matricule}')"
+                            style="
+                                flex:0 0 82px;
+                                width:82px;
+                                height:38px;
+
+                                padding:0;
+                                margin:0;
+
+                                border:none;
+                                border-radius:9px;
+
+                                background:#1f4cff;
+                                color:white;
+
+                                font-size:13px;
+                                font-weight:500;
+
+                                cursor:pointer;
+
+                                display:flex;
+                                align-items:center;
+                                justify-content:center;
+                            "
+                        >
+                            Voir
+                        </button>
+
+
+                    </div>
+
+                `;
 
             });
 
         }
 
-        html+=`
 
-</div>
+        html += `
 
-<button
-onclick="openAdmin()"
-style="margin-top:15px;">
+            </div>
 
-⬅ Retour
 
-</button>
+            <!-- RETOUR -->
 
-`;
+            <button
+                onclick="openAdmin()"
+                style="
+                    width:100%;
+                    box-sizing:border-box;
 
-        document.querySelector(".login-box").innerHTML=html;
+                    margin-top:12px;
+
+                    padding:9px 12px;
+
+                    border:1px solid #ddd;
+                    border-radius:9px;
+
+                    background:#f5f5f5;
+                    color:#333;
+
+                    font-size:13px;
+                    cursor:pointer;
+                "
+            >
+                ⬅ Retour
+            </button>
+
+        `;
+
+
+        const zone =
+            document.querySelector(
+                ".login-box"
+            );
+
+
+        if(!zone){
+
+            hideLoader();
+
+            alert(
+                "Zone d'affichage introuvable."
+            );
+
+            return;
+
+        }
+
+
+        zone.innerHTML =
+            html;
+
 
         hideLoader();
 
     })
 
+
     .catch(error=>{
 
         hideLoader();
 
-        alert(error.message);
+        console.error(
+            "Erreur fiches élèves :",
+            error
+        );
+
+        alert(
+            error.message ||
+            "Impossible de charger les élèves."
+        );
 
     });
 
@@ -20337,186 +21745,67 @@ html+=`
 
 document.querySelector(".login-box").innerHTML=html;
 
+// Réafficher les demandes après la construction
+// complète de l'espace Contrôle MASOMO-ECOLE
+afficherDemandesResponsableMasomo();
+
 }
 
 // ============================================================
-// AFFICHER LES DEMANDES DE RESPONSABLE
-// DANS LE CONTRÔLE MASOMO-ECOLE
+// AFFICHER LES DEMANDES DE RESPONSABLE DANS MASOMO-ECOLE
+// Version simple et compatible avec l'ancien WebView
 // ============================================================
 
 function afficherDemandesResponsableMasomo(){
 
-    const demandes =
-        window.masomoResponsableRequests ||
-        {};
+    var demandes =
+        window.masomoResponsableRequests || {};
 
-
-    const demandesPending =
-        [];
-
-
-    Object.keys(demandes).forEach(
-        function(id){
-
-            const demande =
-                demandes[id];
-
-
-            if(
-                demande &&
-                demande.statut ===
-                "pending"
-            ){
-
-                demandesPending.push(
-                    demande
-                );
-
-            }
-
-        }
-    );
-
-
-    if(
-        demandesPending.length === 0
-    ){
-
-        return;
-
-    }
-
-
-    const zone =
-        document.querySelector(
-            ".login-box"
-        );
-
+    var zone =
+        document.querySelector(".login-box");
 
     if(!zone){
-
         return;
+    }
+
+
+    var ids =
+        Object.keys(demandes);
+
+    var pending = [];
+
+
+    // ========================================================
+    // RÉCUPÉRER UNIQUEMENT LES DEMANDES EN ATTENTE
+    // ========================================================
+
+    for(var i = 0; i < ids.length; i++){
+
+        var id = ids[i];
+
+        var demande =
+            demandes[id];
+
+        if(
+            demande &&
+            demande.statut === "pending"
+        ){
+
+            demande.demandeId =
+                demande.demandeId || id;
+
+            pending.push(demande);
+
+        }
 
     }
 
 
-    let html = `
+    // ========================================================
+    // SUPPRIMER L'ANCIEN BLOC
+    // ========================================================
 
-        <div style="
-            background:#fff;
-            border:2px solid #1565C0;
-            border-radius:15px;
-            padding:15px;
-            margin:15px 0;
-        ">
-
-            <h3 style="
-                text-align:center;
-                color:#1565C0;
-                margin-top:0;
-            ">
-                🔔 DEMANDES DE RESPONSABLE
-            </h3>
-
-    `;
-
-
-    demandesPending.forEach(
-        function(demande){
-
-            html += `
-
-                <div style="
-                    background:#f5f7ff;
-                    border:1px solid #dce3ff;
-                    border-radius:12px;
-                    padding:12px;
-                    margin-bottom:10px;
-                ">
-
-                    <b>
-                        👨‍💼 Demande de responsable
-                    </b>
-
-                    <br><br>
-
-                    🏫 École :
-                    <b>
-                        ${demande.schoolId}
-                    </b>
-
-                    <br>
-
-                    📞 Demandeur :
-                    ${demande.demandePar}
-
-                    <br>
-
-                    ⏳ Statut :
-                    <b style="color:#f57c00;">
-                        En attente
-                    </b>
-
-                    <br><br>
-
-                    <button
-                        onclick="
-                            accepterResponsableMasomo(
-                                '${demande.id}'
-                            )
-                        "
-                        style="
-                            width:48%;
-                            padding:10px;
-                            background:#2e7d32;
-                            color:white;
-                            border:none;
-                            border-radius:10px;
-                            font-weight:bold;
-                        "
-                    >
-                        ✅ Autoriser
-                    </button>
-
-                    <button
-                        onclick="
-                            refuserResponsableMasomo(
-                                '${demande.id}'
-                            )
-                        "
-                        style="
-                            width:48%;
-                            padding:10px;
-                            background:#c62828;
-                            color:white;
-                            border:none;
-                            border-radius:10px;
-                            font-weight:bold;
-                        "
-                    >
-                        ❌ Refuser
-                    </button>
-
-                </div>
-
-            `;
-
-        }
-    );
-
-
-    html += `
-
-        </div>
-
-    `;
-
-
-    /*
-     * Ajouter en haut du contrôle MASOMO
-     */
-
-    const ancien =
+    var ancien =
         document.getElementById(
             "demandesResponsableMasomo"
         );
@@ -20524,42 +21813,307 @@ function afficherDemandesResponsableMasomo(){
 
     if(ancien){
 
-        ancien.innerHTML =
-            html;
+        ancien.remove();
+
+    }
+
+
+    // ========================================================
+    // AUCUNE DEMANDE
+    // ========================================================
+
+    if(pending.length === 0){
 
         return;
 
     }
 
 
-    const premier =
-        zone.firstElementChild;
+    // ========================================================
+    // CRÉER LE BLOC
+    // ========================================================
 
-
-    const bloc =
-        document.createElement(
-            "div"
-        );
-
+    var bloc =
+        document.createElement("div");
 
     bloc.id =
         "demandesResponsableMasomo";
 
+    bloc.style.background =
+        "white";
 
-    bloc.innerHTML =
-        html;
+    bloc.style.border =
+        "2px solid #1565C0";
+
+    bloc.style.borderRadius =
+        "15px";
+
+    bloc.style.padding =
+        "15px";
+
+    bloc.style.margin =
+        "15px 0";
+
+    bloc.style.boxSizing =
+        "border-box";
 
 
-    if(premier){
+    var titre =
+        document.createElement("h3");
 
-        zone.insertBefore(
-            bloc,
-            premier.nextSibling
+    titre.textContent =
+        "🔔 DEMANDES DE RESPONSABLE";
+
+    titre.style.textAlign =
+        "center";
+
+    titre.style.color =
+        "#1565C0";
+
+    titre.style.margin =
+        "0 0 15px 0";
+
+
+    bloc.appendChild(titre);
+
+
+    // ========================================================
+    // CONSTRUIRE LES DEMANDES
+    // ========================================================
+
+    for(
+        var j = 0;
+        j < pending.length;
+        j++
+    ){
+
+        var d =
+            pending[j];
+
+        var demandeId =
+            String(
+                d.demandeId || ""
+            );
+
+
+        if(!demandeId){
+
+            continue;
+
+        }
+
+
+        var carte =
+            document.createElement("div");
+
+        carte.style.background =
+            "#f5f7ff";
+
+        carte.style.border =
+            "1px solid #dce3ff";
+
+        carte.style.borderRadius =
+            "12px";
+
+        carte.style.padding =
+            "12px";
+
+        carte.style.marginBottom =
+            "10px";
+
+
+        var nomEcole =
+            d.schoolName ||
+            d.schoolId ||
+            "École inconnue";
+
+
+        var demandeur =
+            d.demandeParNom ||
+            d.demandeParPhone ||
+            d.demandePar ||
+            "Inconnu";
+
+
+        var telephone =
+            d.demandeParPhone ||
+            d.demandePar ||
+            "";
+
+
+        var section =
+            d.section ||
+            "Non précisée";
+
+
+        var informations =
+            document.createElement("div");
+
+
+        informations.style.fontSize =
+            "13px";
+
+        informations.style.lineHeight =
+            "1.6";
+
+
+        informations.innerHTML =
+            "👨‍💼 <b>Demande de responsable</b><br>" +
+            "🏫 École : <b>" +
+            nomEcole +
+            "</b><br>" +
+            "🏷️ Section : <b>" +
+            section +
+            "</b><br>" +
+            "👤 Demandeur : " +
+            demandeur +
+            "<br>" +
+            "📞 Téléphone : " +
+            telephone +
+            "<br>" +
+            "⏳ Statut : <b style='color:#f57c00;'>En attente</b>";
+
+
+        carte.appendChild(
+            informations
+        );
+
+
+        // ====================================================
+        // ZONE BOUTONS
+        // ====================================================
+
+        var boutons =
+            document.createElement("div");
+
+        boutons.style.display =
+            "flex";
+
+        boutons.style.gap =
+            "8px";
+
+        boutons.style.marginTop =
+            "12px";
+
+
+        // ====================================================
+        // BOUTON AUTORISER
+        // ====================================================
+
+        var accepter =
+            document.createElement("button");
+
+        accepter.textContent =
+            "✅ Autoriser";
+
+        accepter.style.flex =
+            "1";
+
+        accepter.style.padding =
+            "10px";
+
+        accepter.style.background =
+            "#2e7d32";
+
+        accepter.style.color =
+            "white";
+
+        accepter.style.border =
+            "none";
+
+        accepter.style.borderRadius =
+            "10px";
+
+        accepter.style.fontWeight =
+            "bold";
+
+
+        accepter.onclick =
+            function(){
+
+                accepterResponsableMasomo(
+                    demandeId
+                );
+
+            };
+
+
+        // ====================================================
+        // BOUTON REFUSER
+        // ====================================================
+
+        var refuser =
+            document.createElement("button");
+
+        refuser.textContent =
+            "❌ Refuser";
+
+        refuser.style.flex =
+            "1";
+
+        refuser.style.padding =
+            "10px";
+
+        refuser.style.background =
+            "#c62828";
+
+        refuser.style.color =
+            "white";
+
+        refuser.style.border =
+            "none";
+
+        refuser.style.borderRadius =
+            "10px";
+
+        refuser.style.fontWeight =
+            "bold";
+
+
+        refuser.onclick =
+            function(){
+
+                refuserResponsableMasomo(
+                    demandeId
+                );
+
+            };
+
+
+        boutons.appendChild(
+            accepter
+        );
+
+        boutons.appendChild(
+            refuser
+        );
+
+
+        carte.appendChild(
+            boutons
+        );
+
+
+        bloc.appendChild(
+            carte
         );
 
     }
 
-    else {
+
+    // ========================================================
+    // AJOUTER LE BLOC DANS L'ESPACE MASOMO
+    // ========================================================
+
+    if(zone.firstElementChild){
+
+        zone.insertBefore(
+            bloc,
+            zone.firstElementChild.nextSibling
+        );
+
+    }
+    else{
 
         zone.appendChild(
             bloc
