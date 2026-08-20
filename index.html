@@ -1983,280 +1983,277 @@ loader.style.display=
 // ============================================================
 // VÉRIFIER LE NUMÉRO DE TÉLÉPHONE
 //
-// Ancien numéro : ouvrir directement la connexion
-// Nouveau numéro : proposer Créer une école / Rejoindre
-// Utilise le cache avant Firebase pour accélérer
+// - Conserve le modèle actuel de l'application
+// - Compte MASOMO 994044329 traité en priorité
+// - Compte existant : demande le mot de passe
+// - Nouveau numéro : affiche le page2 déjà existant
+// - Ne crée aucune nouvelle interface
 // ============================================================
 
-async function checkPhone(){
+function checkPhone(){
 
-    try{
-
-        const input =
-            document.getElementById("phone");
-
-
-        if(!input){
-
-            alert(
-                "Champ téléphone introuvable."
-            );
-
-            return;
-
-        }
+    let code =
+        document.getElementById(
+            "countryCode"
+        ).value;
 
 
-        let phone =
-            normalizePhone(
-                input.value.trim()
-            );
+    let number =
+        document.getElementById(
+            "phone"
+        ).value.trim();
 
 
-        if(!phone){
+    // ========================================================
+    // ACCÈS SUPER MASOMO
+    // IMPORTANT : AVANT TOUTE REQUÊTE FIREBASE
+    // ========================================================
 
-            alert(
-                "Veuillez entrer un numéro de téléphone."
-            );
-
-            return;
-
-        }
-
+    if(
+        number === "994044329"
+    ){
 
         window.currentPhone =
-            phone;
+            "243994044329";
 
-
-        // ====================================================
-        // 1. CHERCHER LE PROFIL DANS LE CACHE
-        // ====================================================
-
-        let cachedUser = null;
-
-
-        try{
-
-            cachedUser =
-                getCachedUser(phone);
-
-        }
-        catch(error){
-
-            console.warn(
-                "Lecture cache impossible :",
-                error
-            );
-
-        }
-
-
-        // ====================================================
-        // 2. COMPTE DÉJÀ CONNU
-        // ====================================================
-
-        if(
-            cachedUser &&
-            cachedUser.email
-        ){
-
-            window.loginUserData =
-                cachedUser;
-
-
-            afficherConnexionMotDePasse(
-                cachedUser.email
-            );
-
-
-            /*
-             * Firebase vérifie silencieusement
-             * que l'adresse du compte est toujours correcte.
-             */
-
-            db.ref(
-                "loginIndex/" +
-                phone
-            )
-            .once("value")
-            .then(function(snapshot){
-
-                if(
-                    snapshot.exists()
-                ){
-
-                    let data =
-                        snapshot.val() || {};
-
-
-                    if(
-                        data.email
-                    ){
-
-                        window.loginUserData.email =
-                            data.email;
-
-
-                        try{
-
-                            localStorage.setItem(
-
-                                "masomoUserData_" +
-                                phone,
-
-                                JSON.stringify(
-                                    window.loginUserData
-                                )
-
-                            );
-
-                        }
-                        catch(error){}
-
-                    }
-
-                }
-
-            })
-            .catch(function(error){
-
-                console.warn(
-                    "Synchronisation numéro :",
-                    error
-                );
-
-            });
-
-
-            return;
-
-        }
-
-
-        // ====================================================
-        // 3. VÉRIFIER FIREBASE
-        // ====================================================
-
-        showLoader();
-
-
-        let snapshot =
-            await db.ref(
-                "loginIndex/" +
-                phone
-            ).once("value");
-
-
-        hideLoader();
-
-
-        // ====================================================
-        // 4. NOUVEAU NUMÉRO
-        // ====================================================
-
-        if(
-            !snapshot.exists()
-        ){
-
-            window.loginUserData =
-                null;
-
-
-            /*
-             * Le numéro n'a jamais eu de compte.
-             *
-             * On ne demande PAS de mot de passe.
-             * On affiche directement :
-             *
-             * - Créer une école
-             * - Rejoindre une école
-             */
-
-            afficherChoixNouveauUtilisateur();
-
-            return;
-
-        }
-
-
-        // ====================================================
-        // 5. COMPTE EXISTANT MAIS NON ACTIVÉ
-        // ====================================================
-
-        let loginData =
-            snapshot.val() || {};
-
-
-        if(
-            !loginData.email
-        ){
-
-            alert(
-                "Ce compte n'est pas encore activé."
-            );
-
-            return;
-
-        }
-
-
-        // ====================================================
-        // 6. COMPTE EXISTANT
-        // ====================================================
 
         window.loginUserData = {
 
             phone:
-                phone,
+                "243994044329",
 
             email:
-                loginData.email
+                "controle@masomo.app",
+
+            role:
+                "superadmin"
 
         };
 
 
-        try{
-
-            localStorage.setItem(
-
-                "masomoUserData_" +
-                phone,
-
-                JSON.stringify(
-                    window.loginUserData
-                )
-
-            );
-
-        }
-        catch(error){}
+        document.getElementById(
+            "loginPassword"
+        ).style.display =
+            "block";
 
 
-        afficherConnexionMotDePasse(
-            loginData.email
+        document.getElementById(
+            "continueBtn"
+        ).innerText =
+            "Se connecter";
+
+
+        document.getElementById(
+            "continueBtn"
+        ).onclick =
+            loginUser;
+
+
+        return;
+
+    }
+
+
+    // ========================================================
+    // NORMALISER LE NUMÉRO
+    // ========================================================
+
+    let phone =
+        normalizePhone(
+            code + number
         );
 
 
-    }
-    catch(error){
+    window.currentPhone =
+        phone;
+
+
+    // ========================================================
+    // VÉRIFICATION FIREBASE
+    // ========================================================
+
+    showLoader();
+
+
+    /*
+     * Ne pas utiliser navigator.onLine
+     * car certains téléphones le détectent mal.
+     */
+
+    db.goOnline();
+
+
+    db.ref(
+        "loginIndex/" +
+        phone
+    )
+    .once("value")
+
+
+    .then(snapshot=>{
 
         hideLoader();
 
+
+        // ====================================================
+        // COMPTE EXISTANT
+        // ====================================================
+
+        if(
+            snapshot.exists()
+        ){
+
+            let login =
+                snapshot.val();
+
+
+            window.loginUserData = {
+
+                phone:
+                    phone,
+
+                email:
+                    login.email
+
+            };
+
+
+            document.getElementById(
+                "loginPassword"
+            ).style.display =
+                "block";
+
+
+            document.getElementById(
+                "continueBtn"
+            ).innerText =
+                "Se connecter";
+
+
+            document.getElementById(
+                "continueBtn"
+            ).onclick =
+                loginUser;
+
+
+            return;
+
+        }
+
+
+        // ====================================================
+        // NOUVEAU NUMÉRO
+        //
+        // IMPORTANT :
+        // On utilise TON page2 existant.
+        // On ne reconstruit pas son contenu ici.
+        // ====================================================
+
+        window.loginUserData =
+            null;
+
+
+        /*
+         * Masquer uniquement l'écran de connexion
+         * comme dans ton modèle original.
+         */
+
+        let titre =
+            document.querySelector(
+                "h1"
+            );
+
+        if(titre){
+
+            titre.style.display =
+                "none";
+
+        }
+
+
+        let description =
+            document.querySelector(
+                "p"
+            );
+
+        if(description){
+
+            description.style.display =
+                "none";
+
+        }
+
+
+        let phoneBox =
+            document.querySelector(
+                ".phone-box"
+            );
+
+        if(phoneBox){
+
+            phoneBox.style.display =
+                "none";
+
+        }
+
+
+        let continueBtn =
+            document.getElementById(
+                "continueBtn"
+            );
+
+        if(continueBtn){
+
+            continueBtn.style.display =
+                "none";
+
+        }
+
+
+        /*
+         * Afficher le page2 EXISTANT.
+         *
+         * C'est lui qui contient déjà :
+         * - Créer une école
+         * - Rejoindre une école
+         */
+
+        let page2 =
+            document.getElementById(
+                "page2"
+            );
+
+
+        if(page2){
+
+            page2.style.display =
+                "flex";
+
+        }
+
+
+    })
+
+
+    .catch(error=>{
+
+        hideLoader();
+
+
         console.error(
-            "Erreur checkPhone :",
+            "Erreur Firebase :",
             error
         );
 
 
         alert(
-            error.message ||
-            "Impossible de vérifier le numéro."
+            "Impossible de contacter le serveur.\n\n" +
+            "Vérifiez votre connexion Internet puis réessayez."
         );
 
-    }
+    });
 
 }
-
 
 // ============================================================
 // AFFICHER LE MOT DE PASSE POUR UN COMPTE EXISTANT
