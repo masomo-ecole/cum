@@ -1,11 +1,24 @@
 {
   "name": "Masomo-Ecole",
   "short_name": "Masomo",
+  "id": "/cum/",
   "description": "Application de gestion scolaire",
+
   "start_url": "/cum/",
+  "scope": "/cum/",
+
   "display": "standalone",
+  "display_override": [
+    "standalone"
+  ],
+
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+
   "background_color": "#ffffff",
   "theme_color": "#2196f3",
+
   "icons": [
     {
       "src": "icon-192.png",
