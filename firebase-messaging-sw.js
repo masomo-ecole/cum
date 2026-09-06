@@ -12,41 +12,133 @@ firebase.initializeApp({
 });
 
 var messaging = firebase.messaging();
+
 var MASOMO_URL = "https://masomo-ecole.github.io/cum/";
 var MASOMO_ICON = MASOMO_URL + "icon-192.png";
 
-messaging.setBackgroundMessageHandler(function(payload){
+
+/* =========================================================
+   NOTIFICATION EN ARRIÈRE-PLAN
+   ========================================================= */
+
+messaging.setBackgroundMessageHandler(function(payload) {
+
   console.log("Notification MASOMO reçue :", payload);
+
   var notification = payload.notification || {};
   var data = payload.data || {};
-  var title = notification.title || data.title || "MASOMO";
-  var body = notification.body || data.body || data.message || "Nouvelle notification MASOMO";
-  var url = data.url || MASOMO_URL;
+
+  var title =
+    notification.title ||
+    data.title ||
+    "MASOMO";
+
+  var body =
+    notification.body ||
+    data.body ||
+    data.message ||
+    "Nouvelle notification MASOMO";
+
+  var url =
+    data.url ||
+    MASOMO_URL;
 
   return self.registration.showNotification(title, {
+
     body: body,
-    icon: notification.icon || MASOMO_ICON,
-    badge: notification.badge || MASOMO_ICON,
-    tag: data.notificationId || ("masomo-" + Date.now()),
-    data: { url: url },
+
+    icon:
+      notification.icon ||
+      MASOMO_ICON,
+
+    badge:
+      notification.badge ||
+      MASOMO_ICON,
+
+    tag:
+      data.notificationId ||
+      ("masomo-" + Date.now()),
+
     renotify: true,
-    requireInteraction: false
+
+    requireInteraction: false,
+
+    data: {
+      url: url
+    }
   });
 });
 
-self.addEventListener("notificationclick", function(event){
+
+/* =========================================================
+   CLIC SUR LA NOTIFICATION
+   ========================================================= */
+
+self.addEventListener("notificationclick", function(event) {
+
   event.notification.close();
-  var url = (event.notification.data && event.notification.data.url) || MASOMO_URL;
+
+  var url =
+    (event.notification.data &&
+     event.notification.data.url) ||
+    MASOMO_URL;
+
 
   event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then(function(clientList){
+
+    clients.matchAll({
+      type: "window",
+      includeUncontrolled: true
+    })
+
+    .then(function(clientList) {
+
+      /*
+       * 1. Chercher une fenêtre MASOMO déjà ouverte.
+       */
+
       for (var i = 0; i < clientList.length; i++) {
+
         var client = clientList[i];
-        if (client.url.indexOf("masomo-ecole.github.io/cum") !== -1 && "focus" in client) {
-          return client.focus();
+
+        if (
+          client.url &&
+          client.url.indexOf(
+            "masomo-ecole.github.io/cum"
+          ) !== -1
+        ) {
+
+          /*
+           * Si MASOMO est déjà ouvert,
+           * on le met simplement au premier plan.
+           */
+
+          if ("focus" in client) {
+            return client.focus();
+          }
         }
       }
-      if (clients.openWindow) return clients.openWindow(url);
+
+
+      /*
+       * 2. Aucune fenêtre MASOMO actuellement ouverte.
+       *
+       * On ouvre l'URL de l'application.
+       *
+       * Si Android/Chrome reconnaît cette URL comme
+       * appartenant à la PWA installée, il peut ouvrir
+       * la PWA.
+       *
+       * Sinon, Chrome ouvre le site comme solution
+       * de secours.
+       */
+
+      if (clients.openWindow) {
+        return clients.openWindow(url);
+      }
+
     })
+
   );
+
 });
